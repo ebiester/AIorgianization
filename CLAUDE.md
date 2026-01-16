@@ -259,6 +259,14 @@ def test_add_task_with_duplicate_id_retries(temp_vault):
 
 ## Coding Conventions
 
+### Work in Small Pieces
+
+- Make incremental changes and commit frequently
+- Each commit should be a single logical unit (one feature, one fix, one refactor)
+- Prefer multiple small PRs over one large PR
+- Test each piece before moving to the next
+- If a task feels too big, break it down further
+
 ### Python Style
 
 - Python 3.12+
