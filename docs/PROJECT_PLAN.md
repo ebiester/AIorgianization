@@ -34,55 +34,78 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 
 | Item | Description | Status |
 |------|-------------|--------|
-| Vault structure | Define folder layout (Tasks/, Projects/, People/, etc.) | Done (in docs) |
-| Task file format | YAML frontmatter + markdown spec | Done (in docs) |
+| Vault structure | Define folder layout (AIO/Tasks/, Projects/, People/, Dashboard/, Archive/) | Done (in docs) |
+| Task file format | YAML frontmatter + markdown spec (with dependencies) | Done (in docs) |
+| Project file format | Links, timeline, health queries | Done (in docs) |
+| Dashboard file format | Daily note integration with Dataview queries | Done (in docs) |
 | CLI scaffold | TypeScript + Commander setup | Partial (needs rewrite) |
+| Init command | `aio init <vault-path>` creates AIO directory structure | Not Started |
 | VaultService | Locate and read Obsidian vault | Not Started |
 | TaskFileService | Parse/write task markdown files | Not Started |
 | Add command | Create task file in Inbox | Not Started |
 | List command | Query tasks by status/folder | Not Started |
 | Done command | Move task to Completed folder | Not Started |
+| Dashboard command | Generate/append dashboard to daily note | Not Started |
+| Archive commands | Archive tasks, projects, areas, people | Not Started |
+| Date-based archive | `aio archive tasks --before <date>` | Not Started |
 
 ### Verification
 
 ```bash
-aio add "Test task" -d tomorrow -P P1
-# Creates: Tasks/Inbox/2024-01-15-test-task.md
+aio init /path/to/vault
+# Creates: AIO/ directory structure with Archive/ parallel folders
+
+aio add "Test task" -d tomorrow
+# Creates: AIO/Tasks/Inbox/2024-01-15-test-task.md
 
 aio list inbox
-# Lists tasks in Tasks/Inbox/
+# Lists tasks in AIO/Tasks/Inbox/
 
 aio done "test-task"
-# Moves to Tasks/Completed/2024/01/
+# Moves to AIO/Tasks/Completed/2024/01/
+
+aio dashboard
+# Appends to daily note or creates AIO/Dashboard/2024-01-15.md
+
+aio archive tasks --before 2024-01-01
+# Moves old completed tasks to AIO/Archive/Tasks/
 ```
 
 ---
 
 ## Phase 2: Obsidian Plugin Core
 
-**Objective:** Build Obsidian plugin with task views and commands.
+**Objective:** Build Obsidian plugin with task views, commands, and dependency management.
 
 ### Deliverables
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| Plugin scaffold | manifest.json, main.ts, esbuild | P0 |
-| Settings tab | Configure folder paths | P0 |
-| Task list view | Custom pane showing tasks | P0 |
-| Quick add modal | Command palette task entry | P0 |
-| Task edit modal | Edit frontmatter fields | P0 |
-| Status commands | Complete, start, defer, wait | P0 |
-| Right-click menu | Context actions on tasks | P1 |
-| Inbox view | Process items one-by-one | P1 |
-| Waiting-for view | Grouped by person | P1 |
+| Item | Description | Status |
+|------|-------------|--------|
+| Plugin scaffold | manifest.json, main.ts, esbuild | Not Started |
+| Settings tab | Configure folder paths | Not Started |
+| Task list view | Custom pane showing tasks | Not Started |
+| Quick add modal | Command palette task entry | Not Started |
+| Task edit modal | Edit frontmatter fields | Not Started |
+| Status commands | Complete, start, defer, wait | Not Started |
+| Right-click menu | Context actions on tasks | Not Started |
+| Inbox view | Process items one-by-one | Not Started |
+| Waiting-for view | Grouped by person | Not Started |
+| Dependency management | Link tasks as blockedBy/blocks | Not Started |
+| Dependency visualization | Show blocked tasks and blockers in views | Not Started |
+| Blocked view | Tasks waiting on dependencies | Not Started |
+| Location linking | Connect task to file path, line number, or URL | Not Started |
+| Location navigation | Click to open file/URL from task view | Not Started |
+| Subtask progress | Track and display subtask completion (e.g., "3/5") | Not Started |
 
 ### Verification
 
 - Open Obsidian with plugin enabled
 - Cmd+P → "AIo: Add task" → modal opens
-- Create task → file appears in Tasks/Inbox/
+- Create task → file appears in AIO/Tasks/Inbox/
 - Open task list view → task visible
 - Right-click → Complete → file moves to Completed/
+- Link task as blocked by another → shows in Blocked view
+- Complete blocking task → blocked task no longer shows blockers
 
 ---
 
@@ -200,5 +223,6 @@ The existing CLI code needs rewriting to use VaultService instead of Drizzle.
 1. [ ] Rewrite CLI to use markdown files instead of SQLite
 2. [ ] Implement VaultService (find vault, read files)
 3. [ ] Implement TaskFileService (parse/write frontmatter)
-4. [ ] Test add/list/done with real vault
-5. [ ] Begin Obsidian plugin scaffold
+4. [ ] Implement DashboardService (generate daily dashboard)
+5. [ ] Test add/list/done/dashboard with real vault
+6. [ ] Begin Obsidian plugin scaffold

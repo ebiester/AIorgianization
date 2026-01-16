@@ -50,23 +50,26 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Quick add | `aio add "Task" -d tomorrow -P P1` | Done |
-| Task listing | Filter by status, project, context, due date | Done |
+| Vault init | `aio init <vault-path>` creates AIO directory structure | Planned |
+| Quick add | `aio add "Task" -d tomorrow` | Done |
+| Task listing | Filter by status, project, due date | Done |
 | Status transitions | inbox → next_action → in_progress → completed | Done |
 | Waiting-for | Track tasks delegated to others | Done |
 | Someday/maybe | Defer non-urgent items | Done |
 | Natural dates | "tomorrow", "next monday", "in 3 days" | Done |
-| Priority levels | P1-P4 (Eisenhower matrix) | Done |
+| Archiving | Archive tasks, projects, areas, people | Planned |
+| Date-based archive | `aio archive tasks --before <date>` | Planned |
 
 ### P0: Project & Team Structure (Phase 2)
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Projects | Group tasks under projects with outcomes | Planned |
+| Projects | Group tasks under projects with links, timeline, health | Planned |
 | Teams | Define teams and members | Planned |
 | People | Track who you delegate to | Planned |
-| Contexts | GTD contexts (@work, @1on1, @deep-work) | Planned |
 | Delegated view | See all tasks you've given to others | Planned |
+| Morning dashboard | Daily view: due today, due soon, waiting-for, team load | Planned |
+| Team load view | See task counts per person, flag overload (>5 items, >2 P1s) | Planned |
 
 ### P1: Obsidian Plugin (Phase 3)
 
@@ -79,6 +82,11 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Weekly review | Guided review wizard | Planned |
 | Task editing | Modal to edit all task fields | Planned |
 | Status commands | Complete, start, defer via commands | Planned |
+| Task dependencies | Link tasks as blockers/blocked-by | Planned |
+| Dependency visualization | See blocked tasks and blockers in views | Planned |
+| Location linking | Connect task to file path, line, or URL in project | Planned |
+| Location navigation | Click to open file/URL from task view | Planned |
+| Subtask progress | Track and display completion of subtasks within tasks | Planned |
 | Jira sync | Background sync with status bar indicator | Planned |
 
 #### Obsidian Plugin Detailed Requirements
@@ -89,7 +97,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 | View | Purpose |
 |------|---------|
-| Task List | Main view showing tasks, filterable by status/project/context |
+| Task List | Main view showing tasks, filterable by status/project |
 | Inbox | Process unclarified items one-by-one with action buttons |
 | Waiting For | Delegated items grouped by person with days-waiting |
 | Weekly Review | Guided wizard: inbox → projects → waiting → someday |
@@ -112,12 +120,11 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Title input with natural language parsing
 - Shows preview: "Due: tomorrow, Priority: P1"
 - Keyboard: Enter to save, Esc to cancel
-- Optional fields expandable (project, context, notes)
+- Optional fields expandable (project, notes)
 
 **Task Edit Modal:**
 - All frontmatter fields editable
 - Wikilink pickers for project and person
-- Context multi-select (existing + new)
 - Due date with natural language
 - Delete with confirmation
 
@@ -128,7 +135,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Due date (relative, red if overdue)
 - Project link
 - Person link (if delegated)
-- Context tags
 
 **Right-Click Context Menu:**
 - Complete
@@ -140,7 +146,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 **Settings Tab:**
 - Folder paths (Tasks, Projects, People, etc.)
-- Default priority and context
+- Default settings
 - Jira configuration (URL, email, projects)
 - Sync interval
 - Completed task archiving (by month/year)
@@ -234,7 +240,7 @@ These use cases are designed to drive automated test development.
 | 4 | Run `aio list inbox` | All three tasks appear in inbox list |
 
 **Test assertions:**
-- Task ID is valid ULID
+- Task ID is valid 4-char alphanumeric (e.g., `AB2C`)
 - createdAt and updatedAt are set to current timestamp
 - Default status is "inbox"
 - Default taskType is "personal"
@@ -304,20 +310,19 @@ These use cases are designed to drive automated test development.
 - All formats parse without error
 - Invalid dates return parse error, task not created
 
-### UC-006: Task Lookup by Partial ID
+### UC-006: Task Lookup by ID
 
-**Preconditions:** Task exists with ID `01KF1TFK2QQ33H2FS3KBGVVZKM`
+**Preconditions:** Task exists with ID `AB2C`
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Run `aio done GVVZKM` | Task found and completed |
-| 2 | Run `aio done 01KF1TFK2QQ33H2FS3KBGVVZKM` | Task found (full ID) |
+| 1 | Run `aio done AB2C` | Task found and completed |
+| 2 | Run `aio done ab2c` | Task found (case-insensitive) |
 | 3 | Run `aio done "Review PR"` | Task found by title match |
-| 4 | Run `aio done XXXXXX` | Error: "Task not found" |
+| 4 | Run `aio done ZZZZ` | Error: "Task not found" |
 
 **Test assertions:**
-- 6-character suffix match works
-- Full ULID match works
+- 4-char ID match works (case-insensitive)
 - Title substring match works (case-insensitive)
 - No match returns clear error
 
@@ -364,21 +369,7 @@ These use cases are designed to drive automated test development.
 - Overdue tasks included in "today" view
 - Visual indicator (red) for overdue
 
-### UC-010: Context Assignment
-
-**Preconditions:** Contexts "@work", "@1on1" exist
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `aio add "Discuss promotion" -c @1on1` | Task linked to @1on1 context |
-| 2 | Run `aio list @1on1` | Task appears |
-| 3 | Run `aio list @work` | Task does not appear |
-
-**Test assertions:**
-- Multiple contexts can be assigned to one task
-- Context filter is exact match on context name
-
-### UC-011: Jira Sync (Import)
+### UC-010: Jira Sync (Import)
 
 **Preconditions:** Jira configured, issues assigned to user exist
 
@@ -395,7 +386,7 @@ These use cases are designed to drive automated test development.
 - Status mapping applied correctly
 - Sync log records success/failure
 
-### UC-012: Obsidian Note Linking
+### UC-011: Obsidian Note Linking
 
 **Preconditions:** Obsidian vault configured, note exists at `1-Projects/Migration.md`
 
@@ -410,7 +401,7 @@ These use cases are designed to drive automated test development.
 - Note content readable from vault
 - Missing note handled gracefully
 
-### UC-013: Weekly Review Workflow
+### UC-012: Weekly Review Workflow
 
 **Preconditions:** Inbox has items, projects exist, waiting-for items exist
 
@@ -427,7 +418,7 @@ These use cases are designed to drive automated test development.
 - Review can be resumed if interrupted
 - Completion timestamp recorded
 
-### UC-014: AI Task Breakdown
+### UC-013: AI Task Breakdown
 
 **Preconditions:** Task exists, Obsidian note linked
 
@@ -443,7 +434,7 @@ These use cases are designed to drive automated test development.
 - Subtasks inherit project from parent
 - Each subtask is actionable (has verb)
 
-### UC-015: MCP Tool Invocation
+### UC-014: MCP Tool Invocation
 
 **Preconditions:** MCP server running
 
@@ -459,7 +450,7 @@ These use cases are designed to drive automated test development.
 - Errors return structured error objects
 - Tool descriptions accurate
 
-### UC-016: Database Initialization
+### UC-015: Vault Initialization
 
 **Preconditions:** ~/.aio directory does not exist
 
@@ -474,7 +465,7 @@ These use cases are designed to drive automated test development.
 - Migrations applied automatically
 - Idempotent (running again doesn't break)
 
-### UC-017: Error Handling
+### UC-016: Error Handling
 
 | Scenario | Expected Behavior |
 |----------|-------------------|
@@ -489,7 +480,7 @@ These use cases are designed to drive automated test development.
 - Exit codes: 0=success, 1=error
 - Errors written to stderr
 
-### UC-018: Obsidian Plugin - View Tasks
+### UC-017: Obsidian Plugin - View Tasks
 
 **Preconditions:** API server running, tasks exist in database
 
@@ -506,7 +497,7 @@ These use cases are designed to drive automated test development.
 - Modal opens/closes without page reload
 - Task data matches database record
 
-### UC-019: Obsidian Plugin - Edit Task Inline
+### UC-018: Obsidian Plugin - Edit Task Inline
 
 **Preconditions:** Task exists, web UI loaded
 
@@ -525,7 +516,7 @@ These use cases are designed to drive automated test development.
 - Rollback on API error with error message
 - updatedAt timestamp changes
 
-### UC-020: Obsidian Plugin - Edit Task Modal
+### UC-019: Obsidian Plugin - Edit Task Modal
 
 **Preconditions:** Task exists with all fields populated
 
@@ -534,9 +525,8 @@ These use cases are designed to drive automated test development.
 | 1 | Click task to open modal | Modal shows all task fields |
 | 2 | Edit description | Textarea accepts multiline text |
 | 3 | Change project dropdown | Project selection updates |
-| 4 | Add context tag | Tag appears in list |
-| 5 | Click Save (or Cmd+Enter) | Modal closes, task updated |
-| 6 | Reopen task | All changes persisted |
+| 4 | Click Save (or Cmd+Enter) | Modal closes, task updated |
+| 5 | Reopen task | All changes persisted |
 
 **Test assertions:**
 - All fields editable
@@ -544,7 +534,7 @@ These use cases are designed to drive automated test development.
 - Save disabled while submitting
 - Keyboard shortcuts work (Esc=close, Cmd+Enter=save)
 
-### UC-021: Obsidian Plugin - Quick Add
+### UC-020: Obsidian Plugin - Quick Add
 
 **Preconditions:** Web UI loaded on any page
 
@@ -561,7 +551,7 @@ These use cases are designed to drive automated test development.
 - New task appears without page reload
 - Input clears after successful add
 
-### UC-022: Obsidian Plugin - Status Transitions
+### UC-021: Obsidian Plugin - Status Transitions
 
 **Preconditions:** Task in inbox status
 
@@ -578,7 +568,7 @@ These use cases are designed to drive automated test development.
 - Completed tasks hidden from default view
 - Undo available for 5 seconds after complete
 
-### UC-023: Obsidian Plugin - Bulk Actions
+### UC-022: Obsidian Plugin - Bulk Actions
 
 **Preconditions:** Multiple tasks exist
 
@@ -596,7 +586,7 @@ These use cases are designed to drive automated test development.
 - Confirmation required for destructive actions
 - Undo works for bulk operations
 
-### UC-024: Obsidian Plugin - Filtering
+### UC-023: Obsidian Plugin - Filtering
 
 **Preconditions:** Tasks exist with various priorities, projects, dates
 
@@ -614,7 +604,7 @@ These use cases are designed to drive automated test development.
 - Filter state persists on navigation
 - Count updates to show "5 of 23 tasks"
 
-### UC-025: Obsidian Plugin - Drag and Drop
+### UC-024: Obsidian Plugin - Drag and Drop
 
 **Preconditions:** Multiple tasks in next_action status
 
@@ -630,7 +620,7 @@ These use cases are designed to drive automated test development.
 - Order persists after refresh
 - Status change triggers on cross-list drop
 
-### UC-026: Obsidian Plugin - Weekly Review Flow
+### UC-025: Obsidian Plugin - Weekly Review Flow
 
 **Preconditions:** Inbox has items, projects exist
 
@@ -651,7 +641,7 @@ These use cases are designed to drive automated test development.
 - Review completion timestamp saved
 - "Last review: 3 days ago" shown on dashboard
 
-### UC-027: Obsidian Plugin - Responsive Layout
+### UC-026: Obsidian Plugin - Responsive Layout
 
 **Preconditions:** Web UI loaded
 
@@ -667,7 +657,7 @@ These use cases are designed to drive automated test development.
 - No horizontal scroll
 - Quick add accessible on all sizes
 
-### UC-028: Obsidian Plugin - Keyboard Navigation
+### UC-027: Obsidian Plugin - Keyboard Navigation
 
 **Preconditions:** Web UI loaded with task list
 

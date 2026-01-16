@@ -29,49 +29,67 @@ AIorgianization is an Obsidian-native task and context management system for eng
 
 ## Vault Structure
 
+The CLI initializes this structure via `aio init <vault-path>`:
+
 ```
 Vault/
 ├── .aio/                          # AIorgianization config & cache
 │   ├── config.yaml                # Settings (Jira, sync, etc.)
 │   └── jira-cache.json            # Cached Jira state for sync
 │
-├── Tasks/                         # All tasks organized by status
-│   ├── Inbox/                     # Unclarified items (GTD)
-│   │   └── 2024-01-15-review-pr.md
-│   ├── Next/                      # Next actions
-│   │   └── 2024-01-14-design-api.md
-│   ├── Waiting/                   # Waiting for others
-│   ├── Scheduled/                 # Calendar-bound
-│   ├── Someday/                   # Someday/maybe
-│   └── Completed/                 # Done (archived)
-│       └── 2024/
-│           └── 01/
-│
-├── Projects/                      # Active projects (PARA)
-│   ├── Q4-Migration.md
-│   └── Hiring-Senior-Eng.md
-│
-├── Areas/                         # Ongoing responsibilities
-│   ├── Team-Alpha.md
-│   └── 1on1s.md
-│
-├── People/                        # Team members for delegation
-│   ├── Sarah.md
-│   └── John.md
-│
-├── Context-Packs/                 # Reusable context for AI
-│   ├── Domains/
-│   │   ├── Payments.md
-│   │   └── Identity.md
-│   ├── Systems/
-│   │   ├── Payment-API.md
-│   │   └── Auth-Service.md
-│   └── Operating/
-│       ├── Definition-of-Done.md
-│       └── Ticket-Standards.md
-│
-└── ADRs/                          # Architecture Decision Records
-    └── 2024-01-10-caching-strategy.md
+├── AIO/                           # All AIorgianization content
+│   ├── Dashboard/                 # Daily dashboards (generated)
+│   │   ├── 2024-01-15.md          # Today's dashboard
+│   │   └── 2024-01-14.md
+│   │
+│   ├── Tasks/                     # All tasks organized by status
+│   │   ├── Inbox/                 # Unclarified items (GTD)
+│   │   │   └── 2024-01-15-review-pr.md
+│   │   ├── Next/                  # Next actions
+│   │   │   └── 2024-01-14-design-api.md
+│   │   ├── Waiting/               # Waiting for others
+│   │   ├── Scheduled/             # Calendar-bound
+│   │   ├── Someday/               # Someday/maybe
+│   │   └── Completed/             # Done
+│   │       └── 2024/
+│   │           └── 01/
+│   │
+│   ├── Projects/                  # Active projects (PARA)
+│   │   ├── Q4-Migration.md
+│   │   └── Hiring-Senior-Eng.md
+│   │
+│   ├── Areas/                     # Ongoing responsibilities
+│   │   ├── Team-Alpha.md
+│   │   └── 1on1s.md
+│   │
+│   ├── People/                    # Team members for delegation
+│   │   ├── Sarah.md
+│   │   └── John.md
+│   │
+│   ├── Context-Packs/             # Reusable context for AI
+│   │   ├── Domains/
+│   │   │   ├── Payments.md
+│   │   │   └── Identity.md
+│   │   ├── Systems/
+│   │   │   ├── Payment-API.md
+│   │   │   └── Auth-Service.md
+│   │   └── Operating/
+│   │       ├── Definition-of-Done.md
+│   │       └── Ticket-Standards.md
+│   │
+│   ├── ADRs/                      # Architecture Decision Records
+│   │   └── 2024-01-10-caching-strategy.md
+│   │
+│   └── Archive/                   # Archived items (parallel structure)
+│       ├── Tasks/
+│       │   ├── Inbox/
+│       │   ├── Next/
+│       │   ├── Waiting/
+│       │   ├── Scheduled/
+│       │   └── Someday/
+│       ├── Projects/
+│       ├── Areas/
+│       └── People/
 ```
 
 ---
@@ -82,16 +100,19 @@ Tasks are markdown files with YAML frontmatter for structured data.
 
 ```markdown
 ---
+id: AB2C              # 4-char alphanumeric ID
 type: task
 status: next          # inbox | next | waiting | scheduled | someday | completed
-priority: P1          # P1 | P2 | P3 | P4
 due: 2024-01-20
 project: "[[Projects/Q4-Migration]]"
+location:             # Where in the project this task applies
+  file: "src/api/payments.ts"    # File path (relative to project root)
+  line: 142                       # Optional: specific line number
+  url: "https://..."              # Optional: external URL (PR, doc, etc.)
 assignedTo: "[[People/Sarah]]"
 waitingOn: null       # Person we're waiting on (if status=waiting)
-contexts:
-  - "@deep-work"
-  - "@work"
+blockedBy: []         # Wikilinks to tasks that must complete first
+blocks: []            # Wikilinks to tasks waiting on this one
 tags:
   - backend
   - api
@@ -104,14 +125,14 @@ completed: null
 
 # Review Q4 roadmap with stakeholders
 
-## Notes
-- Need to align on timeline
-- Check with Sarah about API dependencies
-
-## Checklist
+## Subtasks
 - [ ] Draft agenda
 - [ ] Schedule meeting
 - [ ] Send pre-read
+
+## Notes
+- Need to align on timeline
+- Check with Sarah about API dependencies
 
 ## Related
 - [[ADRs/2024-01-10-caching-strategy]]
@@ -128,6 +149,65 @@ Someday → Next (when reactivated)
 Completed → (archived to Completed/YYYY/MM/)
 ```
 
+### Task Hierarchy
+
+Tasks support two levels of organization:
+
+1. **Project**: High-level grouping (e.g., "Q4 Migration") - stored as separate files
+2. **Subtasks**: Breakdown of a task - stored within the parent task file as a checklist
+
+```
+Project: Q4 Migration (Projects/Q4-Migration.md)
+├── Task: API Migration (Tasks/Next/2024-01-15-api-migration.md)
+│   └── Subtasks: (inside the task file)
+│       - [ ] Design new endpoints
+│       - [ ] Implement endpoints
+│       - [ ] Write tests
+└── Task: Data Migration (Tasks/Next/2024-01-16-data-migration.md)
+    └── Subtasks: (inside the task file)
+        - [ ] Create migration scripts
+        - [ ] Run migration
+```
+
+**Task file with subtasks:**
+
+```markdown
+---
+type: task
+status: next
+project: "[[Projects/Q4-Migration]]"
+due: 2024-01-20
+---
+
+# API Migration
+
+## Subtasks
+- [ ] Design new endpoints
+- [ ] Implement endpoints
+- [ ] Write tests
+
+## Notes
+Focus on backwards compatibility.
+```
+
+The plugin tracks subtask completion progress and can display it in task views.
+
+### Task IDs
+
+Each task is assigned a 4-character alphanumeric ID stored in frontmatter:
+
+```yaml
+id: AB2C
+```
+
+**ID format:**
+- 4 characters from: `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (32 chars)
+- Excludes ambiguous characters: `0`, `1`, `I`, `O`
+- Case-insensitive (stored uppercase, matched case-insensitively)
+- ~1 million combinations (32^4), sufficient for <10,000 active tasks
+
+**Collision handling:** On creation, generate random ID and retry if collision detected.
+
 ### File Naming Convention
 
 ```
@@ -142,51 +222,99 @@ Examples:
 
 ## Project File Format
 
+Projects are markdown files that serve as the central hub for a body of work, linking to external tools (Jira, Slack), internal docs, timeline milestones, and live task queries.
+
 ```markdown
 ---
 type: project
 status: active        # active | on-hold | completed | archived
 category: project     # project | area (PARA)
-team: "[[People/Team-Alpha]]"
+team: "[[People/Team-Platform]]"
 targetDate: 2024-03-31
-jiraEpic: PLAT-100
+jiraEpic: PLAT-500
 created: 2024-01-01
 ---
 
 # Q4 Platform Migration
 
 ## Outcome
-Successfully migrate payment processing to new platform with zero downtime.
+Migrate payment processing to new platform with zero downtime.
 
-## Success Metrics
-- [ ] All traffic on new platform
-- [ ] p99 latency < 200ms
-- [ ] Zero payment failures during migration
+---
 
-## Scope
-**In scope:**
-- Payment API migration
-- Database migration
-- Monitoring setup
+## Key Links
 
-**Out of scope:**
-- UI changes
-- New payment methods
+| Resource | Link |
+|----------|------|
+| Jira Epic | [PLAT-500](https://company.atlassian.net/browse/PLAT-500) |
+| Jira Board | [Platform Board](https://company.atlassian.net/jira/software/projects/PLAT/boards/42) |
+| Backlog | [Filtered Backlog](https://company.atlassian.net/jira/software/projects/PLAT/boards/42/backlog?epics=PLAT-500) |
+| Tech Spec | [[Specs/Platform-Migration-Spec]] |
+| PRD | [[PRDs/Platform-Migration-PRD]] |
+| Slack Channel | [#platform-migration](https://company.slack.com/archives/C123ABC) |
+| Runbook | [[Runbooks/Migration-Runbook]] |
 
-## Key Decisions
-- [[ADRs/2024-01-10-caching-strategy]]
+---
 
-## Context
-- [[Context-Packs/Domains/Payments]]
-- [[Context-Packs/Systems/Payment-API]]
+## Timeline
 
-## Tasks
+| Milestone | Date | Status |
+|-----------|------|--------|
+| Design complete | 2024-01-31 | Done |
+| API migration | 2024-02-15 | In Progress |
+| Data migration | 2024-02-28 | Not Started |
+| Cutover | 2024-03-15 | Not Started |
+| Hypercare complete | 2024-03-31 | Not Started |
+
+---
+
+## Project Health
+
+### Open Tasks
 ```dataview
-TABLE status, priority, due
+TABLE status, priority, due, assignedTo.file.name AS "Owner"
 FROM "Tasks"
-WHERE project = this.file.link
+WHERE contains(project, this.file.link) AND status != "completed"
 SORT priority ASC, due ASC
 ```
+
+### Blocked / Waiting
+```dataview
+LIST
+FROM "Tasks"
+WHERE contains(project, this.file.link) AND status = "waiting"
+```
+
+### Completed This Week
+```dataview
+LIST
+FROM "Tasks"
+WHERE contains(project, this.file.link) AND status = "completed" AND completed >= date(today) - dur(7d)
+```
+
+---
+
+## Team
+
+| Person | Role |
+|--------|------|
+| [[People/Sarah]] | Tech Lead |
+| [[People/John]] | Backend |
+| [[People/Maya]] | Backend |
+
+---
+
+## Notes & Decisions
+
+- [[ADRs/2024-01-10-caching-strategy]]
+- [[Meeting-Notes/2024-01-12-kickoff]]
+
+---
+
+## Risks & Blockers
+
+- [ ] Dependency on Auth team for token migration
+- [ ] Load testing environment not ready
 ```
 
 ---
@@ -219,6 +347,120 @@ WHERE assignedTo = this.file.link AND status != "completed"
 SORT due ASC
 ```
 ```
+
+---
+
+## Morning Dashboard File Format
+
+The dashboard integrates with Obsidian's daily notes. It can be:
+1. **Embedded in daily notes** via Templater template (recommended)
+2. **Generated as standalone** file in `AIO/Dashboard/YYYY-MM-DD.md` via CLI
+
+The dashboard surfaces what needs attention today.
+
+```markdown
+---
+type: dashboard
+date: 2024-01-15
+generated: 2024-01-15T07:00:00
+---
+
+# Wednesday, January 15
+
+## Overdue
+```dataview
+TABLE due, assignedTo.file.name AS "Owner"
+FROM "AIO/Tasks"
+WHERE due < date(today) AND status != "completed"
+SORT due ASC
+```
+
+## Due Today
+```dataview
+TABLE project.file.name AS "Project"
+FROM "AIO/Tasks"
+WHERE due = date(today) AND status != "completed"
+SORT file.name ASC
+```
+
+## Due This Week
+```dataview
+TABLE due, project.file.name AS "Project"
+FROM "AIO/Tasks"
+WHERE due > date(today) AND due <= date(today) + dur(7d) AND status != "completed"
+SORT due ASC
+```
+
+## Blocked
+```dataview
+TABLE blockedBy AS "Blocked By"
+FROM "AIO/Tasks"
+WHERE length(blockedBy) > 0 AND status != "completed"
+```
+
+---
+
+## Waiting For
+
+### By Person
+```dataview
+TABLE WITHOUT ID
+  rows.file.link AS "Tasks",
+  length(rows) AS "Count",
+  min(rows.updated) AS "Oldest"
+FROM "AIO/Tasks"
+WHERE status = "waiting"
+FLATTEN waitingOn AS person
+GROUP BY person
+SORT length(rows) DESC
+```
+
+### Stale (>7 days)
+```dataview
+LIST
+FROM "AIO/Tasks"
+WHERE status = "waiting" AND (date(today) - updated) > dur(7d)
+SORT updated ASC
+```
+
+---
+
+## Team Load
+
+```dataview
+TABLE WITHOUT ID
+  person AS "Person",
+  length(rows) AS "Active Tasks"
+FROM "AIO/Tasks"
+WHERE status != "completed" AND assignedTo
+FLATTEN assignedTo AS person
+GROUP BY person
+SORT length(rows) DESC
+```
+
+> **Flag if anyone has >5 active items**
+
+---
+
+## Quick Links
+
+| View | Link |
+|------|------|
+| Inbox | [[AIO/Tasks/Inbox/]] |
+| My Next Actions | [[AIO/Tasks/Next/]] |
+| All Projects | [[AIO/Projects/]] |
+| 1:1 Prep | [[AIO/Areas/1on1s]] |
+```
+
+### Dashboard Generation
+
+The morning dashboard can be generated via:
+
+1. **Templater plugin:** Configure as daily note template with `tp.date.now()` for dynamic date
+2. **CLI command:** `aio dashboard` generates today's file in the vault
+3. **Manual:** Create from template when starting the day
+
+The Dataview queries run live, so the dashboard always shows current state even if generated earlier.
 
 ---
 
@@ -340,6 +582,9 @@ packages/cli/
 ### CLI Commands
 
 ```bash
+# Initialization
+aio init <vault-path>      # Initialize AIO structure in an existing Obsidian vault
+
 # Task management
 aio add "Task title" [-d due] [-P priority] [-p project]
 aio list [inbox|next|waiting|someday|today|all]
@@ -352,11 +597,25 @@ aio wait <task> [person]
 aio project list
 aio delegated [person]
 
+# Dashboard
+aio dashboard              # Generate today's morning dashboard
+aio dashboard --date 2024-01-15  # Generate for specific date
+
+# Archiving
+aio archive task <task>              # Archive a single task
+aio archive project <project>        # Archive a project and its linked tasks
+aio archive area <area>              # Archive an area
+aio archive person <person>          # Archive a person
+aio archive tasks --before <date>    # Archive tasks completed before date
+aio archive tasks --before "6 months ago"  # Natural language dates supported
+aio archive tasks --before 2024-01-01 --dry-run  # Preview without archiving
+
 # Sync
 aio sync jira
 aio sync status
 
 # Config
+aio config show
 aio config set vault.path /path/to/vault
 aio config set jira.baseUrl https://company.atlassian.net
 ```
@@ -416,6 +675,70 @@ CLI finds the vault via (in order):
 | In Review | Tasks/Waiting/ |
 | Blocked | Tasks/Waiting/ |
 | Done | Tasks/Completed/ |
+
+---
+
+## Archive Architecture
+
+The archive system provides a way to move inactive items out of active views while preserving history and maintaining organizational structure.
+
+### Archive Structure
+
+The `Archive/` folder mirrors the active folder structure:
+
+```
+AIO/
+├── Tasks/                  # Active tasks
+│   ├── Inbox/
+│   ├── Next/
+│   └── ...
+├── Projects/               # Active projects
+├── Areas/                  # Active areas
+├── People/                 # Active people
+│
+└── Archive/                # Archived items (parallel structure)
+    ├── Tasks/
+    │   ├── Inbox/          # Archived inbox tasks
+    │   ├── Next/           # Archived next actions
+    │   ├── Waiting/
+    │   ├── Scheduled/
+    │   └── Someday/
+    ├── Projects/           # Archived projects
+    ├── Areas/              # Archived areas
+    └── People/             # Archived people
+```
+
+### Archive Operations
+
+| Operation | Behavior |
+|-----------|----------|
+| `archive task <task>` | Move task file to `Archive/Tasks/<original-status>/` |
+| `archive project <project>` | Move project to `Archive/Projects/`, optionally archive linked tasks |
+| `archive area <area>` | Move area to `Archive/Areas/` |
+| `archive person <person>` | Move person to `Archive/People/` |
+| `archive tasks --before <date>` | Bulk archive completed tasks older than date |
+
+### Archive Metadata
+
+When a file is archived, frontmatter is updated:
+
+```yaml
+---
+archived: true
+archivedAt: 2024-06-01T10:00:00
+archivedFrom: "AIO/Tasks/Completed/2024/01/"
+---
+```
+
+### Date-Based Archiving
+
+The `archive tasks --before <date>` command supports:
+
+- ISO dates: `2024-01-01`
+- Natural language: `"6 months ago"`, `"last year"`, `"January 1"`
+- Dry run mode: `--dry-run` to preview without making changes
+
+This is useful for periodic cleanup (e.g., archive all completed tasks older than 6 months).
 
 ---
 
