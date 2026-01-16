@@ -1,0 +1,267 @@
+# Pressure Test & Extension: Context Library for Engineering Managers
+
+## Summary of the Original Vision
+
+The conversation in 001.txt outlines a "personal shadow context library" approach:
+- Build reusable "context packs" (project, domain, system)
+- Capture context exhaust from meetings, decisions, incidents
+- Store in a private repo/Obsidian vault you control
+- Package on-demand for LLM requests (tickets, docs)
+- Share outward later once proven valuable
+
+The goal: eliminate the "prompt tax" of rewriting context for every LLM interaction.
+
+---
+
+## Pressure Testing the Ideas
+
+### What's Strong
+
+1. **The "capture → distill → canonicalize → package" pipeline is sound.**
+   Most knowledge work already produces artifacts (PRs, meeting notes, decisions).
+   The insight is to harvest and structure them rather than create from scratch.
+
+2. **PARA + context packs is a good fit.**
+   Projects = time-bound initiatives with packs
+   Areas = operating norms, team standards
+   Resources = domain knowledge, system docs
+   This maps well to how an EM actually thinks about their work.
+
+3. **"Shadow library first, share later" is politically smart.**
+   You don't need buy-in. You build value privately, then let quality
+   pull others in. This avoids the "empty wiki" problem.
+
+4. **ADRs as the "context engine" is high-ROI.**
+   Decisions are the highest-value context. They explain why things are
+   the way they are. Everything else (code, config, process) follows.
+
+### What Needs Strengthening
+
+1. **The "2-minute capture" habit is fragile.**
+
+   Problem: Willpower-based habits decay. After a busy week, the inbox
+   grows stale and the weekly distill gets skipped.
+
+   Mitigation: Tie capture to existing workflows. Don't add a step;
+   hijack an existing one.
+   - After every meeting: Gemini summary → structured note in Obsidian
+   - After every decision: CLI command or Claude skill → ADR draft
+
+   Better: Make the tool capture for you. If AIorgianization tracks
+   your tasks, it can also track decisions, blockers, and context.
+
+2. **"Context pack assembly" is still manual.**
+
+   Problem: You still have to decide which packs to include. With 5
+   projects and 10 domains, that's cognitive overhead.
+
+   Mitigation: Encode relationships. If a task belongs to Project X,
+   and Project X touches Domain Y and System Z, the tool should
+   suggest the relevant packs automatically.
+
+   This is where the task manager + Obsidian integration becomes
+   powerful: tasks link to notes, notes link to packs, AI gets the
+   full graph.
+
+3. **The model assumes mostly text output (tickets, docs).**
+
+   Problem: EMs also need context for verbal work: 1:1s, stakeholder
+   updates, skip-levels, interviews. These don't produce written
+   artifacts but consume the same context.
+
+   Extension: Build "briefing packs" for recurring meetings:
+   - 1:1 with Sarah → her recent tasks + waiting-for items + notes
+   - Leadership update → project status + risks + decisions
+   - Skip-level → team health + escalations + wins
+
+   AIorgianization could generate these as a "review" feature.
+
+4. **No mention of decay and freshness.**
+
+   Problem: Context goes stale. A 6-month-old system one-pager may be
+   wrong. An ADR from 2 years ago may be superseded.
+
+   Mitigation: Add freshness metadata (already suggested in 001.txt)
+   but also build decay alerts:
+   - "System-payments.md hasn't been updated in 90 days"
+   - "ADR-caching-strategy is marked 'revisit when traffic > 10k'
+     and we hit 15k last week"
+
+   This requires the tool to track metrics/events and cross-reference
+   with the "revisit when" triggers.
+
+5. **The MCP/Cursor integration is hand-wavy.**
+
+   Problem: "Stand up MCP connectors" is easy to say, hard to do.
+   External APIs have auth complexity, rate limits, and data
+   sensitivity concerns.
+
+   Realistic path (MVP):
+   - Phase 1: Local files only (Obsidian vault). No external API.
+   - Phase 2: Read-only integration for Obsidian (filesystem)
+   - Phase 3: Jira API for team task sync
+
+   Keep external integrations minimal. Most context should live in
+   your local library (Obsidian), not scattered across SaaS tools.
+
+---
+
+## Connecting to AIorgianization
+
+The 001.txt conversation and AIorgianization are solving adjacent problems:
+
+| 001.txt Focus | AIorgianization Focus |
+|---------------|----------------------|
+| What context do I have? | What tasks do I have? |
+| Why did we decide X? | What's due when? |
+| How do I write tickets/docs? | How do I track delegation? |
+| Eliminate prompt tax | Eliminate task tracking chaos |
+
+**The synthesis:** A single system that tracks both TASKS and CONTEXT,
+linked together.
+
+### How They Merge
+
+1. **Tasks link to context.**
+   Every task can reference:
+   - Project pack (via projectId)
+   - Obsidian note (via obsidianNotePath)
+   - ADR (via a new adrs[] field or tag)
+   - System pack (via a new system field)
+
+2. **Context informs task breakdown.**
+   When you run `aio breakdown "Improve payment reliability"`:
+   - Pull the project pack for context
+   - Pull the domain pack (payments) for constraints
+   - Pull the system pack (payment-api) for current state
+   - AI generates subtasks with full awareness
+
+3. **Tasks generate context.**
+   When you complete a task tagged as "decision":
+   - Prompt: "Would you like to create an ADR for this decision?"
+   - Auto-populate context from the task + linked notes
+
+   When you complete a task tagged as "incident":
+   - Prompt: "Would you like to create an incident nugget?"
+
+4. **Weekly review surfaces context gaps.**
+   During `aio review`, the tool could flag:
+   - "Project Q4-Migration has no linked ADRs"
+   - "System payment-api hasn't been updated in 60 days"
+   - "You made 3 decisions this week with no ADRs"
+
+---
+
+## Extended Vision: The EM Operating System
+
+If we take both visions to their conclusion, we get something bigger:
+An "Engineering Manager Operating System" that handles:
+
+### Layer 1: Task & Time Management (GTD)
+- Inbox → Next Actions → Waiting For → Someday
+- Delegation tracking with follow-up reminders
+- Weekly review workflow
+- Calendar-aware scheduling (future)
+
+### Layer 2: Context Library (BASB + Context Packs)
+- Project packs (auto-generated from tasks + notes)
+- Domain packs (manually curated, AI-assisted)
+- System packs (could sync from repo READMEs)
+- ADR library (captured from decisions)
+- Meeting notes (structured from Gemini summaries)
+
+### Layer 3: AI Generation Layer
+- Ticket writing (context pack → ticket draft)
+- Doc writing (context pack → doc draft)
+- Briefing generation (tasks + notes → 1:1 prep)
+- Decision recommendations ("Based on your constraints...")
+
+### Layer 4: External Sync (MVP)
+- Jira: team task visibility
+- Obsidian: knowledge base
+
+### Layer 5: Insights (Future)
+- "You've delegated 12 tasks to Sarah, 3 are overdue"
+- "Project X has no progress in 2 weeks"
+- "You're spending 60% of time on Area Y, 10% on Area Z"
+- "This ADR contradicts ADR-42 from last year"
+
+---
+
+## Concrete Next Steps
+
+To move toward this vision incrementally:
+
+### Already Planned (Phases 1-5)
+- Task CRUD with GTD statuses ✓
+- Obsidian vault reading
+- Jira sync
+- Claude skills + MCP
+- Weekly review
+
+### New Additions to Consider
+
+**Phase 2 additions:**
+- Add `systemId` field to tasks (links to system packs)
+- Add `tags` field for semantic categorization (decision, incident, etc.)
+- Create "context pack" as a first-class entity (or use Obsidian folders)
+
+**Phase 4 additions:**
+- When syncing Obsidian, index notes by type (project-pack, domain-pack, etc.)
+- Build context assembly: given a task, find related packs automatically
+
+**Phase 5 additions:**
+- AI ticket generation: task + context packs → GitHub issue
+- AI doc generation: context packs → Confluence-ready markdown
+- Briefing generator: upcoming 1:1s → prep notes with relevant tasks/context
+
+**Phase 6 additions:**
+- Freshness tracking: flag stale packs
+- Decision capture: prompt for ADR when closing "decision" tasks
+- Context gap detection: surface missing packs during review
+
+---
+
+## Open Questions
+
+1. **How much structure to impose on Obsidian?**
+   - Option A: Require specific folders/frontmatter (more reliable)
+   - Option B: Infer from content (more flexible, less reliable)
+   - Recommendation: Start with A, add B later via AI classification
+
+2. **Should context packs live in Obsidian or in the tool?**
+   - Option A: Obsidian is source of truth, tool indexes it
+   - Option B: Tool has its own pack storage, syncs to Obsidian
+   - Recommendation: A. Don't duplicate. Obsidian is the editor; tool is the indexer.
+
+3. **How to handle sensitive context?**
+   - Some packs contain info you wouldn't send to external AI
+   - Need a "safe for LLM" flag per pack/note
+   - Need local-only AI option (Ollama, local Claude) for sensitive work
+
+4. **How to prevent context library from becoming another unmaintained wiki?**
+   - Tie updates to workflow (task completion → pack update prompt)
+   - Freshness alerts with snooze
+   - Minimal viable structure (don't over-template)
+   - AI-assisted updates ("Here's what changed in this system, update the pack?")
+
+---
+
+## Summary
+
+The 001.txt vision is solid: build a personal context library, structured for
+LLM use, grown incrementally, shared later. The main risks are:
+1. Habit decay (mitigation: automate capture, tie to existing workflows)
+2. Manual assembly (mitigation: encode relationships, auto-suggest packs)
+3. Staleness (mitigation: freshness tracking, decay alerts)
+
+AIorgianization is the natural home for this system. Tasks and context are
+two sides of the same coin: tasks are "what you're doing," context is
+"why and how." Linking them creates an EM operating system that:
+- Tracks work across people and teams
+- Maintains institutional knowledge
+- Eliminates prompt tax for AI interactions
+- Surfaces gaps and staleness automatically
+
+The extended vision is ambitious but achievable incrementally. Start with
+tasks + Obsidian integration, then layer on AI generation and insights.

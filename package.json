@@ -1,0 +1,22 @@
+{
+  "name": "aiorgianization",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal task and deadline management for engineering managers",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "db:generate": "pnpm --filter @aio/core db:generate",
+    "db:migrate": "pnpm --filter @aio/core db:migrate"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

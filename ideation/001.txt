@@ -1,0 +1,987 @@
+Skip to content
+Chat history
+You said:
+I’m an engineering manager looking to brainstorm changes to my process to better integrate AI. The biggest challenge I have is building a context library - when I am looking for llm help, I have to rewrite all the context from scratch. 
+
+I’m looking for a process to start building that context so that I can include it with questions. Please help me brainstorm ways to organize the information, log the information, and make it available with context when necessary. 
+ChatGPT said:
+
+You’re describing the classic “prompt tax”: every time you want LLM help, you pay the cost of reconstructing context. The fix is to stop treating context as something you write for the model and start treating it as something you continuously capture for the team—then package it on demand.
+
+Here are practical, low-friction ways to organize, log, and retrieve context so it’s “prompt-ready.”
+1) Think in “Context Packs,” not one giant wiki
+
+Instead of a single knowledge base, build a few reusable bundles you can attach (or paste snippets from) depending on the question.
+
+Core context packs (most teams need these):
+
+    Product Pack (1–2 pages): What you’re building, for whom, key workflows, success metrics, north-star constraints.
+
+    Architecture Pack (2–5 pages): C4-ish overview, key services, data flows, dependencies, known bottlenecks, non-goals.
+
+    Team Pack (1 page): Who owns what, on-call/incident flow, definitions of “done,” coding/review norms.
+
+    Domain Glossary (living): Terms, acronyms, “means X not Y,” links to canonical sources.
+
+    Decision Log (ADRs) Pack: Why you chose X over Y, tradeoffs, and “when would we revisit.”
+
+    Operating Pack (runbooks): How deploys work, how to debug, “common failure modes,” links to dashboards.
+
+Why this works: when you ask an LLM for help, you rarely need “everything,” you need the right pack(s).
+2) Capture events as they happen (the “context exhaust”)
+
+Most context already gets produced—PRs, tickets, incidents, meetings. Your process should harvest it.
+A. Decision Records (ADRs) — the highest ROI
+
+Whenever you make a decision that future-you will forget, write a tiny ADR.
+
+ADR template (8 lines):
+
+    Title: (Decision in one sentence)
+
+    Date / Owners:
+
+    Context: (what forced the choice)
+
+    Decision:
+
+    Options considered: (2–4 bullets)
+
+    Tradeoffs: (what you’re giving up)
+
+    Consequences: (what changes now)
+
+    Revisit when: (explicit triggers)
+
+Make “ADR or it didn’t happen” the norm for non-trivial technical/product decisions.
+B. PR Summaries (2–5 bullets)
+
+Add a required PR section:
+
+    What changed (user-visible + internal)
+
+    Why
+
+    How to verify / rollback
+
+    Follow-ups / tech debt created
+
+Those PR summaries become retrievable context later.
+C. Incident Nuggets
+
+After incidents, capture a short “LLM-usable” artifact:
+
+    Symptoms
+
+    Root cause
+
+    Fix
+
+    Prevent / alert improvements
+
+    Links to dashboards + queries that mattered
+
+You don’t need long postmortems to get value—just consistent nuggets.
+3) Store it where it naturally lives (and make it linkable)
+
+Pick one “source of truth” style and commit to it:
+
+Option 1: Docs in your repo (recommended for eng context)
+
+    /docs/context-packs/
+
+    /docs/adr/
+
+    /docs/runbooks/
+    Pros: versioned, reviewable, close to code.
+
+Option 2: Confluence/Notion
+Pros: easy editing, good for product + org context.
+
+Key rule: every artifact needs a stable link and a predictable place.
+4) Add metadata so you can retrieve context fast
+
+Whether it’s a doc page or markdown file, put a tiny header at the top:
+
+    Owner: team/person
+
+    Last updated:
+
+    Applies to: service/product area
+
+    Confidence: (high/medium/low)
+
+    Tags: payments, mobile, latency, oncall, etc.
+
+    Related: links to ADRs, runbooks, dashboards, tickets
+
+This is what makes later retrieval possible without rereading everything.
+5) Make “prompt-ready snippets” a first-class artifact
+
+Create a folder/page called Snippets with copy/paste blocks you reuse constantly:
+
+Examples:
+
+    “Architecture overview (short)”
+
+    “Constraints & non-goals”
+
+    “Definition of done / release process”
+
+    “Current priorities and what not to optimize”
+
+    “Tone/style guide for comms”
+
+These are the things you keep rewriting today—turn them into reusable blocks.
+6) A lightweight “Ask an LLM” intake template (so you stop rewriting)
+
+When you want help, fill this mini form (often 60 seconds):
+
+LLM Request Template
+
+    Goal: what outcome do you want?
+
+    Audience: (me, my team, leadership, customers)
+
+    Context packs to include: Product / Arch / Team / ADR links
+
+    Inputs: links (ticket, PR, doc), or pasted snippets
+
+    Constraints: time, security, performance, backwards compat, etc.
+
+    What you’ve tried / current hypothesis:
+
+    Desired format: bullets, plan, diff, email, checklist, etc.
+
+Over time, you’ll mostly answer this by linking rather than rewriting.
+7) If you want it to feel “magical”: retrieval (RAG) later, but process first
+
+Once the above is in place, you can make context “available when necessary” in two ways:
+
+Low-tech retrieval (start here):
+
+    A “Context Index” page with links to each pack + top ADRs + top runbooks.
+
+    A consistent tagging/search convention.
+
+    Weekly habit: “update one pack, create one ADR.”
+
+Higher-tech retrieval (when ready):
+
+    Put docs/ADRs/runbooks/ticket summaries into a searchable system (vector search / RAG) so you can ask:
+
+        “What decisions did we make about caching and why?”
+
+        “What are common causes of 500s in service X?”
+        This is great, but it only works if your underlying artifacts are clean and consistent.
+
+8) A simple rollout that won’t overwhelm your team
+
+Week 1
+
+    Create: Product Pack, Architecture Pack, Glossary (even if rough).
+
+    Introduce ADR template + “PR summary” section.
+
+Week 2
+
+    Add 2–3 runbooks for the most common on-call issues.
+
+    Start an “AI Snippets” page with reusable blocks.
+
+Week 3+ (ongoing)
+
+    Every meaningful decision → ADR.
+
+    Every incident → nugget.
+
+    Every sprint → 10-minute “context upkeep” (update packs + tag links).
+
+9) Guardrails (so AI integration doesn’t become risky)
+
+    Don’t store secrets in packs/snippets.
+
+    Add a “safe to share with LLM?” flag to artifacts.
+
+    Keep “unknown/assumption” sections explicit so the model doesn’t confidently improvise.
+
+If you tell me what your current stack is (Jira vs Linear, GitHub/GitLab, Confluence/Notion, Slack/Teams) and what kinds of LLM help you most often want (design reviews, debugging, planning, writing), I’ll propose a concrete folder/page structure + 5–10 reusable snippets tailored to your workflow.
+You said:
+We use confluence, slack, GitHub, cursor, and Gemini at work. (I use ChatGPT for personal projects.) I’m looking mostly for writing tickets, writing documentation based on my internal knowledge to share with others. I’m thinking I might be able to use cursor cli to be able to access gpt to build this and access everything necessary. 
+ChatGPT said:
+
+Given your stack (Confluence + Slack + GitHub + Cursor + Gemini), the fastest win is to stop “rewriting context” and instead capture it once in structured places that AI can reliably pull from—then generate tickets/docs by assembling the right slices.
+
+Below is a concrete process you can implement incrementally.
+1) Build a Confluence “Context Library” that’s AI-friendly (not just human-friendly)
+
+Create a dedicated space (or top-level section) with repeatable page types:
+
+    Product One-Pager (what, who, why, success metrics, constraints)
+
+    System/Service One-Pager (what it does, interfaces, dependencies, SLOs, common failure modes)
+
+    Runbooks (how to debug/mitigate)
+
+    Decision Log (ADRs) (why we chose X)
+
+    Glossary (terms + “means X not Y”)
+
+    Standards (definition of done, PR norms, incident norms, ticket quality bar)
+
+Make every page start with a tiny “Context Header” block (so it can be pulled cleanly):
+
+    Owner
+
+    Last updated
+
+    Scope (team/system)
+
+    Tags/labels
+
+    Canonical links (repo, dashboards, key ADRs)
+
+In Confluence, you can use Page Properties on each page + a central Context Registry page that auto-lists pages by label/type (so you can quickly grab “the top 5 most relevant pages” for any question).
+2) Add two “capture streams” so context accumulates without extra work
+A) GitHub as the “change log”
+
+    PR template: require 4 bullets: What changed / Why / Verification / Follow-ups.
+
+    Labeling: docs-needed, adr-needed, runbook-needed.
+
+    ADR trigger: any non-trivial decision → must link an ADR (even if it’s short).
+
+B) Slack as the “decision and discovery exhaust”
+
+Create 2 channels with clear norms:
+
+    #eng-decisions: any meaningful decision → post a 3–5 line summary + link to ADR/Confluence page.
+
+    #eng-incidents (or your existing incident channel): after resolution, post a short “incident nugget” (symptoms, root cause, fix, prevention links).
+
+If you want this to be very low friction, use a Slack Workflow/shortcut that asks 5 questions and outputs a formatted post (and optionally opens a Confluence draft link).
+3) Make “Ticket Writing” an assembly problem (not a writing problem)
+
+Create a Ticket Intake Template (in Slack workflow or a Confluence template) that captures only what AI can’t infer:
+
+    Goal / user problem
+
+    Scope (in/out)
+
+    Constraints (performance, security, timeline)
+
+    Acceptance criteria (3–7 bullets)
+
+    Links (Slack thread, PRs, Confluence context pages)
+
+    “Definition of done” (choose from standards)
+
+Then your AI step becomes: “Rewrite + enrich this into a high-quality ticket using linked context.”
+
+In practice, you’ll attach:
+
+    Product one-pager (or section)
+
+    Relevant service one-pager
+
+    Standards page (ticket quality + DoD)
+
+    Any relevant ADR
+
+4) Use Cursor CLI + MCP to eliminate manual context copying
+
+Cursor’s CLI is explicitly designed for agent workflows from the terminal, including resuming past threads (cursor-agent resume) and listing prior conversations (cursor-agent ls).
+
+Cursor also supports headless CLI for automation/CI use cases. The big lever for your problem is MCP (Model Context Protocol): Cursor can connect to external systems and data so you don’t have to restate project structure/context repeatedly.
+(And Cursor’s own announcement notes the CLI works with models available in your Cursor subscription.)
+What to do with MCP in your case
+
+Stand up (or adopt) read-only MCP connectors for:
+
+    GitHub (issues, PRs, diffs, file reads)
+
+    Confluence (search pages by label, fetch page content by URL/id)
+
+    Slack (fetch thread messages by permalink, channel history by timestamp range)
+
+Then build a small “context compiler” command that:
+
+    Takes a question type: ticket or doc
+
+    Takes links: Slack thread + relevant Confluence pages + repo paths/PRs
+
+    Pulls the content via MCP
+
+    Outputs:
+
+        a short “Context Pack” (bulleted summary + citations/links)
+
+        the finished ticket/doc draft
+
+Even if you don’t fully automate Confluence writes, generating a clean markdown draft you paste in is already a big win.
+5) Two ready-to-use workflows
+Workflow A: Slack thread → high-quality GitHub issue
+
+Input: Slack permalink + 2–3 checkboxes from intake (type/priority/system)
+Agent pulls: thread + referenced PRs + service one-pager + standards
+Output: GitHub issue formatted with:
+
+    Summary
+
+    Context (linked sources)
+
+    Proposed approach (optional)
+
+    Acceptance criteria
+
+    Risks / unknowns
+
+Workflow B: “Knowledge dump” → Confluence doc
+
+Input: your rough bullets (or a quick voice-to-text) + target doc type (runbook / overview / ADR)
+Agent output: Confluence-ready structure with:
+
+    Overview
+
+    Decision/approach
+
+    Steps
+
+    Edge cases
+
+    Links (PRs, dashboards, owners)
+
+    “Last updated” + tags to add
+
+6) The minimum viable setup (you can do this in a week)
+
+    Confluence: create 3 templates (Product One-Pager, Service One-Pager, ADR).
+
+    GitHub: add PR template + labels docs-needed / adr-needed.
+
+    Slack: add one shortcut: “Create Ticket Intake”.
+
+    Cursor: start using one repeating agent thread for “Ticket Writer” and one for “Doc Writer” so you’re building memory in a consistent place (and can resume).
+
+    Optional next: MCP connectors so the agent fetches links instead of you pasting.
+
+If you tell me (a) whether your “tickets” live in GitHub Issues vs Jira, and (b) what 3 doc types you write most (runbooks? service overviews? RFCs?), I’ll draft:
+
+    a Confluence page tree + labels convention,
+
+    3 templates (copy/paste-ready),
+
+    and a “context compiler” prompt format you can use in Cursor/Gemini immediately.
+
+You said:
+So, how would you change this if I was looking first to build my process and then later look to share it? Our slack and confluence is somewhat unreliable and I don’t yet have the organizational pull to coerce others into doing this. 
+ChatGPT said:
+
+If you’re doing this solo first (no org buy-in, Slack/Confluence messy), I’d flip the whole approach from “team system” to a personal context capture + packaging system that you can later publish outward once it’s proven valuable.
+
+Here’s how I’d set it up.
+The key change: build a “personal shadow context library”
+
+You don’t need reliable Slack/Confluence or other people’s habits. You just need:
+
+    a place you control (local files / a private repo),
+
+    a lightweight capture habit,
+
+    a way to generate “context packs” on demand for tickets/docs.
+
+Think: second brain for engineering context, optimized for LLM use.
+1) Pick a private, durable store you control
+
+Use one of these (in order of practicality):
+
+    Private GitHub repo (work account if allowed) with markdown files
+
+    Local folder synced (company-approved) to Drive/Dropbox/OneDrive
+
+    Obsidian-style vault (still just markdown underneath)
+
+Suggested structure (simple but powerful):
+
+/context
+  /packs
+    product.md
+    architecture.md
+    team-norms.md
+    glossary.md
+  /systems
+    service-a.md
+    service-b.md
+  /decisions
+    adr-YYYY-MM-DD-short-title.md
+  /incidents
+    incident-YYYY-MM-DD-short-title.md
+  /snippets
+    ticket-template.md
+    doc-template-runbook.md
+    doc-template-overview.md
+  /inbox
+    notes-raw.md
+
+This is your reliable “source of truth.” Confluence becomes “publish later,” not “capture now.”
+2) Add one capture habit that doesn’t depend on anyone else
+
+Your constraint is willpower + time. So make capture tiny.
+The “2-minute capture” rule
+
+After any of these events:
+
+    you learn something important,
+
+    you make a decision,
+
+    you explain something twice,
+
+    you finish an incident,
+
+    you ship a change you’ll forget…
+
+…you add one short entry to /context/inbox/notes-raw.md (or a daily note).
+
+Format:
+
+    Date
+
+    What happened / what I learned (3–6 bullets)
+
+    Links (PR, ticket, Slack permalink if you have it, doc link)
+
+    Tags (service-a, deploy, latency, auth, etc.)
+
+No polishing. Just capture.
+
+Then (important): once a week you process the inbox into a real artifact (ADR/runbook/system page).
+3) Your weekly “distill” loop (30 minutes)
+
+Once per week, pick one item from the inbox and convert it into one of:
+
+    ADR (decision you’ll need to justify later)
+
+    System one-pager update (things you learned about a service)
+
+    Runbook snippet (how to debug/fix)
+
+    Glossary entry (term confusion you saw)
+
+This is how your library grows without needing team compliance.
+4) Make LLM use automatic: generate “Context Packs” on demand
+
+Instead of pasting random notes, you’ll assemble a small bundle each time:
+
+Ticket pack usually needs:
+
+    product.md (or relevant section)
+
+    relevant system/service.md
+
+    any related ADR(s)
+
+    your ticket template snippet
+
+Doc pack usually needs:
+
+    service.md
+
+    recent PR summary bullets
+
+    runbook snippet(s)
+
+    glossary terms
+
+A practical trick with Cursor
+
+Keep a “Ticket Writer” and a “Doc Writer” as recurring agent threads so you can reuse patterns and prompts without rethinking every time.
+
+And maintain a file called:
+
+/context/prompt-instructions.md
+
+that tells the agent how to behave (“ask me only for missing info; default to our ticket format; include acceptance criteria; include unknowns; etc.”).
+5) What to do about unreliable Slack/Confluence right now
+
+Don’t fight them.
+
+    Slack: treat as an ephemeral source. When something matters, you copy the key lines into your inbox note + paste the permalink. That’s it.
+
+    Confluence: treat as a publishing layer. When you write a doc “for real,” generate it in markdown first, then paste into Confluence.
+
+If Confluence search/navigation is bad, your “Context Registry” is simply your repo folder + a README index.
+6) Templates (so you’re not reinventing structure)
+ADR (super lightweight)
+
+    Context
+
+    Decision
+
+    Options considered
+
+    Tradeoffs
+
+    Consequences
+
+    Revisit when
+
+System one-pager
+
+    What it is / owns
+
+    Interfaces (inputs/outputs)
+
+    Dependencies
+
+    Operational notes (deploy, configs, common issues)
+
+    Dashboards/alerts (links)
+
+    Known risks / TODOs
+
+Runbook snippet
+
+    Symptom
+
+    Likely causes
+
+    Quick checks (with links/commands)
+
+    Mitigation
+
+    Follow-up hardening
+
+7) How this becomes shareable later (without “coercing” anyone)
+
+Once you’ve run this for a few weeks, you’ll have a library that’s already useful. Then sharing becomes “pull” not “push”:
+
+    When someone asks a question: you reply with a crisp answer + link to your page.
+
+    When you write a strong ticket: others copy the format.
+
+    When an incident happens: you drop your runbook snippet in the channel.
+
+Eventually you can “graduate” the best artifacts into Confluence (copy/paste) and invite others to contribute because it’s clearly useful.
+A 2-week starter plan
+
+Day 1: create folders + templates + prompt-instructions.md
+Days 2–10: 2-minute capture after notable events (aim 1/day)
+End of week 1: convert 1 inbox item → ADR or runbook
+End of week 2: convert 1 more item + create product.md (even rough)
+
+After 2 weeks, you’ll feel the prompt tax drop.
+
+If you want, describe one real example—like “I need to write a ticket for X” or “I need to document service Y”—and I’ll show exactly what your personal context pack would look like (which files to pull + a ready-to-use prompt you can run in Cursor/Gemini).
+You said:
+I already have an internal GitHub repo that has accumulated scripts. I also have an obsidian adult of which 95 is notes only I understand and rough drafts. I also have access to zoom and Gemini summaries of meetings. These are organized by the PARA method currently - at least loosely. 
+ChatGPT said:
+
+Nice — you already have 90% of what you need. The change I’d make is not “create a new system,” but turn your existing PARA + Obsidian + repo + meeting summaries into a context supply chain:
+
+Capture → Distill → Canonicalize → Package (for LLM + for humans later).
+
+Below is a setup that works solo first, using what you already have.
+1) Pick one “canonical” layer (even if you still draft elsewhere)
+
+Right now you have:
+
+    Obsidian = rough drafts + private shorthand (great for capture)
+
+    Internal GitHub repo = scripts + durable artifacts (great for canonical)
+
+Recommendation: Keep Obsidian as your working surface, but create a small subset of notes that are “canonical” and written so someone else could understand them. Store those canonical notes in the GitHub repo (markdown), and optionally open that folder inside Obsidian as a second vault or as a folder in the same vault.
+
+Think of it like:
+
+    Obsidian (messy): inbox / scratch / drafts
+
+    Repo (clean): context-packs / adr / runbooks / system-onepagers
+
+This avoids trying to “clean” 95% of your vault.
+2) Map PARA to “LLM-ready” artifacts
+
+Keep PARA, but make each bucket produce specific reusable artifacts:
+Projects → “Project Context Pack”
+
+For each active project, maintain one short page that answers:
+
+    What problem / why now
+
+    Scope (in/out)
+
+    Success metrics
+
+    Key constraints / non-goals
+
+    Current status + next milestones
+
+    Links: roadmap/tickets/repos/PRs/meetings/ADRs
+
+This is the page you attach when writing tickets/docs for that project.
+Areas → “Operating Packs”
+
+Areas are perfect for things like:
+
+    “How we ship”
+
+    “How on-call works”
+
+    “How we write good tickets”
+
+    “How we do reviews”
+
+    “What ‘done’ means”
+    These become stable packs you reuse constantly with an LLM.
+
+Resources → “System One-Pagers + Glossary”
+
+Resources should hold:
+
+    Service/system one-pagers
+
+    Glossary / acronyms
+
+    Common patterns (auth, caching, data model conventions)
+
+Archive → “Reference only”
+
+No need to clean; just keep links.
+3) Turn meeting summaries into structured context, automatically
+
+You already have Zoom + Gemini summaries. Treat those as raw input.
+
+Create a note type: Meeting Note (Structured) with frontmatter so it’s searchable and packable:
+
+---
+type: meeting
+date: 2025-12-23
+project: <project>
+area: <area>
+attendees: [...]
+source: <zoom link or doc id>
+tags: [decisions, risks, roadmap]
+---
+
+## 30-sec summary
+
+## Decisions (candidate ADRs)
+- D1:
+- D2:
+
+## Action items
+- [ ] who / what / by when
+
+## Risks / unknowns
+
+## Links mentioned
+
+Solo-friendly move: don’t write these by hand. Paste the Gemini summary and use Cursor/Gemini to transform into that structure in ~30 seconds.
+
+Then, crucially: whenever “Decisions (candidate ADRs)” has anything real, you mint an ADR.
+4) Create a tiny “ADR habit” (this is the real context library engine)
+
+Your biggest future pain is “why did we decide this?” so make ADRs the non-negotiable output.
+
+ADR template (small enough to actually use):
+
+---
+type: adr
+date: 2025-12-23
+project: <project>
+system: <service>
+status: proposed|accepted|superseded
+---
+
+# Decision
+
+## Context
+
+## Options considered
+- A
+- B
+
+## Decision
+
+## Tradeoffs / consequences
+
+## Revisit when
+
+Solo workflow: whenever you extract “D1” from a meeting note, create adr-YYYY-MM-DD-short-title.md and link it from:
+
+    the project context pack
+
+    the relevant system one-pager
+
+    the meeting note
+
+That linkage is what makes retrieval trivial later.
+5) Add “Context Pack Builder” so you never rewrite context again
+
+This is the bridge from “notes exist” → “LLM can use them.”
+
+Make a simple convention:
+
+    Any note that is safe + useful to paste gets a tag like #pack
+
+    You maintain 5–15 core pack notes (project packs, system one-pagers, operating packs)
+
+Then you create a lightweight script (in your internal repo) that:
+
+    takes a list of note paths (or a tag query export)
+
+    concatenates them into one markdown “context pack”
+
+    optionally prepends a standard header (“you are helping write a ticket/doc; ask only for missing info; output format is…”)
+
+This can be dead simple at first (even manual copy/paste), but once you have the script, your prompt becomes:
+
+    “Use pack_project_X + pack_service_Y + ticket_template and draft the ticket.”
+
+No rewriting.
+6) How I’d tweak your current Obsidian setup (without reorganizing your life)
+
+Add just three folders (or PARA-friendly equivalents):
+
+    00-Inbox/ (raw meeting summaries, rough notes)
+
+    10-Canonical/ (LLM-ready: packs, ADRs, system one-pagers, runbooks)
+
+    90-Archive/ (everything else stays as-is)
+
+You’re not cleaning the vault; you’re creating a clean lane.
+7) “Share later” becomes easy if you do one extra thing now
+
+Write canonical notes in a way that:
+
+    avoids private shorthand
+
+    includes links to sources (PRs, tickets, meeting note)
+
+    has an owner + last-updated
+
+When you eventually want to share, you can:
+
+    paste to Confluence
+
+    or point people to the repo
+
+    or export a pack as a Confluence page
+
+Because you already did the hard part: making it legible.
+
+If you tell me how your notes are stored today (single Obsidian vault on disk? and is the internal repo on the same machine?), I’ll propose a concrete folder layout that respects your current PARA structure and a first pass at:
+
+    your Project Context Pack template
+
+    your System One-Pager template
+
+    your Ticket template
+
+    the exact “pack builder” format (so Cursor/Gemini can assemble context automatically).
+
+You said:
+I also track 5 projects at any given time, some of which I lead and some of which I am a stakeholder or participant. I also have many domains of which I need to hold knowledge and they only loosely overlap. How would you separate the contexts? 
+ChatGPT said:
+
+When you’re juggling ~5 projects and multiple mostly-independent domains, the trick is to separate context along two axes and then “stack” only what you need for a given ask:
+
+    Axis A: Project context (time-bound, goal-driven, changes fast)
+
+    Axis B: Domain context (conceptual/operational knowledge, changes slower)
+
+Then you add a small third layer:
+
+    System/service context (where the work happens; interfaces, runbooks, constraints)
+
+The mental model
+
+For any LLM request (ticket/doc), you assemble a context stack:
+
+(Base Operating Norms) + (Domain Pack) + (Project Pack) + (System Pack) + (Task Delta)
+
+You almost never need “all domains” or “all projects.”
+1) Define 3 “context types” and keep them separate
+A) Project Packs (one per project)
+
+A project pack answers: What are we doing and why, right now?
+
+Include:
+
+    goal + success metrics
+
+    scope (in/out)
+
+    milestones / current status
+
+    decision links (ADRs)
+
+    stakeholders + owners
+
+    risks / open questions
+
+    links (repo, docs, key threads)
+
+Key rule: a project pack should NOT teach the domain. It should reference the domain pack(s).
+B) Domain Packs (one per domain)
+
+A domain pack answers: How does this world work and what are the invariants?
+
+Include:
+
+    definitions + glossary
+
+    policies/constraints (security, compliance, performance)
+
+    common patterns
+
+    “gotchas”
+
+    canonical diagrams/flows
+
+    links to deep sources
+
+Key rule: domain packs should not be polluted with “Project X status.” They’re reusable across projects.
+C) System Packs (one per service/system area)
+
+A system pack answers: Where is this implemented and how does it behave in production?
+
+Include:
+
+    responsibilities + boundaries
+
+    dependencies + interfaces
+
+    deploy/rollback basics
+
+    dashboards/alerts
+
+    common failure modes + runbook links
+
+Key rule: system packs are your bridge between domain intent and concrete engineering reality.
+2) Handle overlap without duplication: “one owner per fact”
+
+Overlaps are fine; duplication is what kills you.
+
+Use this rule:
+
+    If it’s true across time and projects → it lives in a Domain Pack
+
+    If it’s true for this initiative → it lives in a Project Pack
+
+    If it’s true for this code/service → it lives in a System Pack
+
+And when something touches multiple packs, you don’t copy it—you link it.
+3) Introduce “Context IDs” and a tiny metadata header
+
+Make every canonical note declare what it is and where it belongs. Example frontmatter:
+
+---
+type: project | domain | system | adr | runbook
+context_id: PROJ-payments-reliability
+domains: [payments, risk]
+systems: [svc-payments-api]
+owner_role: lead | stakeholder
+freshness: high | medium | low
+---
+
+This lets you separate and assemble context consistently even if your folders are messy.
+4) Practical structure for 5 projects + many domains
+
+Keep PARA if you like, but add a Canonical lane with these subfolders:
+
+    Canonical/Projects/PROJ-…
+
+    Canonical/Domains/DOM-…
+
+    Canonical/Systems/SYS-…
+
+    Canonical/ADRs/
+
+    Canonical/Runbooks/
+
+    Canonical/Snippets/ (ticket template, doc template, etc.)
+
+Inside each project folder, keep only:
+
+    project-pack.md
+
+    decisions/ (links or ADR pointers)
+
+    threads/ (optional: extracted meeting decisions)
+
+Inside each domain folder:
+
+    domain-pack.md
+
+    glossary.md (or embedded)
+
+    patterns.md
+
+5) How you decide “which context to attach” (fast)
+
+Use a 30-second chooser:
+
+    What am I producing? ticket or doc
+
+    Which project is this for? include that project pack
+
+    Which domain governs the requirements? include 1–2 domain packs max
+
+    Which system will be changed/owned? include 1 system pack
+
+    What’s new right now? paste the “task delta” (your latest notes / meeting snippet / PR diff)
+
+If you include more than 2 domains or more than 1–2 systems, you’re usually mixing concerns—split the ticket/doc.
+6) Lead vs stakeholder projects: separate “ownership depth”
+
+Since you’re not equally involved in all 5 projects, maintain two levels of project packs:
+
+    Lead Pack (full): status, risks, milestones, decisions, rationale
+
+    Stakeholder Pack (thin): purpose, your concerns, dependency points, what you need from others, decision log links
+
+This keeps you from over-investing in “participant” contexts.
+7) A very usable default: “Base packs”
+
+Create 3 packs you reuse everywhere:
+
+    Operating Norms Pack (DoD, ticket style, doc style, comms expectations)
+
+    Glossary Pack (global acronyms + linking to domain glossaries)
+
+    Architecture Topology Pack (one high-level map of systems)
+
+Then each request just adds: (Project + Domain + System + Delta).
+
+If you tell me the names of your 5 projects and ~6–10 domains (just labels like “Payments,” “Identity,” “Observability,” etc.), I’ll map them into a clean “context graph” (which projects depend on which domains/systems) and propose exactly which packs you should create first so you get maximum prompt-tax reduction with minimal writing.
+You said:
+Can you reference an external source talking about project packs or domain packs?
+ChatGPT said:
+
+Yes — those exact labels (“project pack” / “domain pack”) aren’t universal terms, but the same idea is well-established under a few widely used patterns:
+“Project pack” ≈ Project brief / project charter / PRD
+
+These are short, high-level documents meant to avoid repeatedly re-explaining the purpose/scope/stakeholders/success criteria.
+
+    A project brief commonly includes goals/success criteria, stakeholders, and milestones/timeline.
+
+A project charter is explicitly described as a formal doc capturing purpose, scope, stakeholders, and key milestones (Atlassian’s Confluence template is a good reference since you already use Confluence).
+
+A PRD is another close analogue: it clarifies scope, constraints, acceptance criteria, and expected value.
+“Domain pack” ≈ DDD bounded context + context map
+
+If what you mean by “domain pack” is “the stable concepts/rules/language for a domain that multiple projects draw on,” that aligns very closely with Domain-Driven Design’s strategic patterns:
+
+    Bounded Context is a central DDD pattern for separating models and being explicit about boundaries/interrelationships.
+
+Context mapping describes how bounded contexts relate and communicate (useful when your “domains” loosely overlap).
+
+And a modern caution that’s relevant to your situation: domains and bounded contexts don’t necessarily map 1:1 (i.e., overlap is normal).
+Bonus: “Pack” as a documented interface (Team APIs)
+
+If part of what you want is “a reusable bundle that tells people/how-to-engage,” Team Topologies’ Team API template is basically a “context pack” for team interaction.
+
+If you want, tell me 2–3 of your domains (just names like “Payments,” “Identity,” “Data platform,” etc.) and I’ll translate them into DDD-style “domain pack” sections (definitions, invariants, constraints, common gotchas) that are optimized for reuse with LLMs.
+
+
