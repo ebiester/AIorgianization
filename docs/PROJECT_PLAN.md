@@ -8,9 +8,10 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 
 - **Storage:** Markdown files in Obsidian vault (no database)
 - **UI:** Obsidian plugin for viewing/editing tasks
-- **CLI:** Quick capture when not in Obsidian
-- **Integrations:** Jira sync, Claude MCP
-- **AI:** MCP server for Claude Code integration
+- **CLI:** Python (Click) for quick capture when not in Obsidian
+- **MCP:** Python MCP server for Cursor CLI integration
+- **Integrations:** Jira sync
+- **Testing:** pytest (unit, integration, e2e)
 
 ---
 
@@ -21,7 +22,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | 1 | Foundation | In Progress | Vault structure, CLI basics |
 | 2 | Obsidian Plugin Core | Not Started | Task views, commands |
 | 3 | Jira Integration | Not Started | Sync assigned issues |
-| 4 | AI Integration | Not Started | MCP server for Claude |
+| 4 | AI Integration | Not Started | MCP server for Cursor CLI |
 | 5 | Polish | Not Started | Weekly review, refinements |
 
 ---
@@ -38,16 +39,20 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | Task file format | YAML frontmatter + markdown spec (with dependencies) | Done (in docs) |
 | Project file format | Links, timeline, health queries | Done (in docs) |
 | Dashboard file format | Daily note integration with Dataview queries | Done (in docs) |
-| CLI scaffold | TypeScript + Commander setup | Partial (needs rewrite) |
+| Python project setup | pyproject.toml, uv, pytest, ruff, mypy | Not Started |
+| CLI scaffold | Python + Click setup | Not Started |
 | Init command | `aio init <vault-path>` creates AIO directory structure | Not Started |
-| VaultService | Locate and read Obsidian vault | Not Started |
-| TaskFileService | Parse/write task markdown files | Not Started |
+| VaultService | Locate and read Obsidian vault (Python) | Not Started |
+| TaskService | Parse/write task markdown files (Python) | Not Started |
 | Add command | Create task file in Inbox | Not Started |
 | List command | Query tasks by status/folder | Not Started |
 | Done command | Move task to Completed folder | Not Started |
 | Dashboard command | Generate/append dashboard to daily note | Not Started |
 | Archive commands | Archive tasks, projects, areas, people | Not Started |
 | Date-based archive | `aio archive tasks --before <date>` | Not Started |
+| Unit tests | Test services, utils, models | Not Started |
+| Integration tests | Test CLI commands | Not Started |
+| E2E tests | Test full workflows with fixtures | Not Started |
 
 ### Verification
 
@@ -141,25 +146,27 @@ aio sync jira
 
 ## Phase 4: AI Integration
 
-**Objective:** MCP server exposing vault to Claude for AI assistance.
+**Objective:** MCP server exposing vault to Cursor CLI for AI assistance.
 
 ### Deliverables
 
 | Item | Description | Priority |
 |------|-------------|----------|
-| MCP package | @modelcontextprotocol/sdk setup | P0 |
+| MCP package | Python mcp SDK setup | P0 |
 | aio_add_task tool | Create task via MCP | P0 |
 | aio_list_tasks tool | Query tasks via MCP | P0 |
 | aio_complete_task tool | Complete task via MCP | P0 |
 | aio_get_context tool | Read context packs | P0 |
+| aio_get_dashboard tool | Get daily dashboard | P0 |
 | Task resources | Expose task lists as resources | P1 |
-| Claude skill files | .claude/skills/aio/ instructions | P1 |
+| Cursor skill file | .cursor/skills/aio.md instructions | P1 |
+| MCP integration tests | Test tool invocations | P0 |
 
 ### Verification
 
-- Configure MCP server in Claude Code
+- Configure MCP server in Cursor (`~/.cursor/mcp.json`)
 - "Add a task to review the roadmap by Friday"
-- Claude calls aio_add_task
+- Cursor calls aio_add_task
 - Task file created in vault
 
 ---
@@ -183,46 +190,53 @@ aio sync jira
 
 ## Work Breakdown by Component
 
-### CLI (@aio/cli)
+### Python Package (aio/)
 
 | Phase | Work |
 |-------|------|
-| 1 | VaultService, TaskFileService, add/list/done commands |
-| 3 | sync jira command |
+| 1 | Project setup, VaultService, TaskService, CLI (add/list/done), tests |
+| 3 | JiraSyncService |
+| 4 | MCP server, tools, resources |
 | 5 | Polish, better output |
 
-### Obsidian Plugin (obsidian-aio)
+### Obsidian Plugin (obsidian-aio/)
 
 | Phase | Work |
 |-------|------|
-| 2 | All plugin features |
+| 2 | All plugin features (TypeScript) |
 | 3 | Jira sync UI, settings |
 | 5 | Weekly review, polish |
 
-### MCP Server (@aio/mcp)
+### Cursor Integration
 
 | Phase | Work |
 |-------|------|
-| 4 | All MCP features |
+| 4 | MCP config, skill file (.cursor/skills/aio.md) |
 
 ---
 
 ## Migration Notes
 
-The Phase 1 prototype used SQLite + Drizzle. This has been replaced:
+The Phase 1 prototype used TypeScript + SQLite + Drizzle. This has been replaced:
 
-- **Before:** Tasks in `~/.aio/aio.db` (SQLite)
-- **After:** Tasks in `Vault/Tasks/*.md` (Markdown files)
+- **Before:** TypeScript CLI, tasks in `~/.aio/aio.db` (SQLite)
+- **After:** Python CLI, tasks in `Vault/AIO/Tasks/*.md` (Markdown files)
 
-The existing CLI code needs rewriting to use VaultService instead of Drizzle.
+The existing TypeScript CLI is being rewritten in Python.
 
 ---
 
 ## Next Actions
 
-1. [ ] Rewrite CLI to use markdown files instead of SQLite
-2. [ ] Implement VaultService (find vault, read files)
-3. [ ] Implement TaskFileService (parse/write frontmatter)
-4. [ ] Implement DashboardService (generate daily dashboard)
-5. [ ] Test add/list/done/dashboard with real vault
-6. [ ] Begin Obsidian plugin scaffold
+1. [ ] Set up Python project (pyproject.toml, uv, ruff, mypy, pytest)
+2. [ ] Implement VaultService (find vault, read/write files)
+3. [ ] Implement TaskService (parse/write frontmatter)
+4. [ ] Implement ID generation utility (4-char alphanumeric)
+5. [ ] Implement date parsing utility (natural language)
+6. [ ] Implement CLI scaffold with Click
+7. [ ] Implement init, add, list, done commands
+8. [ ] Write unit tests for services and utils
+9. [ ] Write integration tests for CLI
+10. [ ] Write E2E tests with vault fixtures
+11. [ ] Implement DashboardService
+12. [ ] Begin Obsidian plugin scaffold
