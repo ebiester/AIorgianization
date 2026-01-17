@@ -267,6 +267,20 @@ def test_add_task_with_duplicate_id_retries(temp_vault):
 - Test each piece before moving to the next
 - If a task feels too big, break it down further
 
+### Exit Criteria / Verification
+
+Before considering a task complete, verify the expected behavior:
+
+- **CLI changes**: Run the actual command and confirm the output matches expectations
+  - After modifying entry points or dependencies, run `uv pip install -e . --force-reinstall` to ensure changes are picked up
+  - Test both success and error cases
+  - For error handling changes, trigger the error condition and verify user-friendly output (no tracebacks unless `--debug`)
+- **Service/model changes**: Run relevant unit tests with `uv run pytest tests/unit/test_<module>.py`
+- **Integration changes**: Run `uv run pytest tests/integration/`
+- **Any code change**: Ensure `uv run ruff check .` and `uv run mypy aio` pass
+
+A task is not complete until the expected output is observed. If verification fails, continue debugging until it passes.
+
 ### Python Style
 
 - Python 3.12+

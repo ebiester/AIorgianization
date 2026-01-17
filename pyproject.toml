@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-aio = "aio.cli.main:cli"
+aio = "aio.cli.main:main"
 aio-mcp = "aio.mcp.server:main"
 
 [project.optional-dependencies]
