@@ -1,5 +1,6 @@
 """Natural language date parsing and formatting."""
 
+import re
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,48 @@ from aio.exceptions import InvalidDateError
 
 if TYPE_CHECKING:
     pass
+
+# Days of week mapping (0=Monday, 6=Sunday)
+_DAYS_OF_WEEK = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+
+def _parse_next_day_of_week(date_str: str) -> date | None:
+    """Parse 'next <day>' patterns that dateparser doesn't handle.
+
+    Args:
+        date_str: A date string like "next friday" or "next Monday".
+
+    Returns:
+        A date object if the pattern matches, None otherwise.
+    """
+    match = re.match(r"^next\s+(\w+)$", date_str.lower().strip())
+    if not match:
+        return None
+
+    day_name = match.group(1)
+    if day_name not in _DAYS_OF_WEEK:
+        return None
+
+    target_day = _DAYS_OF_WEEK[day_name]
+    today = date.today()
+    current_day = today.weekday()
+
+    # Calculate days until target day in the NEXT week
+    # "next friday" means the friday of next week, not this week
+    days_until = (target_day - current_day) % 7
+    if days_until == 0:
+        days_until = 7  # Same day means next week
+    days_until += 7  # Add a week because "next" means next week
+
+    return today + timedelta(days=days_until)
 
 
 def parse_date(date_str: str) -> date:
@@ -32,6 +75,11 @@ def parse_date(date_str: str) -> date:
     """
     if not date_str or not date_str.strip():
         raise InvalidDateError("Date string cannot be empty")
+
+    # First try our custom "next <day>" parser
+    result_date = _parse_next_day_of_week(date_str)
+    if result_date is not None:
+        return result_date
 
     # Try parsing with dateparser
     result = dateparser.parse(
