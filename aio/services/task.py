@@ -144,9 +144,11 @@ class TaskService:
         if status:
             statuses = [status]
         else:
+            # Default view excludes completed and someday (deferred) tasks
             statuses = list(TaskStatus)
-            if not include_completed:
-                statuses = [s for s in statuses if s != TaskStatus.COMPLETED]
+            statuses = [s for s in statuses if s not in (TaskStatus.COMPLETED, TaskStatus.SOMEDAY)]
+            if include_completed:
+                statuses.append(TaskStatus.COMPLETED)
 
         for s in statuses:
             folder = self.vault.tasks_folder(s.value)
