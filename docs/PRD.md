@@ -118,7 +118,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 **Quick Add Modal:**
 - Title input with natural language parsing
-- Shows preview: "Due: tomorrow, Priority: P1"
+- Shows preview: "Due: tomorrow"
 - Keyboard: Enter to save, Esc to cancel
 - Optional fields expandable (project, notes)
 
@@ -131,7 +131,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 **Task Display (in views):**
 - Checkbox for completion
 - Title (click to open file)
-- Priority badge (colored)
 - Due date (relative, red if overdue)
 - Project link
 - Person link (if delegated)
@@ -236,7 +235,7 @@ These use cases are designed to drive automated test development.
 |------|--------|-----------------|
 | 1 | Run `aio add "Review PR #123"` | Task created with status=inbox, taskType=personal |
 | 2 | Run `aio add "Call vendor" -d tomorrow` | Task created with dueDate=tomorrow 00:00:00 |
-| 3 | Run `aio add "Urgent fix" -P P1 -d today` | Task created with priority=P1, dueDate=today |
+| 3 | Run `aio add "Urgent fix" -d today` | Task created with dueDate=today |
 | 4 | Run `aio list inbox` | All three tasks appear in inbox list |
 
 **Test assertions:**
@@ -328,31 +327,28 @@ These use cases are designed to drive automated test development.
 
 ### UC-007: Project Task Organization
 
-**Preconditions:** Project "Q4 Migration" exists
+**Preconditions:** Vault initialized, no projects exist yet
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Run `aio add "Design API" -p "Q4 Migration"` | Task linked to project |
-| 2 | Run `aio list "Q4 Migration"` | Task appears under project |
-| 3 | Run `aio project show "Q4 Migration"` | Project details + all tasks shown |
+| 1 | Run `aio add "Design API" -p "Q4 Migration"` | Error: "Project not found" with `--create-project` suggestion |
+| 2 | Run `aio add "Design API" -p "Q4 Migration" --create-project` | Project created in AIO/Projects/, task linked |
+| 3 | Run `aio add "Review spec" -p "Q4 Migration"` | Task linked (project now exists) |
+| 4 | Run `aio add "Typo task" -p "Q4 Migartion"` | Error with fuzzy suggestion: "Did you mean? Q4-Migration" |
+| 5 | Run `aio list "Q4 Migration"` | Both tasks appear under project |
+| 6 | Run `aio project show "Q4 Migration"` | Project details + all tasks shown |
 
 **Test assertions:**
-- projectId correctly set
+- Project validation errors by default for non-existent projects
+- Fuzzy matching suggests similar project names on typos
+- `--create-project` flag creates project with template in AIO/Projects/
+- projectId correctly set after validation passes
 - Project filter returns only project tasks
 - Project view shows task count and statuses
 
-### UC-008: Priority Filtering
+### ~~UC-008: Priority Filtering~~ [REMOVED]
 
-**Preconditions:** Tasks exist with P1, P2, P3, P4 priorities
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `aio list --priority P1` | Only P1 tasks shown |
-| 2 | Run `aio list today` | Tasks sorted by priority (P1 first) |
-
-**Test assertions:**
-- Priority filter exact match
-- Default sort order: priority → due date → created date
+*Feature removed - priority not implemented.*
 
 ### UC-009: Overdue Detection
 
@@ -472,7 +468,6 @@ These use cases are designed to drive automated test development.
 |----------|-------------------|
 | Invalid date format | Error message, task not created |
 | Non-existent task ID | "Task not found" error |
-| Invalid priority value | "Invalid priority, use P1-P4" error |
 | Vault not initialized | Clear error with `aio init` instructions |
 | Jira auth failure | Clear error with remediation steps |
 
@@ -506,10 +501,8 @@ These use cases are designed to drive automated test development.
 |------|--------|-----------------|
 | 1 | Click task title | Title becomes editable input |
 | 2 | Change title, press Enter | Title saved, input closes |
-| 3 | Click priority badge | Priority dropdown appears |
-| 4 | Select P1 | Priority updates immediately |
-| 5 | Click due date | Date picker appears |
-| 6 | Select new date | Due date updates |
+| 3 | Click due date | Date picker appears |
+| 4 | Select new date | Due date updates |
 
 **Test assertions:**
 - Changes persist to task file
@@ -542,7 +535,7 @@ These use cases are designed to drive automated test development.
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Press `/` or click quick add bar | Input focused |
-| 2 | Type "Review PR -d tomorrow -P P1" | Preview shows parsed task |
+| 2 | Type "Review PR -d tomorrow" | Preview shows parsed task |
 | 3 | Press Enter | Task created, appears in list |
 | 4 | Type invalid syntax | Preview shows error, submit disabled |
 
@@ -589,12 +582,12 @@ These use cases are designed to drive automated test development.
 
 ### UC-023: Obsidian Plugin - Filtering
 
-**Preconditions:** Tasks exist with various priorities, projects, dates
+**Preconditions:** Tasks exist with various projects, dates
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Click "Priority: P1" filter | Only P1 tasks shown |
-| 2 | Add "Project: Migration" filter | P1 tasks in Migration project |
+| 1 | Click "Project: Migration" filter | Only Migration project tasks shown |
+| 2 | Add "Due: This week" filter | Migration project tasks due this week |
 | 3 | Check URL | URL contains filter params |
 | 4 | Copy URL, open in new tab | Same filtered view loads |
 | 5 | Click "Clear filters" | All tasks shown again |

@@ -49,7 +49,13 @@ class InvalidDateError(AioError):
 class ProjectNotFoundError(AioError):
     """Raised when a project cannot be found."""
 
-    pass
+    def __init__(self, project: str, suggestions: list[str] | None = None) -> None:
+        self.project = project
+        self.suggestions = suggestions or []
+        msg = f"Project not found: {project}"
+        if self.suggestions:
+            msg += "\n\nDid you mean?\n  - " + "\n  - ".join(self.suggestions)
+        super().__init__(msg)
 
 
 class PersonNotFoundError(AioError):
