@@ -1,5 +1,6 @@
 """Config CLI commands for AIorgianization."""
 
+from pathlib import Path
 from typing import Any
 
 import click
@@ -167,6 +168,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     Use dot notation for nested keys.
 
     Examples:
+        aio config set vault ./my-vault
         aio config set jira.enabled true
         aio config set jira.baseUrl https://company.atlassian.net
         aio config set jira.email user@company.com
@@ -178,9 +180,19 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
     config_data = vault_service.get_config()
 
     parsed_value = _parse_value(value)
+
+    # Convert relative paths to absolute for vault setting
+    if key == "vault" and isinstance(parsed_value, str):
+        parsed_value = str(Path(parsed_value).expanduser().resolve())
+
     _set_nested_value(config_data, key, parsed_value)
 
     vault_service.set_config(config_data)
+
+    # Also update global config when setting vault.path
+    if key in ("vault", "vault.path"):
+        vault_service._save_global_config(Path(parsed_value))
+
     console.print(f"[green]Set {key} = {_format_value(parsed_value)}[/green]")
 
 

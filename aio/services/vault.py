@@ -170,7 +170,7 @@ class VaultService:
             folder_path = vault_path / folder
             folder_path.mkdir(parents=True, exist_ok=True)
 
-        # Create .aio config directory and default config
+        # Create .aio config directory and default config in vault
         config_dir = vault_path / ".aio"
         config_dir.mkdir(exist_ok=True)
 
@@ -183,7 +183,34 @@ class VaultService:
             with open(config_file, "w", encoding="utf-8") as f:
                 yaml.dump(default_config, f, default_flow_style=False)
 
+        # Also save to global config so vault can be found from anywhere
+        self._save_global_config(vault_path)
+
         return vault_path
+
+    def _save_global_config(self, vault_path: Path) -> None:
+        """Save vault path to global config file.
+
+        Args:
+            vault_path: Path to the vault to save.
+        """
+        global_config_dir = Path.home() / ".aio"
+        global_config_dir.mkdir(exist_ok=True)
+        global_config_file = global_config_dir / "config.yaml"
+
+        # Read existing global config or create new one
+        global_config: dict[str, Any] = {}
+        if global_config_file.exists():
+            with open(global_config_file, encoding="utf-8") as f:
+                global_config = yaml.safe_load(f) or {}
+
+        # Update vault path
+        if "vault" not in global_config:
+            global_config["vault"] = {}
+        global_config["vault"]["path"] = str(vault_path)
+
+        with open(global_config_file, "w", encoding="utf-8") as f:
+            yaml.dump(global_config, f, default_flow_style=False)
 
     def ensure_initialized(self) -> None:
         """Ensure the vault is initialized.
