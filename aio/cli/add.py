@@ -94,8 +94,9 @@ def add(
                     )
                     raise click.Abort() from None
 
-        # Format as wikilink
-        project_link = f"[[Projects/{project_name}]]"
+        # Format as wikilink using the slug (matches actual filename)
+        project_slug = project_service.get_slug(project_name)
+        project_link = f"[[AIO/Projects/{project_slug}]]"
 
     # Create task
     task = task_service.create(

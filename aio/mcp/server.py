@@ -18,6 +18,7 @@ from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
 from aio.services.jira import JiraSyncService
+from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
 from aio.utils.dates import parse_date
@@ -33,6 +34,7 @@ class ServiceRegistry:
     def __init__(self) -> None:
         self._vault_service: VaultService | None = None
         self._task_service: TaskService | None = None
+        self._project_service: ProjectService | None = None
         self._dashboard_service: DashboardService | None = None
         self._jira_service: JiraSyncService | None = None
         self._context_pack_service: ContextPackService | None = None
@@ -41,6 +43,7 @@ class ServiceRegistry:
         """Reset all services. Useful for testing."""
         self._vault_service = None
         self._task_service = None
+        self._project_service = None
         self._dashboard_service = None
         self._jira_service = None
         self._context_pack_service = None
@@ -78,6 +81,13 @@ class ServiceRegistry:
         if self._task_service is None:
             self._task_service = TaskService(self.vault_service)
         return self._task_service
+
+    @property
+    def project_service(self) -> ProjectService:
+        """Get the project service, creating it lazily if needed."""
+        if self._project_service is None:
+            self._project_service = ProjectService(self.vault_service)
+        return self._project_service
 
     @property
     def dashboard_service(self) -> DashboardService:
@@ -120,6 +130,11 @@ def get_vault_service() -> VaultService:
 def get_task_service() -> TaskService:
     """Get the task service."""
     return _registry.task_service
+
+
+def get_project_service() -> ProjectService:
+    """Get the project service."""
+    return _registry.project_service
 
 
 def get_dashboard_service() -> DashboardService:
@@ -408,6 +423,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
     """Handle aio_add_task tool."""
     task_service = get_task_service()
+    project_service = get_project_service()
 
     title = args["title"]
     due_str = args.get("due")
@@ -424,7 +440,9 @@ async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
     project_link = None
     if project:
         if not project.startswith("[["):
-            project_link = f"[[Projects/{project}]]"
+            # Use slug to match actual filename
+            project_slug = project_service.get_slug(project)
+            project_link = f"[[AIO/Projects/{project_slug}]]"
         else:
             project_link = project
 
@@ -766,7 +784,7 @@ async def read_resource(uri: str) -> str:
         projects = list(projects_folder.glob("*.md"))
         lines = ["# Active Projects", ""]
         for p in projects:
-            lines.append(f"- [[Projects/{p.stem}]]")
+            lines.append(f"- [[AIO/Projects/{p.stem}]]")
         return "\n".join(lines)
     elif uri == "aio://dashboard":
         dashboard_service = get_dashboard_service()

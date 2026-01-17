@@ -46,7 +46,7 @@ class Task(BaseModel):
 
     # Relationships
     project: str | None = Field(
-        default=None, description="Wikilink to project, e.g. [[Projects/Q4-Migration]]"
+        default=None, description="Wikilink to project, e.g. [[AIO/Projects/Q4-Migration]]"
     )
     assigned_to: str | None = Field(
         default=None,

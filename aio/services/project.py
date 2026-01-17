@@ -158,3 +158,18 @@ class ProjectService:
             Lowercase name with spaces and hyphens normalized.
         """
         return name.lower().replace("-", " ").replace("_", " ")
+
+    def get_slug(self, name: str) -> str:
+        """Get the slug (filename stem) for a project name.
+
+        Args:
+            name: Project name.
+
+        Returns:
+            Slugified name matching what would be used in filename.
+        """
+        slug = name.replace(" ", "-")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")
+        while "--" in slug:
+            slug = slug.replace("--", "-")
+        return slug
