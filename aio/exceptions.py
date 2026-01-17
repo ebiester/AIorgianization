@@ -61,7 +61,13 @@ class ProjectNotFoundError(AioError):
 class PersonNotFoundError(AioError):
     """Raised when a person cannot be found."""
 
-    pass
+    def __init__(self, person: str, suggestions: list[str] | None = None) -> None:
+        self.person = person
+        self.suggestions = suggestions or []
+        msg = f"Person not found: {person}"
+        if self.suggestions:
+            msg += "\n\nDid you mean?\n  - " + "\n  - ".join(self.suggestions)
+        super().__init__(msg)
 
 
 class JiraError(AioError):

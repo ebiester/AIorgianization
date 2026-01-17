@@ -339,12 +339,20 @@ role: Senior Engineer
 ## 1:1 Notes
 - [[Meetings/2024-01-15-sarah-1on1]]
 
-## Delegated Tasks
+## Tasks Delegated
 ```dataview
-TABLE status, due
-FROM "Tasks"
-WHERE assignedTo = this.file.link AND status != "completed"
+TABLE due AS "Due", status AS "Status"
+FROM "AIO/Tasks"
+WHERE contains(waitingOn, link("AIO/People/Sarah Chen")) AND status != "completed"
 SORT due ASC
+```
+
+## Previously Completed Tasks
+```dataview
+TABLE due AS "Due", completed AS "Completed"
+FROM "AIO/Tasks"
+WHERE contains(waitingOn, link("AIO/People/Sarah Chen")) AND status = "completed"
+SORT completed DESC
 ```
 ```
 
