@@ -87,6 +87,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Location linking | Connect task to file path, line, or URL in project | Planned |
 | Location navigation | Click to open file/URL from task view | Planned |
 | Subtask progress | Track and display completion of subtasks within tasks | Planned |
+| Template system | Customizable templates for tasks, projects, people from template directory | Planned |
 | Jira sync | Background sync with status bar indicator | Planned |
 
 #### Obsidian Plugin Detailed Requirements
@@ -149,6 +150,15 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Jira configuration (URL, email, projects)
 - Sync interval
 - Completed task archiving (by month/year)
+- Template directory path (default: `AIO/Templates/`)
+- Template selection for each entity type (task, project, person, etc.)
+
+**Template Customization:**
+- Templates stored as markdown files in configurable template directory
+- Each template contains frontmatter defaults and body content
+- Template selection when creating new items via modal or CLI
+- Templates support Obsidian's template variables ({{date}}, {{time}}, etc.)
+- Default templates provided on init, user can customize or add new ones
 
 ### P1: Jira Integration (Phase 4)
 
@@ -250,7 +260,7 @@ These use cases are designed to drive automated test development.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Run `aio activate <id>` | status changes to "next_action" |
+| 1 | Run `aio next <id>` | status changes to "next" |
 | 2 | Run `aio start <id>` | status changes to "in_progress" |
 | 3 | Run `aio done <id>` | status=completed, completedAt set |
 | 4 | Run `aio list` | Task no longer appears (completed filtered) |
@@ -270,7 +280,7 @@ These use cases are designed to drive automated test development.
 | 1 | Run `aio defer <id>` | status changes to "someday_maybe" |
 | 2 | Run `aio list` | Task not in default list |
 | 3 | Run `aio list someday` | Task appears |
-| 4 | Run `aio activate <id>` | status changes to "next_action" |
+| 4 | Run `aio next <id>` | status changes to "next" |
 
 **Test assertions:**
 - Deferred tasks hidden from default view

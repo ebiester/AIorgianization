@@ -200,15 +200,15 @@ Before running any tests:
 
 ---
 
-### UAT-011: Status Transition - Activate
+### UAT-011: Status Transition - Next
 
 **Objective:** Verify moving task from Inbox to Next.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Create task: `aio add "Test activate"` | Task in Inbox |
+| 1 | Create task: `aio add "Test next"` | Task in Inbox |
 | 2 | Note the task ID | e.g., "XY3Z" |
-| 3 | Run `aio activate XY3Z` | Success message |
+| 3 | Run `aio next XY3Z` | Success message |
 | 4 | Check Inbox folder | Task file no longer there |
 | 5 | Check Next folder | Task file now there |
 | 6 | Open task file | `status: next` in frontmatter, `updated` timestamp changed |
@@ -259,7 +259,7 @@ Before running any tests:
 | 4 | Check Someday folder | Task file now there |
 | 5 | Run `aio list` | Task NOT in default list |
 | 6 | Run `aio list someday` | Task IS shown |
-| 7 | Run `aio activate <id>` | Task moves back to Next |
+| 7 | Run `aio next <id>` | Task moves back to Next |
 
 **Pass Criteria:** Deferred tasks hidden from default view, can be reactivated.
 
@@ -269,18 +269,21 @@ Before running any tests:
 
 **Objective:** Verify delegating a task to someone.
 
-**Setup:** Create a person file `test-obsidian-vault/aio-dev/AIO/People/Sarah.md` with basic frontmatter.
-
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Create task: `aio add "Test delegation"` | Task in Inbox |
-| 2 | Run `aio wait "Test delegation" Sarah` | Success message |
+| 2 | Run `aio wait "Test delegation" Sarah --create-person` | Success: person created (if new), task delegated |
 | 3 | Check Inbox folder | Task file no longer there |
 | 4 | Check Waiting folder | Task file now there |
-| 5 | Open task file | `status: waiting`, `waitingOn: "[[People/Sarah]]"` |
+| 5 | Open task file | `status: waiting`, `waitingOn: "[[AIO/People/Sarah]]"` |
 | 6 | Run `aio list waiting` | Task appears |
+| 7 | Open `AIO/People/Sarah.md` in Obsidian | "Tasks Delegated" section shows the task via Dataview |
+| 8 | Complete the task: `aio done "Test delegation"` | Task marked completed |
+| 9 | Refresh Sarah.md in Obsidian | Task moves from "Tasks Delegated" to "Previously Completed Tasks" |
 
-**Pass Criteria:** Task in Waiting folder with person link.
+**Pass Criteria:** Task in Waiting folder with person link. Person file shows active delegations separate from completed tasks.
+
+**Note:** The Person file uses Dataview queries with `link()` function to match wikilinks in the `waitingOn` frontmatter field.
 
 ---
 
@@ -328,20 +331,22 @@ Before running any tests:
 
 ---
 
-### UAT-019: Delegated View
+### UAT-019: Waiting Tasks View
 
-**Objective:** Verify viewing delegated tasks grouped by person.
+**Objective:** Verify listing tasks in waiting status.
 
-**Setup:** Create multiple delegated tasks to different people.
+**Setup:** Create tasks and move them to waiting status.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Create tasks and delegate to Sarah and John | Tasks in Waiting |
-| 2 | Run `aio delegated` | Shows all waiting-for tasks grouped by person |
-| 3 | Run `aio delegated Sarah` | Shows only Sarah's delegated tasks |
-| 4 | Output includes | Days since delegated for each task |
+| 1 | Create task: `aio add "Get feedback from Sarah"` | Task created |
+| 2 | Run `aio wait <id> Sarah` | Task moved to waiting, waitingOn set |
+| 3 | Run `aio list waiting` | Shows all waiting tasks |
+| 4 | Output includes | Task ID, title, status shown as waiting |
 
-**Pass Criteria:** Delegated view groups by person with timing info.
+**Pass Criteria:** Waiting tasks are listed correctly.
+
+**Deferred:** Grouped delegated view by person (`aio delegated`) - not yet implemented.
 
 ---
 
@@ -362,16 +367,20 @@ Before running any tests:
 
 ### UAT-021: Archive Single Task
 
-**Objective:** Verify archiving individual tasks.
+**Objective:** Verify archiving individual tasks (tasks that won't be done but are worth keeping for reference).
+
+**Note:** Archiving is for abandoning tasks, not for completed tasks. Completed tasks stay in `Tasks/Completed/`. Archived tasks preserve their original status folder in the archive structure.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Create and complete a task | Task in Completed folder |
-| 2 | Run `aio archive task <id>` | Success message |
-| 3 | Check original location | Task file no longer there |
-| 4 | Check `AIO/Archive/Tasks/Completed/` | Task file now in archive |
+| 1 | Create a task: `aio add "Feature that got descoped"` | Task in Inbox |
+| 2 | Move to Next: `aio start <id>` | Task in Next folder |
+| 3 | Run `aio archive task <id>` | Success message |
+| 4 | Check `AIO/Tasks/Next/` | Task file no longer there |
+| 5 | Check `AIO/Archive/Tasks/Next/` | Task file now in archive (parallel structure) |
+| 6 | Open archived task file | Status unchanged (`status: next`), file preserved |
 
-**Pass Criteria:** Task moved to parallel archive structure.
+**Pass Criteria:** Task moved to parallel archive structure, preserving original status folder.
 
 ---
 
@@ -800,15 +809,18 @@ Before running any tests:
 
 ### UAT-051: Waiting-For Task Format
 
-**Objective:** Verify delegated task format.
+**Objective:** Verify delegated task format and Person file integration.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Delegate task to person | Task in Waiting |
-| 2 | Open task file | `waitingOn: "[[People/PersonName]]"` present |
+| 2 | Open task file | `waitingOn: "[[AIO/People/PersonName]]"` present |
 | 3 | Status field | `status: waiting` |
+| 4 | Open Person file in Obsidian | Two Dataview sections: "Tasks Delegated" and "Previously Completed Tasks" |
+| 5 | Verify "Tasks Delegated" query | Uses `contains(waitingOn, link("AIO/People/PersonName")) AND status != "completed"` |
+| 6 | Verify "Previously Completed Tasks" query | Uses `contains(waitingOn, link("AIO/People/PersonName")) AND status = "completed"` |
 
-**Pass Criteria:** Delegation metadata stored correctly.
+**Pass Criteria:** Delegation metadata stored correctly. Person file separates active from completed delegations.
 
 ---
 
@@ -1036,7 +1048,7 @@ Before running any tests:
 - [ ] UAT-008: Task Listing (Basic)
 - [ ] UAT-009: Task Listing (By Status)
 - [ ] UAT-010: Task Listing (All Including Completed)
-- [ ] UAT-011: Status Transition - Activate
+- [ ] UAT-011: Status Transition - Next
 - [ ] UAT-012: Status Transition - Done
 - [ ] UAT-013: Status Transition - Start
 - [ ] UAT-014: Status Transition - Defer
