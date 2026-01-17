@@ -19,10 +19,10 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 1 | Foundation | In Progress | Vault structure, CLI basics |
-| 2 | Obsidian Plugin Core | Not Started | Task views, commands |
-| 3 | Jira Integration | Not Started | Sync assigned issues |
-| 4 | AI Integration | Not Started | MCP server for Cursor CLI |
+| 1 | Foundation | Done | Vault structure, CLI basics |
+| 2 | Obsidian Plugin Core | Done | Task views, commands |
+| 3 | Jira Integration | Done | Sync assigned issues |
+| 4 | AI Integration | Done | MCP server for Cursor CLI |
 | 5 | Polish | Not Started | Weekly review, refinements |
 
 ---
@@ -35,24 +35,24 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 
 | Item | Description | Status |
 |------|-------------|--------|
-| Vault structure | Define folder layout (AIO/Tasks/, Projects/, People/, Dashboard/, Archive/) | Done (in docs) |
-| Task file format | YAML frontmatter + markdown spec (with dependencies) | Done (in docs) |
-| Project file format | Links, timeline, health queries | Done (in docs) |
-| Dashboard file format | Daily note integration with Dataview queries | Done (in docs) |
-| Python project setup | pyproject.toml, uv, pytest, ruff, mypy | Not Started |
-| CLI scaffold | Python + Click setup | Not Started |
-| Init command | `aio init <vault-path>` creates AIO directory structure | Not Started |
-| VaultService | Locate and read Obsidian vault (Python) | Not Started |
-| TaskService | Parse/write task markdown files (Python) | Not Started |
-| Add command | Create task file in Inbox | Not Started |
-| List command | Query tasks by status/folder | Not Started |
-| Done command | Move task to Completed folder | Not Started |
-| Dashboard command | Generate/append dashboard to daily note | Not Started |
-| Archive commands | Archive tasks, projects, areas, people | Not Started |
-| Date-based archive | `aio archive tasks --before <date>` | Not Started |
-| Unit tests | Test services, utils, models | Not Started |
-| Integration tests | Test CLI commands | Not Started |
-| E2E tests | Test full workflows with fixtures | Not Started |
+| Vault structure | Define folder layout (AIO/Tasks/, Projects/, People/, Dashboard/, Archive/) | Done |
+| Task file format | YAML frontmatter + markdown spec (with dependencies) | Done |
+| Project file format | Links, timeline, health queries | Done |
+| Dashboard file format | Daily note integration with Dataview queries | Done |
+| Python project setup | pyproject.toml, uv, pytest, ruff, mypy | Done |
+| CLI scaffold | Python + Click setup | Done |
+| Init command | `aio init <vault-path>` creates AIO directory structure | Done |
+| VaultService | Locate and read Obsidian vault (Python) | Done |
+| TaskService | Parse/write task markdown files (Python) | Done |
+| Add command | Create task file in Inbox | Done |
+| List command | Query tasks by status/folder | Done |
+| Done command | Move task to Completed folder | Done |
+| Dashboard command | Generate/append dashboard to daily note | Done |
+| Archive commands | Archive tasks, projects, areas, people | Done |
+| Date-based archive | `aio archive tasks --before <date>` | Done |
+| Unit tests | Test services, utils, models | Done |
+| Integration tests | Test CLI commands | Done |
+| E2E tests | Test full workflows with fixtures | Done |
 
 ### Verification
 
@@ -86,19 +86,19 @@ aio archive tasks --before 2024-01-01
 
 | Item | Description | Status |
 |------|-------------|--------|
-| Plugin scaffold | manifest.json, main.ts, esbuild | Not Started |
-| Settings tab | Configure folder paths | Not Started |
-| Task list view | Custom pane showing tasks | Not Started |
-| Quick add modal | Command palette task entry | Not Started |
-| Task edit modal | Edit frontmatter fields | Not Started |
-| Status commands | Complete, start, defer, wait | Not Started |
+| Plugin scaffold | manifest.json, main.ts, esbuild | Done |
+| Settings tab | Configure folder paths | Done |
+| Task list view | Custom pane showing tasks | Done |
+| Quick add modal | Command palette task entry | Done |
+| Task edit modal | Edit frontmatter fields | Done |
+| Status commands | Complete, start, defer, wait | Done |
 | Right-click menu | Context actions on tasks | Not Started |
-| Inbox view | Process items one-by-one | Not Started |
+| Inbox view | Process items one-by-one | Done |
 | Waiting-for view | Grouped by person | Not Started |
-| Dependency management | Link tasks as blockedBy/blocks | Not Started |
+| Dependency management | Link tasks as blockedBy/blocks | Done (model only) |
 | Dependency visualization | Show blocked tasks and blockers in views | Not Started |
 | Blocked view | Tasks waiting on dependencies | Not Started |
-| Location linking | Connect task to file path, line number, or URL | Not Started |
+| Location linking | Connect task to file path, line number, or URL | Done (model only) |
 | Location navigation | Click to open file/URL from task view | Not Started |
 | Subtask progress | Track and display subtask completion (e.g., "3/5") | Not Started |
 
@@ -120,16 +120,16 @@ aio archive tasks --before 2024-01-01
 
 ### Deliverables
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| Jira settings | URL, email, project keys in plugin settings | P0 |
-| JiraSyncService | Fetch issues via jira.js | P0 |
-| Issue → Task mapping | Convert Jira issue to task file | P0 |
-| Status mapping | Map Jira statuses to folders | P0 |
-| Sync command (CLI) | `aio sync jira` | P0 |
-| Sync command (plugin) | Command palette trigger | P0 |
-| Background sync | Periodic sync with status bar | P1 |
-| Sync cache | Track last sync, avoid duplicates | P0 |
+| Item | Description | Status |
+|------|-------------|--------|
+| Jira settings | URL, email, project keys in config | Done |
+| JiraSyncService | Fetch issues via jira library | Done |
+| Issue → Task mapping | Convert Jira issue to task file | Done |
+| Status mapping | Map Jira statuses to folders | Done |
+| Sync command (CLI) | `aio sync jira` | Done |
+| Sync command (MCP) | `aio_sync_jira` tool | Done |
+| Background sync | Periodic sync with status bar | Not Started |
+| Sync cache | Track last sync, avoid duplicates | Done |
 
 ### Verification
 
@@ -150,17 +150,22 @@ aio sync jira
 
 ### Deliverables
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| MCP package | Python mcp SDK setup | P0 |
-| aio_add_task tool | Create task via MCP | P0 |
-| aio_list_tasks tool | Query tasks via MCP | P0 |
-| aio_complete_task tool | Complete task via MCP | P0 |
-| aio_get_context tool | Read context packs | P0 |
-| aio_get_dashboard tool | Get daily dashboard | P0 |
-| Task resources | Expose task lists as resources | P1 |
-| Cursor skill file | .cursor/skills/aio.md instructions | P1 |
-| MCP integration tests | Test tool invocations | P0 |
+| Item | Description | Status |
+|------|-------------|--------|
+| MCP package | Python mcp SDK setup | Done |
+| aio_add_task tool | Create task via MCP | Done |
+| aio_list_tasks tool | Query tasks via MCP | Done |
+| aio_complete_task tool | Complete task via MCP | Done |
+| aio_start_task tool | Start task via MCP | Done |
+| aio_defer_task tool | Defer task via MCP | Done |
+| aio_get_context tool | Read context packs | Done |
+| aio_get_dashboard tool | Get daily dashboard | Done |
+| aio_sync_jira tool | Sync Jira via MCP | Done |
+| aio_jira_status tool | Get Jira status via MCP | Done |
+| Context pack tools | Create, list, append context packs | Done |
+| Task resources | Expose task lists as resources | Done |
+| Cursor skill file | .cursor/skills/aio.md instructions | Not Started |
+| MCP integration tests | Test tool invocations | Not Started |
 
 ### Verification
 
@@ -222,21 +227,22 @@ The Phase 1 prototype used TypeScript + SQLite + Drizzle. This has been replaced
 - **Before:** TypeScript CLI, tasks in `~/.aio/aio.db` (SQLite)
 - **After:** Python CLI, tasks in `Vault/AIO/Tasks/*.md` (Markdown files)
 
-The existing TypeScript CLI is being rewritten in Python.
+The Python CLI rewrite is complete. All core functionality has been migrated.
 
 ---
 
 ## Next Actions
 
-1. [ ] Set up Python project (pyproject.toml, uv, ruff, mypy, pytest)
-2. [ ] Implement VaultService (find vault, read/write files)
-3. [ ] Implement TaskService (parse/write frontmatter)
-4. [ ] Implement ID generation utility (4-char alphanumeric)
-5. [ ] Implement date parsing utility (natural language)
-6. [ ] Implement CLI scaffold with Click
-7. [ ] Implement init, add, list, done commands
-8. [ ] Write unit tests for services and utils
-9. [ ] Write integration tests for CLI
-10. [ ] Write E2E tests with vault fixtures
-11. [ ] Implement DashboardService
-12. [ ] Begin Obsidian plugin scaffold
+**Phase 5 (Polish) - Not Started:**
+
+1. [ ] Implement weekly review wizard in Obsidian plugin
+2. [ ] Add review tracking (record completion timestamps)
+3. [ ] Implement Waiting-for view grouped by person
+4. [ ] Add right-click context menu in plugin
+5. [ ] Implement dependency visualization in task views
+6. [ ] Add Blocked view for tasks waiting on dependencies
+7. [ ] Implement location navigation (click to open file/URL)
+8. [ ] Add subtask progress display
+9. [ ] Create Cursor skill file (.cursor/skills/aio.md)
+10. [ ] Write MCP integration tests
+11. [ ] Add background Jira sync with status bar indicator

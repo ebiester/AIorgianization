@@ -1,0 +1,403 @@
+/* AIorgianization Plugin Styles */
+
+/* Task List Container */
+.aio-task-list-container {
+  padding: 16px;
+}
+
+.aio-task-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.aio-task-list-title {
+  margin: 0;
+}
+
+.aio-add-btn {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aio-add-btn:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* Status Tabs */
+.aio-status-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.aio-status-tab {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.aio-status-tab:hover {
+  background: var(--background-modifier-hover);
+}
+
+.aio-status-tab.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* Task List */
+.aio-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Task Item */
+.aio-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.aio-task-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.aio-task-checkbox {
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.aio-task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.aio-task-title {
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+
+.aio-task-title:hover {
+  color: var(--interactive-accent);
+}
+
+.aio-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Status Badge */
+.aio-status-badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.aio-status-inbox {
+  background: var(--color-blue);
+  color: white;
+}
+
+.aio-status-next {
+  background: var(--color-green);
+  color: white;
+}
+
+.aio-status-waiting {
+  background: var(--color-orange);
+  color: white;
+}
+
+.aio-status-scheduled {
+  background: var(--color-purple);
+  color: white;
+}
+
+.aio-status-someday {
+  background: var(--text-muted);
+  color: white;
+}
+
+.aio-status-completed {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+/* Due Date */
+.aio-due-date {
+  color: var(--text-muted);
+}
+
+.aio-due-date.aio-overdue {
+  color: var(--color-red);
+  font-weight: 500;
+}
+
+/* Project */
+.aio-project {
+  color: var(--text-accent);
+}
+
+/* Tags */
+.aio-tag {
+  color: var(--text-muted);
+}
+
+/* Task Actions */
+.aio-task-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.aio-task-item:hover .aio-task-actions {
+  opacity: 1;
+}
+
+.aio-action-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.aio-action-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Empty State */
+.aio-empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.aio-error {
+  color: var(--color-red);
+  padding: 16px;
+}
+
+/* Inbox View */
+.aio-inbox-container {
+  padding: 16px;
+}
+
+.aio-inbox-header {
+  margin-bottom: 16px;
+}
+
+.aio-inbox-title {
+  margin: 0;
+}
+
+.aio-inbox-progress {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.aio-progress-bar {
+  height: 4px;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.aio-progress-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+/* Inbox Card */
+.aio-inbox-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.aio-inbox-task-title {
+  margin: 0 0 12px 0;
+  cursor: pointer;
+}
+
+.aio-inbox-task-title:hover {
+  color: var(--interactive-accent);
+}
+
+.aio-inbox-task-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.aio-task-id {
+  font-family: var(--font-monospace);
+}
+
+.aio-inbox-preview {
+  font-size: 14px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+/* Inbox Actions */
+.aio-inbox-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.aio-inbox-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.aio-inbox-action:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.aio-inbox-action.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.aio-inbox-action.mod-cta:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.aio-action-icon {
+  font-size: 24px;
+}
+
+.aio-action-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.aio-inbox-action.mod-cta .aio-action-hint {
+  color: var(--text-on-accent);
+  opacity: 0.8;
+}
+
+/* Inbox Skip */
+.aio-inbox-skip {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.aio-skip-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.aio-skip-btn:hover {
+  color: var(--text-normal);
+}
+
+/* Inbox Zero */
+.aio-inbox-zero {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.aio-inbox-zero-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.aio-inbox-zero h3 {
+  margin: 0 0 8px 0;
+}
+
+.aio-inbox-zero p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* Modals */
+.aio-quick-add-modal,
+.aio-task-edit-modal {
+  max-width: 500px;
+}
+
+.aio-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.aio-modal-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 12px;
+}
+
+.aio-task-id-display {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* Warning button style */
+.mod-warning {
+  background: var(--color-red);
+  color: white;
+}
+
+.mod-warning:hover {
+  background: var(--color-red);
+  opacity: 0.9;
+}

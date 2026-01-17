@@ -34,7 +34,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 3. **Smart organization**: GTD-style workflow with contexts, projects, and reviews
 4. **Integration**: Pull from Jira, reference Obsidian notes
 5. **AI-powered**: Claude helps break down projects and suggests prioritization
-6. **Visual dashboard**: Web UI for daily/weekly planning and reviews
+6. **Visual dashboard**: Obsidian plugin for daily/weekly planning and reviews
 
 ## Non-Goals
 
@@ -50,15 +50,15 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Vault init | `aio init <vault-path>` creates AIO directory structure | Planned |
+| Vault init | `aio init <vault-path>` creates AIO directory structure | Done |
 | Quick add | `aio add "Task" -d tomorrow` | Done |
 | Task listing | Filter by status, project, due date | Done |
-| Status transitions | inbox → next_action → in_progress → completed | Done |
+| Status transitions | inbox → next → waiting → completed | Done |
 | Waiting-for | Track tasks delegated to others | Done |
 | Someday/maybe | Defer non-urgent items | Done |
 | Natural dates | "tomorrow", "next monday", "in 3 days" | Done |
-| Archiving | Archive tasks, projects, areas, people | Planned |
-| Date-based archive | `aio archive tasks --before <date>` | Planned |
+| Archiving | Archive tasks, projects, areas, people | Done |
+| Date-based archive | `aio archive tasks --before <date>` | Done |
 
 ### P0: Project & Team Structure (Phase 2)
 
@@ -202,7 +202,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 > As an EM, I want a guided weekly review so that I maintain GTD discipline.
 
 **Acceptance criteria:**
-- Web UI walks through: inbox → projects → waiting-for → someday
+- Plugin review wizard walks through: inbox → projects → waiting-for → someday
 - Can process inbox items one-by-one
 - Review marked complete with timestamp
 
@@ -230,7 +230,7 @@ These use cases are designed to drive automated test development.
 
 ### UC-001: Quick Task Capture
 
-**Preconditions:** Database initialized, CLI available
+**Preconditions:** Vault initialized with AIO structure, CLI available
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -279,7 +279,7 @@ These use cases are designed to drive automated test development.
 
 ### UC-004: Waiting-For Delegation
 
-**Preconditions:** Task exists, Person "Sarah" exists in database
+**Preconditions:** Task file exists, Person file "Sarah.md" exists in vault
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -452,18 +452,19 @@ These use cases are designed to drive automated test development.
 
 ### UC-015: Vault Initialization
 
-**Preconditions:** ~/.aio directory does not exist
+**Preconditions:** Obsidian vault exists, AIO structure not yet created
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Run any `aio` command | ~/.aio directory created |
-| 2 | Check ~/.aio/aio.db | Database file exists |
-| 3 | Check tables | All schema tables present |
+| 1 | Run `aio init /path/to/vault` | AIO directory structure created |
+| 2 | Check vault/AIO/ | All folders exist (Tasks/, Projects/, People/, etc.) |
+| 3 | Check vault/AIO/Tasks/ | Status subfolders exist (Inbox/, Next/, Waiting/, etc.) |
+| 4 | Check vault/.aio/ | Config directory created |
 
 **Test assertions:**
-- Directory created with correct permissions
-- Migrations applied automatically
+- AIO directory structure created with correct layout
 - Idempotent (running again doesn't break)
+- Works with existing Obsidian vault (.obsidian folder present)
 
 ### UC-016: Error Handling
 
@@ -472,7 +473,7 @@ These use cases are designed to drive automated test development.
 | Invalid date format | Error message, task not created |
 | Non-existent task ID | "Task not found" error |
 | Invalid priority value | "Invalid priority, use P1-P4" error |
-| Database locked | Retry with backoff, then error |
+| Vault not initialized | Clear error with `aio init` instructions |
 | Jira auth failure | Clear error with remediation steps |
 
 **Test assertions:**
@@ -482,24 +483,24 @@ These use cases are designed to drive automated test development.
 
 ### UC-017: Obsidian Plugin - View Tasks
 
-**Preconditions:** API server running, tasks exist in database
+**Preconditions:** Plugin enabled, task files exist in vault
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Navigate to `/` | Dashboard loads with summary counts |
-| 2 | Click "Inbox (5)" | Navigate to `/inbox`, 5 tasks shown |
-| 3 | Click a task card | Task detail modal opens |
+| 1 | Open Task List view | Dashboard loads with summary counts |
+| 2 | Click "Inbox (5)" | Filter to inbox, 5 tasks shown |
+| 3 | Click a task | Task detail modal opens |
 | 4 | Click outside modal | Modal closes |
 
 **Test assertions:**
-- Summary counts match database
+- Summary counts match task files in vault
 - Task list renders within 500ms
 - Modal opens/closes without page reload
-- Task data matches database record
+- Task data matches markdown file content
 
 ### UC-018: Obsidian Plugin - Edit Task Inline
 
-**Preconditions:** Task exists, web UI loaded
+**Preconditions:** Task file exists, plugin loaded
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -511,7 +512,7 @@ These use cases are designed to drive automated test development.
 | 6 | Select new date | Due date updates |
 
 **Test assertions:**
-- Changes persist to database
+- Changes persist to task file
 - UI updates optimistically (before API response)
 - Rollback on API error with error message
 - updatedAt timestamp changes
@@ -536,7 +537,7 @@ These use cases are designed to drive automated test development.
 
 ### UC-020: Obsidian Plugin - Quick Add
 
-**Preconditions:** Web UI loaded on any page
+**Preconditions:** Plugin loaded in Obsidian
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -643,7 +644,7 @@ These use cases are designed to drive automated test development.
 
 ### UC-026: Obsidian Plugin - Responsive Layout
 
-**Preconditions:** Web UI loaded
+**Preconditions:** Plugin loaded in Obsidian
 
 | Viewport | Expected Layout |
 |----------|-----------------|
@@ -659,7 +660,7 @@ These use cases are designed to drive automated test development.
 
 ### UC-027: Obsidian Plugin - Keyboard Navigation
 
-**Preconditions:** Web UI loaded with task list
+**Preconditions:** Plugin loaded in Obsidian with task list
 
 | Shortcut | Action |
 |----------|--------|
@@ -689,11 +690,11 @@ These use cases are designed to drive automated test development.
 
 ## Technical Constraints
 
-1. **Local-first**: All data in SQLite on user's machine
+1. **Local-first**: All data in markdown files within Obsidian vault
 2. **CLI primary**: Must work entirely from terminal
-3. **TypeScript**: Maintainable by user long-term
+3. **Python + TypeScript**: Python for CLI/MCP, TypeScript for Obsidian plugin
 4. **No account required**: No cloud services, no login
-5. **Portable**: Single database file, easy backup
+5. **Portable**: Markdown files in vault, git-friendly, easy backup
 
 ## Open Questions
 

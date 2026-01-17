@@ -1,0 +1,62 @@
+[project]
+name = "aio"
+version = "0.1.0"
+description = "Obsidian-native task and context management system for engineering managers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1.0",
+    "pydantic>=2.0.0",
+    "python-frontmatter>=1.1.0",
+    "dateparser>=1.2.0",
+    "pyyaml>=6.0.0",
+    "rich>=13.0.0",
+    "mcp>=1.0.0",
+    "jira>=3.5.0",
+]
+
+[project.scripts]
+aio = "aio.cli.main:cli"
+aio-mcp = "aio.mcp.server:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.8.0",
+    "ruff>=0.2.0",
+    "types-PyYAML>=6.0.0",
+    "types-dateparser>=1.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["aio"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

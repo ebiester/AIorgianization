@@ -557,26 +557,44 @@ jira:
 The CLI reads and writes the same markdown files as the plugin.
 
 ```
-packages/cli/
-├── src/
-│   ├── index.ts                   # Entry point
-│   ├── commands/
-│   │   ├── add.ts                 # Create task file
-│   │   ├── list.ts                # Query task files
-│   │   ├── done.ts                # Move to completed
-│   │   ├── sync.ts                # Jira sync
-│   │   └── review.ts              # CLI review flow
-│   ├── services/
-│   │   ├── VaultService.ts        # Find and read vault
-│   │   ├── TaskFileService.ts     # Parse/write task markdown
-│   │   ├── JiraSyncService.ts     # Jira API
-│   │   └── ConfigService.ts       # Read .aio/config.yaml
-│   └── utils/
-│       ├── frontmatter.ts         # YAML parsing
-│       ├── dateParser.ts          # Natural language dates
-│       └── output.ts              # Terminal formatting
-├── package.json
-└── tsconfig.json
+aio/
+├── __init__.py
+├── cli/                           # CLI commands (Click)
+│   ├── __init__.py
+│   ├── main.py                    # Entry point, command group
+│   ├── add.py                     # Create task file
+│   ├── list.py                    # Query task files
+│   ├── done.py                    # Move to completed
+│   ├── init.py                    # Initialize vault
+│   ├── archive.py                 # Archive tasks/projects
+│   ├── dashboard.py               # Generate dashboard
+│   ├── status.py                  # Start, defer, wait commands
+│   ├── sync.py                    # Jira sync
+│   └── config.py                  # Configuration management
+├── services/                      # Core business logic
+│   ├── __init__.py
+│   ├── vault.py                   # Find and read vault
+│   ├── task.py                    # Parse/write task markdown
+│   ├── jira.py                    # Jira sync service
+│   ├── dashboard.py               # Dashboard generation
+│   └── context_pack.py            # Context pack operations
+├── models/                        # Pydantic data models
+│   ├── __init__.py
+│   ├── task.py                    # Task model
+│   ├── project.py                 # Project model
+│   ├── person.py                  # Person model
+│   ├── jira.py                    # Jira models
+│   └── context_pack.py            # Context pack model
+├── utils/
+│   ├── __init__.py
+│   ├── frontmatter.py             # YAML frontmatter parsing
+│   ├── dates.py                   # Natural language dates
+│   └── ids.py                     # 4-char ID generation
+├── mcp/                           # MCP server
+│   ├── __init__.py
+│   ├── server.py                  # MCP server implementation
+│   └── tools.py                   # Tool handlers
+└── exceptions.py                  # Custom exceptions
 ```
 
 ### CLI Commands
@@ -866,11 +884,13 @@ User: (via Claude) "Break down the Q4 Migration project"
 |-----------|------------|-----------|
 | Task storage | Markdown + YAML frontmatter | Human-readable, git-friendly, Obsidian-native |
 | Plugin | TypeScript + Obsidian API | Required for Obsidian plugins |
-| CLI | TypeScript + Commander | Consistent with plugin, good ecosystem |
-| Jira client | jira.js | Well-maintained TypeScript library |
-| MCP server | @modelcontextprotocol/sdk | Official SDK |
-| YAML parsing | gray-matter | Standard for frontmatter |
-| Date parsing | chrono-node | Natural language dates |
+| CLI | Python + Click | Type-safe, excellent CLI framework |
+| Jira client | jira (Python) | Well-maintained Python library |
+| MCP server | mcp (Python SDK) | Official Python SDK |
+| YAML parsing | python-frontmatter | Standard for frontmatter |
+| Date parsing | dateparser | Natural language dates |
+| Data validation | Pydantic | Type-safe models with serialization |
+| Terminal output | Rich | Beautiful terminal formatting |
 
 ---
 
@@ -885,12 +905,14 @@ User: (via Claude) "Break down the Q4 Migration project"
 
 ## Migration from SQLite Prototype
 
-The Phase 1 prototype used SQLite. To migrate:
+The Phase 1 prototype used SQLite. Migration is complete:
 
-1. Export tasks: `aio export --format markdown --output ./Tasks/`
-2. Each task becomes a markdown file
-3. Delete `~/.aio/aio.db`
-4. Update CLI to use VaultService instead of Drizzle
+- ~~Export tasks: `aio export --format markdown --output ./Tasks/`~~
+- ~~Each task becomes a markdown file~~
+- ~~Delete `~/.aio/aio.db`~~
+- ~~Update CLI to use VaultService instead of Drizzle~~
+
+**Status:** Migration complete. The Python CLI now uses markdown files in the vault as the source of truth.
 
 ---
 

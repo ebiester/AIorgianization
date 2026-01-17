@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-aio",
+  "version": "0.1.0",
+  "description": "AIorgianization Obsidian plugin",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "Eric Biesterfeld",
+  "license": "MIT",
+  "dependencies": {
+    "chrono-node": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "esbuild": "^0.19.0",
+    "obsidian": "^1.4.0",
+    "typescript": "^5.3.0"
+  }
+}
