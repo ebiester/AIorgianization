@@ -34,6 +34,13 @@ def cli(ctx: click.Context, vault: Path | None, debug: bool) -> None:
     ctx.obj["debug"] = debug
 
 
+@cli.command()
+@click.pass_context
+def help(ctx: click.Context) -> None:
+    """Show this help message."""
+    click.echo(ctx.parent.get_help())
+
+
 # Register commands
 cli.add_command(init)
 cli.add_command(add)
