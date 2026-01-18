@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 
 from aio.exceptions import PersonNotFoundError
 from aio.models.person import Person
+from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
 from aio.utils.frontmatter import write_frontmatter
 
@@ -21,6 +22,7 @@ class PersonService:
             vault_service: The vault service for file operations.
         """
         self.vault = vault_service
+        self._id_service = IdService(vault_service)
 
     def list_people(self) -> list[str]:
         """List all person names.
@@ -130,6 +132,7 @@ class PersonService:
         self.vault.ensure_initialized()
 
         person = Person(
+            id=self._id_service.generate_unique_id(EntityType.PERSON),
             name=name,
             team=team,
             role=role,

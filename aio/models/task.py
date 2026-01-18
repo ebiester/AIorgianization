@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskStatus(str, Enum):
@@ -77,9 +77,7 @@ class Task(BaseModel):
     time_estimate: str | None = Field(default=None, alias="timeEstimate")
     jira_key: str | None = Field(default=None, alias="jiraKey")
 
-    class Config:
-        populate_by_name = True
-        use_enum_values = True
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     def frontmatter(self) -> dict[str, Any]:
         """Convert to frontmatter dictionary for YAML serialization.

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectStatus(str, Enum):
@@ -20,6 +20,7 @@ class Project(BaseModel):
     """A project stored as a markdown file in the vault."""
 
     # Core fields
+    id: str = Field(description="4-char alphanumeric ID")
     type: str = Field(default="project")
     status: ProjectStatus = Field(default=ProjectStatus.ACTIVE)
     category: str = Field(default="project", description="project or area (PARA)")
@@ -38,13 +39,12 @@ class Project(BaseModel):
     # Timestamps
     created: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        populate_by_name = True
-        use_enum_values = True
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     def frontmatter(self) -> dict[str, Any]:
         """Convert to frontmatter dictionary."""
         data: dict[str, Any] = {
+            "id": self.id,
             "type": self.type,
             "status": self.status,
             "category": self.category,

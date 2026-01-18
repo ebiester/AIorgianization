@@ -61,10 +61,10 @@ class TestAddCommand:
     def test_add_task_with_project(
         self, runner: CliRunner, initialized_vault: Path
     ) -> None:
-        """add should accept project."""
+        """add should accept project (creating it if needed)."""
         result = runner.invoke(
             cli,
-            ["--vault", str(initialized_vault), "add", "Test Task", "-p", "MyProject"],
+            ["--vault", str(initialized_vault), "add", "Test Task", "-p", "MyProject", "--create-project"],
         )
 
         assert result.exit_code == 0
@@ -162,9 +162,9 @@ class TestStatusCommands:
     def test_wait_command(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
-        """wait should move task to waiting."""
+        """wait should move task to waiting (creating person if needed)."""
         result = runner.invoke(
-            cli, ["--vault", str(initialized_vault), "wait", "AB2C", "Sarah"]
+            cli, ["--vault", str(initialized_vault), "wait", "AB2C", "Sarah", "--create-person"]
         )
 
         assert result.exit_code == 0

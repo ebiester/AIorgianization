@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 
 from aio.exceptions import ProjectNotFoundError
 from aio.models.project import Project, ProjectStatus
+from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
 from aio.utils.frontmatter import write_frontmatter
 
@@ -22,6 +23,7 @@ class ProjectService:
             vault_service: The vault service for file operations.
         """
         self.vault = vault_service
+        self._id_service = IdService(vault_service)
 
     def list_projects(self) -> list[str]:
         """List all project names.
@@ -129,6 +131,7 @@ class ProjectService:
         self.vault.ensure_initialized()
 
         project = Project(
+            id=self._id_service.generate_unique_id(EntityType.PROJECT),
             title=name,
             status=status,
             team=team,

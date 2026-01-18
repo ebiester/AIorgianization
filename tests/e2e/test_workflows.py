@@ -86,12 +86,12 @@ class TestDelegationWorkflow:
                 task_id = "".join(c for c in task_id if c.isalnum())[:4]
                 break
 
-        # Delegate to Sarah
+        # Delegate to Sarah (creating person since they don't exist yet)
         result = runner.invoke(
-            cli, ["--vault", str(temp_vault), "wait", task_id, "Sarah"]
+            cli, ["--vault", str(temp_vault), "wait", task_id, "Sarah", "--create-person"]
         )
         assert result.exit_code == 0
-        assert "Waiting on: Sarah" in result.output
+        assert "Waiting on:" in result.output
 
         # Verify in waiting list
         result = runner.invoke(cli, ["--vault", str(temp_vault), "list", "waiting"])

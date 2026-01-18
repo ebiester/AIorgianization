@@ -2,13 +2,14 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Person(BaseModel):
     """A person (team member) stored as a markdown file in the vault."""
 
     # Core fields
+    id: str = Field(description="4-char alphanumeric ID")
     type: str = Field(default="person")
     name: str = Field(description="Person's full name")
     body: str = Field(default="", description="Markdown content below frontmatter")
@@ -19,12 +20,11 @@ class Person(BaseModel):
     email: str | None = None
     jira_account_id: str | None = Field(default=None, alias="jiraAccountId")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     def frontmatter(self) -> dict[str, Any]:
         """Convert to frontmatter dictionary."""
-        data: dict[str, Any] = {"type": self.type}
+        data: dict[str, Any] = {"id": self.id, "type": self.type}
 
         if self.team:
             data["team"] = self.team

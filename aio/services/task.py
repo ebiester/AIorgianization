@@ -7,9 +7,10 @@ from typing import Any
 
 from aio.exceptions import AmbiguousMatchError, TaskNotFoundError
 from aio.models.task import Task, TaskLocation, TaskStatus
+from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
 from aio.utils.frontmatter import read_frontmatter, write_frontmatter
-from aio.utils.ids import generate_id, is_valid_id, normalize_id
+from aio.utils.ids import is_valid_id, normalize_id
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class TaskService:
             vault_service: The vault service for file operations.
         """
         self.vault = vault_service
+        self._id_service = IdService(vault_service)
 
     def create(
         self,
@@ -321,39 +323,12 @@ class TaskService:
     def _generate_unique_id(self) -> str:
         """Generate a unique task ID.
 
-        Retries on collision with existing tasks.
+        Delegates to IdService for collision detection.
 
         Returns:
             A unique 4-character ID.
         """
-        max_attempts = 100
-        existing_ids = self._get_all_task_ids()
-
-        for _ in range(max_attempts):
-            task_id = generate_id()
-            if task_id not in existing_ids:
-                return task_id
-
-        raise RuntimeError("Failed to generate unique task ID after 100 attempts")
-
-    def _get_all_task_ids(self) -> set[str]:
-        """Get all existing task IDs.
-
-        Returns:
-            Set of task IDs.
-        """
-        ids: set[str] = set()
-        for status in TaskStatus:
-            folder = self.vault.tasks_folder(status.value)
-            if folder.exists():
-                for filepath in folder.glob("*.md"):
-                    try:
-                        metadata, _ = read_frontmatter(filepath)
-                        if "id" in metadata:
-                            ids.add(metadata["id"])
-                    except Exception as e:
-                        logger.debug("Failed to read task ID from %s: %s", filepath, e)
-        return ids
+        return self._id_service.generate_unique_id(EntityType.TASK)
 
     def _find_task_file_by_id(self, task_id: str) -> Path | None:
         """Find a task file by its ID.

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JiraConfig(BaseModel):
@@ -21,8 +21,7 @@ class JiraConfig(BaseModel):
         default=15, alias="syncInterval", description="Sync interval in minutes"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     def is_configured(self) -> bool:
         """Check if Jira is fully configured.
@@ -51,8 +50,7 @@ class JiraIssue(BaseModel):
     url: str = Field(description="Full URL to the issue")
     updated: datetime = Field(description="Last updated timestamp")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_jira_issue(cls, issue: Any, base_url: str) -> "JiraIssue":
@@ -128,8 +126,7 @@ class JiraSyncState(BaseModel):
     )
     errors: list[str] = Field(default_factory=list, description="Recent sync errors")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SyncResult(BaseModel):
@@ -147,8 +144,7 @@ class SyncResult(BaseModel):
         default_factory=list, alias="updatedTasks", description="IDs of updated tasks"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     @property
     def total_processed(self) -> int:

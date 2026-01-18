@@ -1,4 +1,4 @@
-"""4-character ID generation for tasks.
+"""4-character ID generation for tasks, projects, and people.
 
 IDs use characters that are unambiguous when read aloud or in various fonts.
 Excludes: 0 (zero), 1 (one), I (capital i), O (capital o)
@@ -23,7 +23,7 @@ def generate_id() -> str:
 
 
 def is_valid_id(id_str: str) -> bool:
-    """Check if a string is a valid task ID.
+    """Check if a string is a valid ID.
 
     Args:
         id_str: The string to validate.
@@ -47,5 +47,5 @@ def normalize_id(id_str: str) -> str:
         ValueError: If the ID is not valid.
     """
     if not is_valid_id(id_str):
-        raise ValueError(f"Invalid task ID: {id_str}")
+        raise ValueError(f"Invalid ID: {id_str}")
     return id_str.upper()

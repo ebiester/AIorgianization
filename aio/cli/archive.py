@@ -7,10 +7,12 @@ import click
 from rich.console import Console
 
 from aio.exceptions import InvalidDateError, TaskNotFoundError
+from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
 from aio.utils.dates import parse_date
+from aio.utils.frontmatter import read_frontmatter, write_frontmatter
 
 console = Console()
 
@@ -128,6 +130,11 @@ def archive_project(ctx: click.Context, name: str, with_tasks: bool) -> None:
     if not project_file:
         console.print(f"[red]Project not found:[/red] {name}")
         raise click.Abort()
+
+    # Update project status to archived
+    metadata, content = read_frontmatter(project_file)
+    metadata["status"] = ProjectStatus.ARCHIVED.value
+    write_frontmatter(project_file, metadata, content)
 
     # Archive project file
     archive_folder = vault_service.archive_folder("Projects")
