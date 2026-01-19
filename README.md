@@ -1,6 +1,10 @@
 # AIorgianization
 
-An Obsidian-native task and context management system for engineering managers.
+An Obsidian-native task and context management system for engineering managers. This is built for my needs and is not likely to work for yours but serves as an example of building personal software with Claude Code. 
+
+I have used a lot of todo systems, including the Obsidian Tasks plugin by Clare Macrae, Ilyas Landikov, and Martin Schenck; Todoist, LogSeq and a set of systems I created for it; and Everdo. Each has some great advantages but none of them integrate exactly like I want, especially in 2026 as I start integrating more with Cursor CLI and Claude Code (and possibly Cowork) - and with the cost to create personal software going down, I decided to work on this.
+
+There will be a blog post coming on this if anyone is interested. That said, for this use case I would suggest that you take the project plan and tweak it for how you think and rebuild from there; the hardest part will be in verification and getting it to work the way you need, but that will also teach you your own tool. 
 
 ## Features
 
