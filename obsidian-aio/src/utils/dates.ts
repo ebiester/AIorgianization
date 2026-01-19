@@ -1,5 +1,3 @@
-import * as chrono from 'chrono-node';
-
 export class InvalidDateError extends Error {
   constructor(message: string) {
     super(message);
@@ -14,36 +12,102 @@ export class InvalidDateError extends Error {
  * Supports formats like:
  * - "tomorrow", "today", "yesterday"
  * - "next monday", "friday"
- * - "in 3 days", "in a week", "in 2 months"
+ * - "in 3 days", "in a week"
  * - "end of week", "end of month", "end of year"
  * - ISO format: "2024-01-15"
- * - Absolute: "January 15", "Jan 15, 2024"
  */
 export function parseDate(dateStr: string): Date {
   if (!dateStr?.trim()) {
     throw new InvalidDateError('Date string cannot be empty');
   }
 
-  // Handle "end of week" / "eow" manually (chrono doesn't support this)
+  const today = new Date();
   const lower = dateStr.toLowerCase().trim();
+
+  // ISO format: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const parsed = new Date(dateStr + 'T00:00:00');
+    if (isNaN(parsed.getTime())) {
+      throw new InvalidDateError(`Invalid date: ${dateStr}`);
+    }
+    return parsed;
+  }
+
+  // Today
+  if (lower === 'today') {
+    return today;
+  }
+
+  // Tomorrow
+  if (lower === 'tomorrow') {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  }
+
+  // Yesterday
+  if (lower === 'yesterday') {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+  }
+
+  // Next week
+  if (lower === 'next week') {
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek;
+  }
+
+  // "in X days"
+  const inDaysMatch = lower.match(/^in (\d+) days?$/);
+  if (inDaysMatch) {
+    const days = parseInt(inDaysMatch[1], 10);
+    const future = new Date(today);
+    future.setDate(future.getDate() + days);
+    return future;
+  }
+
+  // "in X weeks"
+  const inWeeksMatch = lower.match(/^in (\d+) weeks?$/);
+  if (inWeeksMatch) {
+    const weeks = parseInt(inWeeksMatch[1], 10);
+    const future = new Date(today);
+    future.setDate(future.getDate() + weeks * 7);
+    return future;
+  }
+
+  // Day names: "monday", "next monday", etc.
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const nextDayMatch = lower.match(/^(next )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/);
+  if (nextDayMatch) {
+    const targetDay = days.indexOf(nextDayMatch[2]);
+    const currentDay = today.getDay();
+    let daysAhead = targetDay - currentDay;
+    if (daysAhead <= 0 || nextDayMatch[1]) {
+      daysAhead += 7;
+    }
+    const targetDate = new Date(today);
+    targetDate.setDate(targetDate.getDate() + daysAhead);
+    return targetDate;
+  }
+
+  // End of week / eow (Friday)
   if (lower === 'end of week' || lower === 'eow') {
     return getEndOfWeek();
   }
+
+  // End of month / eom
   if (lower === 'end of month' || lower === 'eom') {
     return getEndOfMonth();
   }
+
+  // End of year / eoy
   if (lower === 'end of year' || lower === 'eoy') {
     return getEndOfYear();
   }
 
-  // Use chrono-node with forwardDate to match Python's PREFER_DATES_FROM: "future"
-  const result = chrono.parseDate(dateStr, new Date(), { forwardDate: true });
-
-  if (!result) {
-    throw new InvalidDateError(`Could not parse date: ${dateStr}`);
-  }
-
-  return result;
+  throw new InvalidDateError(`Could not parse date: ${dateStr}`);
 }
 
 /**

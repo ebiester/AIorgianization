@@ -3,7 +3,10 @@
 The vault is an Obsidian vault with the AIO directory structure initialized.
 """
 
+import importlib.resources
+import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -303,3 +306,52 @@ class VaultService:
         self.config_path.mkdir(exist_ok=True)
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False)
+
+    def install_plugin(self) -> Path:
+        """Install the AIO Obsidian plugin to the vault.
+
+        Copies main.js, manifest.json, and styles.css to
+        .obsidian/plugins/aio/ and enables the plugin in community-plugins.json.
+
+        Returns:
+            Path to the installed plugin directory.
+        """
+        plugin_dir = self.vault_path / ".obsidian" / "plugins" / "aio"
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get plugin files from package resources
+        plugin_files = ["main.js", "manifest.json", "styles.css"]
+        plugin_package = importlib.resources.files("aio.plugin")
+
+        for filename in plugin_files:
+            source = plugin_package.joinpath(filename)
+            dest = plugin_dir / filename
+            with importlib.resources.as_file(source) as src_path:
+                shutil.copy2(src_path, dest)
+
+        # Enable the plugin in community-plugins.json
+        self._enable_plugin("aio")
+
+        return plugin_dir
+
+    def _enable_plugin(self, plugin_id: str) -> None:
+        """Enable a plugin in Obsidian's community-plugins.json.
+
+        Args:
+            plugin_id: The plugin ID to enable.
+        """
+        community_plugins_file = self.vault_path / ".obsidian" / "community-plugins.json"
+
+        # Read existing enabled plugins or start with empty list
+        enabled_plugins: list[str] = []
+        if community_plugins_file.exists():
+            with open(community_plugins_file, encoding="utf-8") as f:
+                enabled_plugins = json.load(f)
+
+        # Add plugin if not already enabled
+        if plugin_id not in enabled_plugins:
+            enabled_plugins.append(plugin_id)
+
+        # Write back
+        with open(community_plugins_file, "w", encoding="utf-8") as f:
+            json.dump(enabled_plugins, f, indent=2)

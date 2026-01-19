@@ -279,24 +279,22 @@
 
 /* Inbox Actions */
 .aio-inbox-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px;
 }
 
 .aio-inbox-action {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 4px;
+  padding: 16px 12px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
-  width: 100%;
-  text-align: left;
-  font-size: 14px;
 }
 
 .aio-inbox-action:hover {
@@ -315,23 +313,12 @@
 }
 
 .aio-action-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  flex-shrink: 0;
-}
-
-.aio-action-icon svg {
-  width: 18px;
-  height: 18px;
+  font-size: 24px;
 }
 
 .aio-action-hint {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-muted);
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .aio-inbox-action.mod-cta .aio-action-hint {

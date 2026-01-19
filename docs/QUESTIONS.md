@@ -4,4 +4,4 @@ Inbox means I'm processing it and it doesn't live there.
 
 What do I really want for my dashboard? - if I'm looking at a day, I kind of want my daily note instead and a place I can quickly jot notes.  
 
-Is there a way that I can add aio to obsidian and actually call from there?
+stopped at beginning of obsidian plugin

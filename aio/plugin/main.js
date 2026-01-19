@@ -839,7 +839,6 @@ var InboxView = class extends import_obsidian5.ItemView {
     super(leaf);
     this.inboxTasks = [];
     this.currentIndex = 0;
-    this.skippedCount = 0;
     this.plugin = plugin;
   }
   getViewType() {
@@ -859,7 +858,6 @@ var InboxView = class extends import_obsidian5.ItemView {
   async refresh() {
     const container = this.containerEl.children[1];
     container.empty();
-    this.skippedCount = 0;
     container.createEl("div", { cls: "aio-inbox-container" }, async (el) => {
       el.createEl("div", { cls: "aio-inbox-header" }, (header) => {
         header.createEl("h4", { text: "Process Inbox", cls: "aio-inbox-title" });
@@ -954,39 +952,8 @@ var InboxView = class extends import_obsidian5.ItemView {
     container.createEl("div", { cls: "aio-inbox-skip" }, (el) => {
       const skipBtn = el.createEl("button", { cls: "aio-skip-btn", text: "Skip for now" });
       skipBtn.addEventListener("click", () => {
-        this.skippedCount++;
-        if (this.skippedCount >= this.inboxTasks.length) {
-          this.renderReviewComplete(container);
-          return;
-        }
         this.currentIndex = (this.currentIndex + 1) % this.inboxTasks.length;
         this.refresh();
-      });
-    });
-  }
-  renderReviewComplete(container) {
-    container.empty();
-    container.createEl("div", { cls: "aio-inbox-container" }, (el) => {
-      el.createEl("div", { cls: "aio-inbox-header" }, (header) => {
-        header.createEl("h4", { text: "Process Inbox", cls: "aio-inbox-title" });
-      });
-      el.createEl("div", { cls: "aio-inbox-review-complete" }, (content) => {
-        content.createEl("div", { cls: "aio-inbox-zero-icon", text: "\u{1F4CB}" });
-        content.createEl("h3", { text: "Review Complete" });
-        content.createEl("p", {
-          text: `You've reviewed all ${this.inboxTasks.length} task${this.inboxTasks.length === 1 ? "" : "s"} in your inbox.`
-        });
-        const btnContainer = content.createEl("div", { cls: "aio-review-complete-actions" });
-        const reviewAgainBtn = btnContainer.createEl("button", { cls: "mod-cta", text: "Review again" });
-        reviewAgainBtn.addEventListener("click", () => {
-          this.skippedCount = 0;
-          this.currentIndex = 0;
-          this.refresh();
-        });
-        const closeBtn = btnContainer.createEl("button", { text: "Close" });
-        closeBtn.addEventListener("click", () => {
-          this.leaf.detach();
-        });
       });
     });
   }

@@ -8,6 +8,7 @@ export class InboxView extends ItemView {
   private plugin: AioPlugin;
   private inboxTasks: Task[] = [];
   private currentIndex: number = 0;
+  private skippedCount: number = 0;
 
   constructor(leaf: WorkspaceLeaf, plugin: AioPlugin) {
     super(leaf);
@@ -37,6 +38,7 @@ export class InboxView extends ItemView {
   async refresh(): Promise<void> {
     const container = this.containerEl.children[1];
     container.empty();
+    this.skippedCount = 0;
 
     container.createEl('div', { cls: 'aio-inbox-container' }, async (el) => {
       // Header
@@ -164,8 +166,46 @@ export class InboxView extends ItemView {
     container.createEl('div', { cls: 'aio-inbox-skip' }, (el) => {
       const skipBtn = el.createEl('button', { cls: 'aio-skip-btn', text: 'Skip for now' });
       skipBtn.addEventListener('click', () => {
+        this.skippedCount++;
+        if (this.skippedCount >= this.inboxTasks.length) {
+          // User has skipped through all tasks - show review complete message
+          this.renderReviewComplete(container);
+          return;
+        }
         this.currentIndex = (this.currentIndex + 1) % this.inboxTasks.length;
         this.refresh();
+      });
+    });
+  }
+
+  private renderReviewComplete(container: HTMLElement): void {
+    container.empty();
+
+    container.createEl('div', { cls: 'aio-inbox-container' }, (el) => {
+      el.createEl('div', { cls: 'aio-inbox-header' }, (header) => {
+        header.createEl('h4', { text: 'Process Inbox', cls: 'aio-inbox-title' });
+      });
+
+      el.createEl('div', { cls: 'aio-inbox-review-complete' }, (content) => {
+        content.createEl('div', { cls: 'aio-inbox-zero-icon', text: '📋' });
+        content.createEl('h3', { text: 'Review Complete' });
+        content.createEl('p', {
+          text: `You've reviewed all ${this.inboxTasks.length} task${this.inboxTasks.length === 1 ? '' : 's'} in your inbox.`
+        });
+
+        const btnContainer = content.createEl('div', { cls: 'aio-review-complete-actions' });
+
+        const reviewAgainBtn = btnContainer.createEl('button', { cls: 'mod-cta', text: 'Review again' });
+        reviewAgainBtn.addEventListener('click', () => {
+          this.skippedCount = 0;
+          this.currentIndex = 0;
+          this.refresh();
+        });
+
+        const closeBtn = btnContainer.createEl('button', { text: 'Close' });
+        closeBtn.addEventListener('click', () => {
+          this.leaf.detach();
+        });
       });
     });
   }

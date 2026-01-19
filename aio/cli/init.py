@@ -35,6 +35,14 @@ def init(vault_path: Path) -> None:
         console.print("  AIO/Dashboard/")
         console.print("  AIO/Archive/...")
         console.print("  .aio/config.yaml")
+
+        # Install the Obsidian plugin
+        plugin_dir = vault_service.install_plugin()
+        console.print(f"\n[green]Installed Obsidian plugin to:[/green] {plugin_dir}")
+        console.print("\nTo enable the plugin:")
+        console.print("  1. Open Obsidian Settings → Community plugins")
+        console.print("  2. Enable community plugins if prompted")
+        console.print("  3. Find 'AIorgianization' and toggle it on")
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         raise click.Abort()
