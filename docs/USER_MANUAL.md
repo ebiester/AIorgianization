@@ -4,9 +4,153 @@ A personal task and deadline management system for engineering managers, built o
 
 ---
 
-## Quick Start
+## Table of Contents
 
-### 1. Initialize Your Vault
+1. [Installation](#installation)
+2. [Setup](#setup)
+3. [Core Concepts](#core-concepts)
+4. [Daily Workflow](#daily-workflow)
+5. [CLI Reference](#cli-reference)
+6. [Integrations](#integrations)
+7. [File Formats](#file-formats)
+8. [Tips](#tips)
+9. [Troubleshooting](#troubleshooting)
+10. [Reference](#reference)
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.12+** with [uv](https://github.com/astral-sh/uv) package manager
+- **Obsidian** with an existing vault
+- **Dataview plugin** for Obsidian (required for dashboard queries)
+- **Templater plugin** for Obsidian (optional, for dashboard generation)
+
+### Install the CLI
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/AIorgianization.git
+cd AIorgianization
+
+# Install dependencies (for development)
+uv sync
+
+# Verify installation
+uv run aio --help
+```
+
+#### Global Installation (Recommended)
+
+Install AIO as a system-wide command using uv's tool feature:
+
+```bash
+uv tool install --editable /path/to/AIorgianization
+```
+
+This installs `aio` globally while pointing to your local source code—changes are immediately available without reinstalling.
+
+**To update after pulling new code:**
+```bash
+uv tool upgrade aio
+```
+
+**To reinstall after dependency changes in pyproject.toml:**
+```bash
+uv tool install --editable /path/to/AIorgianization --force
+```
+
+#### Configure Your Vault Path
+
+Set your default vault path in your shell profile (`~/.zshrc` or `~/.bashrc`):
+
+```bash
+export AIO_VAULT_PATH="/path/to/your/obsidian/vault"
+```
+
+Then reload your shell:
+```bash
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+### Install the Obsidian Plugin
+
+The plugin is installed automatically when you run `aio init`. To install manually:
+
+1. Copy the `obsidian-aio/` folder contents to your vault's `.obsidian/plugins/aio/` directory
+2. Restart Obsidian
+3. Enable the "AIorgianization" plugin in Settings → Community plugins
+
+### Install the MCP Server (Optional)
+
+The MCP server allows AI assistants (Claude Code, Cursor, Claude Desktop) to interact with your vault.
+
+#### For Claude Code
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "aio": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
+      "env": {
+        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
+      }
+    }
+  }
+}
+```
+
+#### For Cursor
+
+Add to `~/.cursor/mcp.json` or `.cursor/mcp.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "aio": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
+      "env": {
+        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
+      }
+    }
+  }
+}
+```
+
+#### For Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "aio": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
+      "env": {
+        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
+      }
+    }
+  }
+}
+```
+
+**Configuration notes:**
+- Replace `/path/to/AIorgianization` with the actual path to this repository
+- Replace `/path/to/your/obsidian/vault` with the path to your Obsidian vault
+- Restart your MCP client after updating the configuration
+
+---
+
+## Setup
+
+### Initialize Your Vault
 
 Point the CLI at your existing Obsidian vault to create the AIO directory structure:
 
@@ -14,7 +158,7 @@ Point the CLI at your existing Obsidian vault to create the AIO directory struct
 aio init /path/to/your/obsidian/vault
 ```
 
-This creates the following structure inside your vault:
+This creates:
 
 ```
 Vault/
@@ -30,7 +174,7 @@ Vault/
 │   ├── Projects/
 │   ├── People/
 │   ├── Areas/
-│   └── Archive/                  # Parallel structure for archived items
+│   └── Archive/
 │       ├── Tasks/
 │       │   ├── Inbox/
 │       │   ├── Next/
@@ -44,32 +188,29 @@ Vault/
     └── config.yaml
 ```
 
-### 2. Install Dependencies
+### Enable the Obsidian Plugin
 
-- **Obsidian plugins:** Dataview (required), Templater (optional, for dashboard generation)
-- **CLI:** `npm install -g @aio/cli` (when available)
+The `aio init` command automatically installs the Obsidian plugin. To activate it:
 
-### 3. Verify Configuration
+1. Restart Obsidian (or reload plugins via Settings → Community plugins → "Reload plugins")
+2. If prompted about Restricted Mode, click "Turn on community plugins"
+3. The AIorgianization plugin should now be active
+
+### Verify Configuration
 
 ```bash
 aio config show
 # Shows: vault.path = /path/to/your/obsidian/vault
 ```
 
-### 4. Start Your Day
+### Configure Jira Integration (Optional)
 
-The dashboard integrates with Obsidian's daily notes. When you open today's daily note, the AIO dashboard sections are automatically included via Dataview queries.
-
-**Option A: Use Templater** (recommended)
-Configure your daily note template to include the AIO dashboard template.
-
-**Option B: Manual generation**
 ```bash
-aio dashboard
+aio config set jira.baseUrl https://company.atlassian.net
+aio config set jira.email your@email.com
+aio config set jira.projects PLAT,ALPHA
+export JIRA_API_TOKEN=your-token-here
 ```
-This appends dashboard content to your daily note if it exists, or creates `AIO/Dashboard/2026-01-15.md` as a standalone file.
-
-Your daily note becomes your command center.
 
 ---
 
@@ -93,6 +234,14 @@ Your daily note becomes your command center.
 | **Personal** | Your own work |
 | **Delegated** | Work you've given to someone else |
 | **Team** | Team-level milestones you're tracking |
+
+### Task Identifiers
+
+Each task gets a short 4-character ID (e.g., `AB2C`). IDs use alphanumeric characters excluding ambiguous ones (0, 1, I, O) and are case-insensitive.
+
+You can reference tasks by:
+- **Task ID:** `aio done AB2C`
+- **Title substring:** `aio done "auth bug"`
 
 ---
 
@@ -124,10 +273,10 @@ aio add "Fix auth bug" -d today
 
 **Update task status:**
 ```bash
-aio start "auth bug"      # Move to in-progress
+aio start "auth bug"      # Move to Next
 aio done "auth bug"       # Complete it
 aio wait "roadmap" Sarah  # Delegated to Sarah
-aio defer "refactor"      # Move to someday
+aio defer "refactor"      # Move to Someday
 ```
 
 ### End of Day (2 minutes)
@@ -142,39 +291,6 @@ aio defer "refactor"      # Move to someday
 2. **Review projects:** Does each active project have a next action?
 3. **Review waiting-for:** Follow up on stale items (>7 days)
 4. **Review someday:** Anything ready to activate?
-
----
-
-## The Morning Dashboard
-
-Your dashboard is integrated with your daily note and shows:
-
-### Overdue
-Tasks past their due date. These need attention or rescheduling.
-
-### Due Today
-Your focus for the day.
-
-### Due This Week
-What's coming. Plan ahead.
-
-### Blocked
-Tasks waiting on dependencies. Shows what's blocking them.
-
-### Waiting For
-Tasks you've delegated, grouped by person. Shows:
-- How many items per person
-- Oldest item (flag if >7 days)
-
-**Action:** If someone has stale items, follow up in your next 1:1.
-
-### Team Load
-How many active tasks each person has. Flags people who may be overloaded (>5 active items).
-
-**Action:** Rebalance work if someone is drowning.
-
-### Quick Links
-Jump to common views.
 
 ---
 
@@ -214,19 +330,11 @@ aio list overdue      # Past due date
 
 ```bash
 aio activate <task>   # Inbox → Next
-aio start <task>      # → In Progress
+aio start <task>      # → Next
 aio done <task>       # → Completed
 aio defer <task>      # → Someday
 aio wait <task> Sarah # → Waiting (for Sarah)
 ```
-
-### Task Identifiers
-
-Each task gets a short 4-character ID (e.g., `AB2C`). IDs use alphanumeric characters excluding ambiguous ones (0, 1, I, O) and are case-insensitive.
-
-You can reference tasks by:
-- **Task ID:** `aio done AB2C`
-- **Title substring:** `aio done "auth bug"`
 
 ### Archiving
 
@@ -239,7 +347,7 @@ aio archive project <project>     # Archive a project and its tasks
 aio archive area <area>           # Archive an area
 aio archive person <person>       # Archive a person
 
-# Archive tasks by date (archive everything completed before a date)
+# Archive tasks by date
 aio archive tasks --before 2026-01-01
 aio archive tasks --before "6 months ago"
 
@@ -247,29 +355,122 @@ aio archive tasks --before "6 months ago"
 aio archive tasks --before 2026-01-01 --dry-run
 ```
 
-Archived items are moved to the parallel `Archive/` folder structure:
-- `AIO/Tasks/Next/my-task.md` → `AIO/Archive/Tasks/Next/my-task.md`
-- `AIO/Projects/Q4-Migration.md` → `AIO/Archive/Projects/Q4-Migration.md`
+Archived items are moved to the parallel `Archive/` folder structure.
 
 ### Other Commands
 
 ```bash
-aio init <vault-path>      # Initialize AIO structure in an Obsidian vault
+aio init <vault-path>      # Initialize AIO structure
 aio dashboard              # Generate today's dashboard
 aio delegated              # Show all delegated tasks by person
 aio delegated Sarah        # Show tasks delegated to Sarah
 aio project list           # List all projects
+aio config show            # Show current configuration
+aio config set <key> <val> # Set configuration value
 ```
 
 ---
 
-## Task Files
+## Integrations
 
-Tasks are markdown files with YAML frontmatter. You can edit them directly in Obsidian.
+### Jira Integration
 
-### Example Task
+Sync your assigned Jira issues to the vault.
 
-`AIO/Tasks/Next/2026-01-15-review-sarahs-pr.md`:
+#### Setup
+
+```bash
+aio config set jira.baseUrl https://company.atlassian.net
+aio config set jira.email your@email.com
+aio config set jira.projects PLAT,ALPHA
+export JIRA_API_TOKEN=your-token-here
+```
+
+#### Syncing
+
+```bash
+aio sync jira
+```
+
+This:
+1. Fetches issues assigned to you
+2. Creates/updates task files with `jiraKey` in frontmatter
+3. Maps Jira statuses to task folders
+
+#### Status Mapping
+
+| Jira Status | Task Folder |
+|-------------|-------------|
+| To Do | `Tasks/Inbox/` or `Tasks/Next/` |
+| In Progress | `Tasks/Next/` |
+| In Review | `Tasks/Waiting/` |
+| Blocked | `Tasks/Waiting/` |
+| Done | `Tasks/Completed/` |
+
+**Note:** Jira is the source of truth. If you change status locally, the next sync will overwrite it.
+
+### MCP Server Integration
+
+The MCP server allows AI assistants to interact with your vault programmatically.
+
+#### Starting the Server
+
+```bash
+uv run aio-mcp
+```
+
+Or if installed globally:
+```bash
+aio-mcp
+```
+
+#### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `aio_add_task` | Create a new task with optional due date and project |
+| `aio_list_tasks` | List tasks filtered by status or project |
+| `aio_complete_task` | Mark a task as completed |
+| `aio_start_task` | Move a task to Next status |
+| `aio_defer_task` | Move a task to Someday status |
+| `aio_get_dashboard` | Get today's dashboard content |
+| `aio_get_context` | Retrieve context pack content |
+| `aio_list_context_packs` | List available context packs by category |
+| `aio_create_context_pack` | Create a new context pack |
+| `aio_add_to_context_pack` | Append content to an existing context pack |
+| `aio_add_file_to_context_pack` | Copy a file's content into a context pack |
+| `aio_sync_jira` | Sync tasks from Jira (imports assigned issues) |
+| `aio_jira_status` | Get Jira sync status and configuration |
+
+#### Available MCP Resources
+
+| Resource URI | Content |
+|--------------|---------|
+| `aio://tasks/inbox` | Current inbox tasks |
+| `aio://tasks/next` | Next actions |
+| `aio://tasks/waiting` | Waiting-for items |
+| `aio://tasks/today` | Tasks due today + overdue |
+| `aio://projects` | Active projects list |
+| `aio://dashboard` | Today's dashboard |
+
+#### Example Usage
+
+Once configured, you can ask your AI assistant:
+
+- "What's on my plate today?" → Uses `aio_get_dashboard`
+- "Add a task to review the PR by Friday" → Uses `aio_add_task`
+- "Show my inbox" → Uses `aio_list_tasks`
+- "Mark the auth bug task as done" → Uses `aio_complete_task`
+
+---
+
+## File Formats
+
+### Task Files
+
+Tasks are markdown files with YAML frontmatter in `AIO/Tasks/{Status}/`.
+
+**Example:** `AIO/Tasks/Next/2026-01-15-review-sarahs-pr.md`
 
 ```markdown
 ---
@@ -279,9 +480,9 @@ status: next
 due: 2026-01-16
 project: "[[Projects/Q4-Migration]]"
 location:
-  url: "https://github.com/company/repo/pull/456"  # Link to the PR
-blockedBy: []           # Tasks that must complete first
-blocks: []              # Tasks waiting on this one
+  url: "https://github.com/company/repo/pull/456"
+blockedBy: []
+blocks: []
 created: 2026-01-15T09:00:00
 updated: 2026-01-15T09:00:00
 ---
@@ -319,15 +520,11 @@ updated: 2026-01-15T10:00:00
 Delegated to Sarah. Need draft by Friday.
 ```
 
----
-
-## Project Files
+### Project Files
 
 Projects are hubs linking everything related to a body of work.
 
-### Example Project
-
-`Projects/Q4-Migration.md`:
+**Example:** `AIO/Projects/Q4-Migration.md`
 
 ```markdown
 ---
@@ -348,7 +545,6 @@ Migrate payment processing to new platform with zero downtime.
 | Resource | Link |
 |----------|------|
 | Jira Epic | [PLAT-500](https://company.atlassian.net/browse/PLAT-500) |
-| Jira Board | [Platform Board](https://company.atlassian.net/jira/software/projects/PLAT/boards/42) |
 | Tech Spec | [[Specs/Platform-Migration-Spec]] |
 | Slack | [#platform-migration](https://slack.com/...) |
 
@@ -358,16 +554,15 @@ Migrate payment processing to new platform with zero downtime.
 |-----------|------|--------|
 | Design complete | 2026-01-31 | Done |
 | API migration | 2026-02-15 | In Progress |
-| Data migration | 2026-02-28 | Not Started |
 | Cutover | 2026-03-15 | Not Started |
 
 ## Open Tasks
 
 ```dataview
-TABLE status, priority, due, assignedTo.file.name AS "Owner"
+TABLE status, due, assignedTo.file.name AS "Owner"
 FROM "Tasks"
 WHERE contains(project, this.file.link) AND status != "completed"
-SORT priority ASC, due ASC
+SORT due ASC
 ```
 
 ## Risks
@@ -376,15 +571,11 @@ SORT priority ASC, due ASC
 - [ ] Load testing environment not ready
 ```
 
----
-
-## People Files
+### People Files
 
 Track your direct reports and delegates.
 
-### Example Person
-
-`People/Sarah.md`:
+**Example:** `AIO/People/Sarah.md`
 
 ```markdown
 ---
@@ -415,48 +606,6 @@ SORT due ASC
 
 ---
 
-## Jira Integration
-
-Sync your assigned Jira issues to the vault.
-
-### Setup
-
-```bash
-aio config set jira.baseUrl https://company.atlassian.net
-aio config set jira.email your@email.com
-aio config set jira.projects PLAT,ALPHA
-```
-
-Set your API token:
-```bash
-export JIRA_API_TOKEN=your-token-here
-```
-
-### Syncing
-
-```bash
-aio sync jira
-```
-
-This:
-1. Fetches issues assigned to you
-2. Creates/updates task files with `jiraKey` in frontmatter
-3. Maps Jira statuses to task folders
-
-### Status Mapping
-
-| Jira Status | Task Folder |
-|-------------|-------------|
-| To Do | `Tasks/Inbox/` or `Tasks/Next/` |
-| In Progress | `Tasks/Next/` |
-| In Review | `Tasks/Waiting/` |
-| Blocked | `Tasks/Waiting/` |
-| Done | `Tasks/Completed/` |
-
-**Note:** Jira is the source of truth. If you change status locally, the next sync will overwrite it.
-
----
-
 ## Tips
 
 ### Capture Fast, Process Later
@@ -466,10 +615,6 @@ Don't stop to organize when capturing. Just:
 aio add "the thing"
 ```
 Process your inbox during your morning routine or weekly review.
-
-### Use Contexts Sparingly
-
-Contexts like `@1on1` or `@deep-work` are useful for filtering, but don't over-categorize. Start with none and add only if you find yourself needing to filter.
 
 ### Keep Projects Linked
 
@@ -487,9 +632,7 @@ Stale delegated items erode trust. Check your "Waiting For" section weekly and f
 
 If a task doesn't fit neatly, just put it in inbox and process later. The system works when you use it consistently, not perfectly.
 
----
-
-## Keyboard Shortcuts (Obsidian)
+### Keyboard Shortcuts (Obsidian)
 
 Set these up in Obsidian's hotkey settings:
 
@@ -503,42 +646,82 @@ Set these up in Obsidian's hotkey settings:
 
 ## Troubleshooting
 
-### "Vault not found"
+### CLI Issues
+
+**"Vault not found"**
 ```bash
 aio config set vault.path /correct/path/to/vault
 ```
 
-### Dataview queries not working
+**Command not found after install**
+```bash
+uv pip install -e . --force-reinstall
+```
+
+### Obsidian Issues
+
+**Dataview queries not working**
 1. Ensure Dataview plugin is installed and enabled
 2. Check that frontmatter fields match exactly (case-sensitive)
 3. Reload Obsidian
 
-### Tasks not appearing in project view
+**Tasks not appearing in project view**
 Ensure the task's `project` field uses wikilink syntax:
 ```yaml
 project: "[[Projects/Q4-Migration]]"
 ```
 
-### Jira sync creates duplicates
+### Jira Issues
+
+**Jira sync creates duplicates**
 Check that existing task files have the correct `jiraKey` in frontmatter.
+
+### MCP Issues
+
+**Server not starting**
+- Verify `uv` is installed and in your PATH
+- Check the directory path in the configuration is correct
+- Try running `uv run aio-mcp` manually to see error messages
+
+**Vault not found**
+- Ensure `AIO_VAULT_PATH` points to a valid Obsidian vault
+- The vault must have been initialized with `aio init`
+
+**Tools not appearing**
+- Restart your MCP client after configuration changes
+- Check your client's logs for connection errors
 
 ---
 
-## File Locations Summary
+## Reference
+
+### File Locations
 
 | Content | Location |
 |---------|----------|
-| Today's dashboard | `AIO/Dashboard/2026-01-15.md` |
+| Config | `.aio/config.yaml` |
+| Today's dashboard | `AIO/Dashboard/YYYY-MM-DD.md` |
 | Inbox tasks | `AIO/Tasks/Inbox/*.md` |
 | Active tasks | `AIO/Tasks/Next/*.md` |
 | Delegated tasks | `AIO/Tasks/Waiting/*.md` |
+| Scheduled tasks | `AIO/Tasks/Scheduled/*.md` |
 | Deferred tasks | `AIO/Tasks/Someday/*.md` |
 | Completed tasks | `AIO/Tasks/Completed/YYYY/MM/*.md` |
 | Projects | `AIO/Projects/*.md` |
 | People | `AIO/People/*.md` |
 | Areas | `AIO/Areas/*.md` |
-| Archived tasks | `AIO/Archive/Tasks/**/*.md` |
-| Archived projects | `AIO/Archive/Projects/*.md` |
-| Archived people | `AIO/Archive/People/*.md` |
-| Archived areas | `AIO/Archive/Areas/*.md` |
-| Config | `.aio/config.yaml` |
+| Archived items | `AIO/Archive/**/*.md` |
+
+### The Morning Dashboard
+
+Your dashboard shows:
+
+| Section | Content |
+|---------|---------|
+| **Overdue** | Tasks past their due date |
+| **Due Today** | Your focus for the day |
+| **Due This Week** | What's coming |
+| **Blocked** | Tasks waiting on dependencies |
+| **Waiting For** | Delegated tasks, grouped by person |
+| **Team Load** | Active tasks per person |
+| **Quick Links** | Jump to common views |
