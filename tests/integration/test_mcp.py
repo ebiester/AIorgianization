@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from aio.exceptions import ProjectNotFoundError
 from aio.mcp.server import (
     ServiceRegistry,
+    call_tool,
     get_registry,
     handle_add_task,
     handle_list_tasks,
@@ -14,8 +16,11 @@ from aio.mcp.server import (
     handle_start_task,
     handle_defer_task,
     handle_get_dashboard,
+    handle_create_project,
+    handle_create_person,
 )
 from aio.services.dashboard import DashboardService
+from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
 
@@ -35,6 +40,11 @@ def mcp_registry(initialized_vault: Path) -> ServiceRegistry:
     registry.set_task_service(task_service)
     dashboard_service = DashboardService(vault_service, task_service)
     registry.set_dashboard_service(dashboard_service)
+
+    # Create a test project for project-related tests
+    project_service = ProjectService(vault_service)
+    project_service.create("TestProject")
+
     yield registry
     registry.reset()
 
@@ -102,6 +112,28 @@ class TestAddTaskTool:
         assert "Created task:" in result[0].text
         assert "Project:" in result[0].text
         assert "TestProject" in result[0].text
+
+    def test_add_task_with_nonexistent_project(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_add_task should raise error for non-existent project."""
+        with pytest.raises(ProjectNotFoundError) as exc_info:
+            asyncio.run(handle_add_task({
+                "title": "Task with missing project",
+                "project": "NonExistentProject",
+            }))
+
+        assert "NonExistentProject" in str(exc_info.value)
+
+    def test_add_task_nonexistent_project_via_mcp(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_add_task via MCP should return error message for non-existent project."""
+        result = asyncio.run(call_tool("aio_add_task", {
+            "title": "Task with missing project",
+            "project": "NonExistentProject",
+        }))
+
+        assert len(result) == 1
+        assert "Error:" in result[0].text
+        assert "NonExistentProject" in result[0].text
+        assert "Project not found" in result[0].text
 
     def test_add_task_invalid_date(self, mcp_registry: ServiceRegistry) -> None:
         """aio_add_task should handle invalid dates."""
@@ -242,3 +274,68 @@ class TestGetDashboardTool:
         assert len(result) == 1
         # Dashboard should still generate even with custom date
         assert len(result[0].text) > 0
+
+
+class TestCreateProjectTool:
+    """Tests for the aio_create_project MCP tool."""
+
+    def test_create_project_basic(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_create_project should create a project."""
+        result = asyncio.run(handle_create_project({"name": "New Project"}))
+
+        assert len(result) == 1
+        assert "Created project:" in result[0].text
+        assert "New Project" in result[0].text
+        assert "ID:" in result[0].text
+        assert "Status: active" in result[0].text
+
+    def test_create_project_with_status(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_create_project should accept status."""
+        result = asyncio.run(handle_create_project({
+            "name": "On Hold Project",
+            "status": "on-hold",
+        }))
+
+        assert len(result) == 1
+        assert "Created project:" in result[0].text
+        assert "Status: on-hold" in result[0].text
+
+    def test_create_project_with_team(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_create_project should accept team."""
+        result = asyncio.run(handle_create_project({
+            "name": "Team Project",
+            "team": "Engineering",
+        }))
+
+        assert len(result) == 1
+        assert "Created project:" in result[0].text
+        assert "Team: Engineering" in result[0].text
+
+
+class TestCreatePersonTool:
+    """Tests for the aio_create_person MCP tool."""
+
+    def test_create_person_basic(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_create_person should create a person."""
+        result = asyncio.run(handle_create_person({"name": "John Doe"}))
+
+        assert len(result) == 1
+        assert "Created person:" in result[0].text
+        assert "John Doe" in result[0].text
+        assert "ID:" in result[0].text
+
+    def test_create_person_with_details(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_create_person should accept all optional fields."""
+        result = asyncio.run(handle_create_person({
+            "name": "Jane Smith",
+            "team": "Product",
+            "role": "Product Manager",
+            "email": "jane@example.com",
+        }))
+
+        assert len(result) == 1
+        assert "Created person:" in result[0].text
+        assert "Jane Smith" in result[0].text
+        assert "Team: Product" in result[0].text
+        assert "Role: Product Manager" in result[0].text
+        assert "Email: jane@example.com" in result[0].text

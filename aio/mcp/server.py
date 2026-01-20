@@ -14,10 +14,12 @@ from mcp.types import Resource, TextContent, Tool
 
 from aio.exceptions import AioError, InvalidDateError, JiraError
 from aio.models.context_pack import ContextPackCategory
+from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
 from aio.services.jira import JiraSyncService
+from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
@@ -35,6 +37,7 @@ class ServiceRegistry:
         self._vault_service: VaultService | None = None
         self._task_service: TaskService | None = None
         self._project_service: ProjectService | None = None
+        self._person_service: PersonService | None = None
         self._dashboard_service: DashboardService | None = None
         self._jira_service: JiraSyncService | None = None
         self._context_pack_service: ContextPackService | None = None
@@ -44,6 +47,7 @@ class ServiceRegistry:
         self._vault_service = None
         self._task_service = None
         self._project_service = None
+        self._person_service = None
         self._dashboard_service = None
         self._jira_service = None
         self._context_pack_service = None
@@ -68,6 +72,10 @@ class ServiceRegistry:
         """Override the context pack service. Useful for testing."""
         self._context_pack_service = service
 
+    def set_person_service(self, service: PersonService) -> None:
+        """Override the person service. Useful for testing."""
+        self._person_service = service
+
     @property
     def vault_service(self) -> VaultService:
         """Get the vault service, creating it lazily if needed."""
@@ -88,6 +96,13 @@ class ServiceRegistry:
         if self._project_service is None:
             self._project_service = ProjectService(self.vault_service)
         return self._project_service
+
+    @property
+    def person_service(self) -> PersonService:
+        """Get the person service, creating it lazily if needed."""
+        if self._person_service is None:
+            self._person_service = PersonService(self.vault_service)
+        return self._person_service
 
     @property
     def dashboard_service(self) -> DashboardService:
@@ -135,6 +150,11 @@ def get_task_service() -> TaskService:
 def get_project_service() -> ProjectService:
     """Get the project service."""
     return _registry.project_service
+
+
+def get_person_service() -> PersonService:
+    """Get the person service."""
+    return _registry.person_service
 
 
 def get_dashboard_service() -> DashboardService:
@@ -377,6 +397,55 @@ async def list_tools() -> list[Tool]:
                 "required": ["title", "category"],
             },
         ),
+        Tool(
+            name="aio_create_project",
+            description="Create a new project in the vault",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Project name/title",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "on-hold", "completed", "archived"],
+                        "description": "Initial status (default: active)",
+                    },
+                    "team": {
+                        "type": "string",
+                        "description": "Team name (optional)",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="aio_create_person",
+            description="Create a new person in the vault",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Person's full name",
+                    },
+                    "team": {
+                        "type": "string",
+                        "description": "Team name (optional)",
+                    },
+                    "role": {
+                        "type": "string",
+                        "description": "Role/title (optional)",
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Email address (optional)",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
     ]
 
 
@@ -410,6 +479,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_add_file_to_context_pack(arguments)
         elif name == "aio_create_context_pack":
             return await handle_create_context_pack(arguments)
+        elif name == "aio_create_project":
+            return await handle_create_project(arguments)
+        elif name == "aio_create_person":
+            return await handle_create_person(arguments)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except JiraError as e:
@@ -439,6 +512,9 @@ async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
 
     project_link = None
     if project:
+        # Validate that the project exists before creating the task
+        project_service.validate_or_suggest(project)
+
         if not project.startswith("[["):
             # Use slug to match actual filename
             project_slug = project_service.get_slug(project)
@@ -714,6 +790,56 @@ async def handle_create_context_pack(args: dict[str, Any]) -> list[TextContent]:
         result += f"\nDescription: {description}"
     if tags:
         result += f"\nTags: {', '.join(tags)}"
+
+    return [TextContent(type="text", text=result)]
+
+
+async def handle_create_project(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_create_project tool."""
+    project_service = get_project_service()
+
+    name = args["name"]
+    status_str = args.get("status", "active")
+    team = args.get("team")
+
+    status = ProjectStatus(status_str)
+
+    project = project_service.create(
+        name=name,
+        status=status,
+        team=team,
+    )
+
+    result = f"Created project: {project.title}\nID: {project.id}\nStatus: {project.status}"
+    if team:
+        result += f"\nTeam: {team}"
+
+    return [TextContent(type="text", text=result)]
+
+
+async def handle_create_person(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_create_person tool."""
+    person_service = get_person_service()
+
+    name = args["name"]
+    team = args.get("team")
+    role = args.get("role")
+    email = args.get("email")
+
+    person = person_service.create(
+        name=name,
+        team=team,
+        role=role,
+        email=email,
+    )
+
+    result = f"Created person: {person.name}\nID: {person.id}"
+    if team:
+        result += f"\nTeam: {team}"
+    if role:
+        result += f"\nRole: {role}"
+    if email:
+        result += f"\nEmail: {email}"
 
     return [TextContent(type="text", text=result)]
 
