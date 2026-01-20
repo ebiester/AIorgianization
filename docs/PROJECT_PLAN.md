@@ -158,6 +158,7 @@ aio sync jira
 | aio_complete_task tool | Complete task via MCP | Done |
 | aio_start_task tool | Start task via MCP | Done |
 | aio_defer_task tool | Defer task via MCP | Done |
+| aio_delegate_task tool | Delegate task (alias for wait with person) via MCP | Not Started |
 | aio_get_context tool | Read context packs | Done |
 | aio_get_dashboard tool | Get daily dashboard | Done |
 | aio_sync_jira tool | Sync Jira via MCP | Done |
@@ -246,3 +247,5 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 9. [ ] Create Cursor skill file (.cursor/skills/aio.md)
 10. [ ] Write MCP integration tests
 11. [ ] Add background Jira sync with status bar indicator
+12. [ ] Add `delegate` as CLI alias for `wait` with required person argument
+13. [ ] Add `aio_delegate_task` MCP tool (alias for wait with person)
