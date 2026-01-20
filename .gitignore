@@ -61,3 +61,4 @@ Thumbs.db
 # Project-specific
 ralph_mode.py
 test-obsidian-vault/
+.mcp.json
