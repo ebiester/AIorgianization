@@ -138,8 +138,35 @@ class ProjectService:
             created=datetime.now(),
         )
 
-        # Generate content
-        body = f"# {name}\n\n## Overview\n\n## Goals\n\n## Tasks\n\n## Notes\n"
+        # Generate content with Dataview queries for tasks
+        body = f"""# {name}
+
+## Overview
+
+## Goals
+
+## Backlog
+
+```dataview
+TABLE due AS "Due", status AS "Status"
+FROM "AIO/Tasks"
+WHERE contains(project, link("AIO/Projects/{name}")) AND status != "completed"
+SORT due ASC
+```
+
+## Previous Actions
+
+```dataview
+TABLE due AS "Due", completed AS "Completed"
+FROM "AIO/Tasks"
+WHERE contains(project, link("AIO/Projects/{name}")) AND status = "completed"
+SORT completed DESC
+```
+
+## Supporting Material
+
+## Notes
+"""
         project.body = body
 
         # Write file
