@@ -423,29 +423,9 @@ class TaskService:
             elif isinstance(due_val, str):
                 due = date.fromisoformat(due_val)
 
-        created = datetime.now()
-        if "created" in metadata:
-            created_val = metadata["created"]
-            if isinstance(created_val, datetime):
-                created = created_val
-            elif isinstance(created_val, str):
-                created = datetime.fromisoformat(created_val)
-
-        updated = datetime.now()
-        if "updated" in metadata:
-            updated_val = metadata["updated"]
-            if isinstance(updated_val, datetime):
-                updated = updated_val
-            elif isinstance(updated_val, str):
-                updated = datetime.fromisoformat(updated_val)
-
-        completed = None
-        if "completed" in metadata and metadata["completed"]:
-            completed_val = metadata["completed"]
-            if isinstance(completed_val, datetime):
-                completed = completed_val
-            elif isinstance(completed_val, str):
-                completed = datetime.fromisoformat(completed_val)
+        created = self._parse_datetime(metadata.get("created"), datetime.now())
+        updated = self._parse_datetime(metadata.get("updated"), datetime.now())
+        completed = self._parse_datetime(metadata.get("completed"), None)
 
         return Task(
             id=metadata.get("id", "????"),
@@ -525,3 +505,31 @@ class TaskService:
 
         # Match wikilink or plain name
         return project_lower in task_project_lower
+
+    def _parse_datetime(
+        self, value: Any, default: datetime | None
+    ) -> datetime | None:
+        """Parse a datetime value, ensuring it's naive (no timezone).
+
+        Args:
+            value: The value to parse (datetime, str, or None).
+            default: Default value if parsing fails or value is None.
+
+        Returns:
+            Naive datetime or None.
+        """
+        if value is None:
+            return default
+
+        result: datetime | None = None
+        if isinstance(value, datetime):
+            result = value
+        elif isinstance(value, str):
+            # Handle 'Z' suffix for UTC
+            result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+        if result is not None and result.tzinfo is not None:
+            # Convert to naive datetime for consistent comparison
+            result = result.replace(tzinfo=None)
+
+        return result if result is not None else default
