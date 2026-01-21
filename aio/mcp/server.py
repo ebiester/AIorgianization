@@ -446,6 +446,27 @@ async def list_tools() -> list[Tool]:
                 "required": ["name"],
             },
         ),
+        Tool(
+            name="aio_delegate_task",
+            description=(
+                "Delegate a task to a person "
+                "(moves to Waiting status with person set as waitingOn)"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Task ID or title substring",
+                    },
+                    "person": {
+                        "type": "string",
+                        "description": "Person name or ID to delegate to",
+                    },
+                },
+                "required": ["query", "person"],
+            },
+        ),
     ]
 
 
@@ -483,6 +504,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_create_project(arguments)
         elif name == "aio_create_person":
             return await handle_create_person(arguments)
+        elif name == "aio_delegate_task":
+            return await handle_delegate_task(arguments)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except JiraError as e:
@@ -840,6 +863,27 @@ async def handle_create_person(args: dict[str, Any]) -> list[TextContent]:
         result += f"\nEmail: {email}"
 
     return [TextContent(type="text", text=result)]
+
+
+async def handle_delegate_task(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_delegate_task tool."""
+    task_service = get_task_service()
+    person_service = get_person_service()
+
+    query = args["query"]
+    person_query = args["person"]
+
+    # Find the person by ID or name
+    person = person_service.find(person_query)
+    person_link = f"[[AIO/People/{person_service.get_slug(person.name)}]]"
+
+    # Delegate the task (move to waiting with person)
+    task = task_service.wait(query, person_link)
+
+    return [TextContent(
+        type="text",
+        text=f"Delegated: {task.title} ({task.id})\nWaiting on: {person.name}\nStatus: waiting",
+    )]
 
 
 @server.list_resources()

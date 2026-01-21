@@ -213,4 +213,24 @@ TOOL_SCHEMAS = {
             "required": ["title", "category"],
         },
     },
+    "aio_delegate_task": {
+        "description": (
+            "Delegate a task to a person "
+            "(moves to Waiting status with person set as waitingOn)"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Task ID or title substring",
+                },
+                "person": {
+                    "type": "string",
+                    "description": "Person name or ID to delegate to",
+                },
+            },
+            "required": ["query", "person"],
+        },
+    },
 }

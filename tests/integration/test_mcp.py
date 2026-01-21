@@ -15,11 +15,13 @@ from aio.mcp.server import (
     handle_complete_task,
     handle_start_task,
     handle_defer_task,
+    handle_delegate_task,
     handle_get_dashboard,
     handle_create_project,
     handle_create_person,
 )
 from aio.services.dashboard import DashboardService
+from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
@@ -44,6 +46,10 @@ def mcp_registry(initialized_vault: Path) -> ServiceRegistry:
     # Create a test project for project-related tests
     project_service = ProjectService(vault_service)
     project_service.create("TestProject")
+
+    # Set up person service for delegate tests
+    person_service = PersonService(vault_service)
+    registry.set_person_service(person_service)
 
     yield registry
     registry.reset()
@@ -339,3 +345,86 @@ class TestCreatePersonTool:
         assert "Team: Product" in result[0].text
         assert "Role: Product Manager" in result[0].text
         assert "Email: jane@example.com" in result[0].text
+
+
+class TestDelegateTaskTool:
+    """Tests for the aio_delegate_task MCP tool."""
+
+    def test_delegate_task(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_delegate_task should move task to waiting with person."""
+        # Create a person first
+        asyncio.run(handle_create_person({"name": "Alice Test"}))
+
+        # Create a task
+        asyncio.run(handle_add_task({"title": "Task to delegate"}))
+
+        # Delegate the task
+        result = asyncio.run(handle_delegate_task({
+            "query": "Task to delegate",
+            "person": "Alice Test",
+        }))
+
+        assert len(result) == 1
+        assert "Delegated:" in result[0].text
+        assert "Task to delegate" in result[0].text
+        assert "Waiting on: Alice Test" in result[0].text
+        assert "Status: waiting" in result[0].text
+
+    def test_delegate_task_by_id(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_delegate_task should work with task ID."""
+        # Create a person
+        asyncio.run(handle_create_person({"name": "Bob Test"}))
+
+        # Create a task and extract the ID
+        add_result = asyncio.run(handle_add_task({"title": "Task for Bob"}))
+        lines = add_result[0].text.split("\n")
+        task_id = None
+        for line in lines:
+            if line.startswith("ID:"):
+                task_id = line.split(":")[1].strip()
+                break
+
+        assert task_id is not None
+
+        # Delegate by ID
+        result = asyncio.run(handle_delegate_task({
+            "query": task_id,
+            "person": "Bob Test",
+        }))
+
+        assert len(result) == 1
+        assert "Delegated:" in result[0].text
+        assert "Task for Bob" in result[0].text
+
+    def test_delegate_task_person_not_found(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_delegate_task should raise error for unknown person."""
+        from aio.exceptions import PersonNotFoundError
+
+        # Create a task
+        asyncio.run(handle_add_task({"title": "Orphan task"}))
+
+        with pytest.raises(PersonNotFoundError) as exc_info:
+            asyncio.run(handle_delegate_task({
+                "query": "Orphan task",
+                "person": "Unknown Person",
+            }))
+
+        assert "Unknown Person" in str(exc_info.value)
+
+    def test_delegate_task_via_call_tool(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_delegate_task should work via generic call_tool handler."""
+        # Create a person
+        asyncio.run(handle_create_person({"name": "Charlie Test"}))
+
+        # Create a task
+        asyncio.run(handle_add_task({"title": "Task for Charlie"}))
+
+        # Delegate via call_tool
+        result = asyncio.run(call_tool("aio_delegate_task", {
+            "query": "Task for Charlie",
+            "person": "Charlie Test",
+        }))
+
+        assert len(result) == 1
+        assert "Delegated:" in result[0].text
+        assert "Waiting on: Charlie Test" in result[0].text
