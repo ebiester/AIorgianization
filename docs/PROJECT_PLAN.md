@@ -166,7 +166,7 @@ aio sync jira
 | Context pack tools | Create, list, append context packs | Done |
 | Task resources | Expose task lists as resources | Done |
 | Cursor skill file | .cursor/skills/aio.md instructions | Not Started |
-| MCP integration tests | Test tool invocations | Not Started |
+| MCP integration tests | Test tool invocations | Done |
 
 ### Verification
 
@@ -245,7 +245,7 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 7. [ ] Implement location navigation (click to open file/URL)
 8. [ ] Add subtask progress display
 9. [ ] Create Cursor skill file (.cursor/skills/aio.md)
-10. [ ] Write MCP integration tests
+10. [x] Write MCP integration tests
 11. [ ] Add background Jira sync with status bar indicator
 12. [ ] Add `delegate` as CLI alias for `wait` with required person argument
 13. [ ] Add `aio_delegate_task` MCP tool (alias for wait with person)

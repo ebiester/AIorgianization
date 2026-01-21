@@ -60,35 +60,35 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Archiving | Archive tasks, projects, areas, people | Done |
 | Date-based archive | `aio archive tasks --before <date>` | Done |
 
-### P0: Project & Team Structure (Phase 2)
+### P0: Project & Team Structure (Phase 2) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Projects | Group tasks under projects with links, timeline, health | Planned |
-| Teams | Define teams and members | Planned |
-| People | Track who you delegate to | Planned |
-| Delegated view | See all tasks you've given to others | Planned |
-| Morning dashboard | Daily view: due today, due soon, waiting-for, team load | Planned |
+| Projects | Group tasks under projects with links, timeline, health | Done |
+| Teams | Define teams and members | Done (via Person model) |
+| People | Track who you delegate to | Done |
+| Delegated view | See all tasks you've given to others | Done (`aio list waiting`) |
+| Morning dashboard | Daily view: due today, due soon, waiting-for, team load | Done |
 | Team load view | See task counts per person, flag overload (>5 items, >2 P1s) | Planned |
 
-### P1: Obsidian Plugin (Phase 3)
+### P1: Obsidian Plugin (Phase 3) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Task list view | Custom pane showing tasks by status | Planned |
-| Quick add modal | Fast task entry via command palette | Planned |
-| Inbox processing | GTD clarify/organize workflow | Planned |
-| Waiting-for view | Delegated items grouped by person | Planned |
-| Weekly review | Guided review wizard | Planned |
-| Task editing | Modal to edit all task fields | Planned |
-| Status commands | Complete, start, defer via commands | Planned |
-| Task dependencies | Link tasks as blockers/blocked-by | Planned |
-| Dependency visualization | See blocked tasks and blockers in views | Planned |
-| Location linking | Connect task to file path, line, or URL in project | Planned |
-| Location navigation | Click to open file/URL from task view | Planned |
-| Subtask progress | Track and display completion of subtasks within tasks | Planned |
-| Template system | Customizable templates for tasks, projects, people from template directory | Planned |
-| Jira sync | Background sync with status bar indicator | Planned |
+| Task list view | Custom pane showing tasks by status | Done |
+| Quick add modal | Fast task entry via command palette | Done |
+| Inbox processing | GTD clarify/organize workflow | Done |
+| Waiting-for view | Delegated items grouped by person | Not Started |
+| Weekly review | Guided review wizard | Not Started |
+| Task editing | Modal to edit all task fields | Done |
+| Status commands | Complete, start, defer via commands | Done |
+| Task dependencies | Link tasks as blockers/blocked-by | Done (model only) |
+| Dependency visualization | See blocked tasks and blockers in views | Not Started |
+| Location linking | Connect task to file path, line, or URL in project | Done (model only) |
+| Location navigation | Click to open file/URL from task view | Not Started |
+| Subtask progress | Track and display completion of subtasks within tasks | Not Started |
+| Template system | Customizable templates for tasks, projects, people from template directory | Not Started |
+| Jira sync | Background sync with status bar indicator | Not Started |
 
 #### Obsidian Plugin Detailed Requirements
 
@@ -160,25 +160,25 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Templates support Obsidian's template variables ({{date}}, {{time}}, etc.)
 - Default templates provided on init, user can customize or add new ones
 
-### P1: Jira Integration (Phase 4)
+### P1: Jira Integration (Phase 4) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Jira import | Sync assigned issues to vault as task files | Planned |
-| Status mapping | Map Jira statuses to task folders | Planned |
-| Automatic sync | Background sync at configurable interval | Planned |
-| Manual sync | Command to trigger immediate sync | Planned |
-| Conflict handling | Jira wins (team system of record) | Planned |
+| Jira import | Sync assigned issues to vault as task files | Done |
+| Status mapping | Map Jira statuses to task folders | Done |
+| Automatic sync | Background sync at configurable interval | Not Started |
+| Manual sync | Command to trigger immediate sync | Done |
+| Conflict handling | Jira wins (team system of record) | Done |
 
-### P2: AI Features (Phase 5)
+### P2: AI Features (Phase 5) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Claude skill | Add tasks via Claude Code | Planned |
-| MCP server | Structured API for Claude | Planned |
-| Task breakdown | Decompose projects into actions | Planned |
-| Context injection | Use Obsidian notes in breakdown | Planned |
-| Priority suggestions | AI-assisted daily planning | Planned |
+| Claude skill | Add tasks via Claude Code | Done (MCP tools) |
+| MCP server | Structured API for Claude | Done |
+| Task breakdown | Decompose projects into actions | Not Started |
+| Context injection | Use Obsidian notes in breakdown | Done (context packs) |
+| Priority suggestions | AI-assisted daily planning | Not Started |
 
 ### P2: Polish (Phase 6)
 
