@@ -64,7 +64,12 @@ class TestAddCommand:
         """add should accept project (creating it if needed)."""
         result = runner.invoke(
             cli,
-            ["--vault", str(initialized_vault), "add", "Test Task", "-p", "MyProject", "--create-project"],
+            [
+                "--vault", str(initialized_vault),
+                "add", "Test Task",
+                "-p", "MyProject",
+                "--create-project",
+            ],
         )
 
         assert result.exit_code == 0

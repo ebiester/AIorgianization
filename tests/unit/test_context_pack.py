@@ -1,6 +1,5 @@
 """Unit tests for ContextPack model and ContextPackService."""
 
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -281,7 +280,7 @@ class TestContextPackService:
         pack_service = ContextPackService(vault_service)
 
         # Create pack and source file
-        pack = pack_service.create(title="Test", category=ContextPackCategory.DOMAIN)
+        pack_service.create(title="Test", category=ContextPackCategory.DOMAIN)
 
         source_file = vault_service.aio_path / "ADRs" / "test-adr.md"
         source_file.parent.mkdir(parents=True, exist_ok=True)

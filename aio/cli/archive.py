@@ -1,6 +1,5 @@
 """Archive command for AIorgianization CLI."""
 
-from datetime import date
 from pathlib import Path
 
 import click
@@ -44,7 +43,7 @@ def archive_task(ctx: click.Context, query: str) -> None:
         console.print(f"  ID: [cyan]{task.id}[/cyan]")
     except TaskNotFoundError:
         console.print(f"[red]Task not found:[/red] {query}")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @archive.command("tasks")
@@ -68,7 +67,7 @@ def archive_tasks_before(ctx: click.Context, before: str, dry_run: bool) -> None
         cutoff_date = parse_date(before)
     except InvalidDateError as e:
         console.print(f"[red]Invalid date:[/red] {e}")
-        raise click.Abort()
+        raise click.Abort() from None
 
     # Get completed tasks
     tasks = task_service.list_tasks(status=TaskStatus.COMPLETED, include_completed=True)

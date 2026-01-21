@@ -32,13 +32,13 @@ def done(ctx: click.Context, query: str) -> None:
         task = task_service.complete(query)
         console.print(f"[green]Completed:[/green] {task.title}")
         console.print(f"  ID: [cyan]{task.id}[/cyan]")
-        console.print(f"  Moved to: Tasks/Completed/")
+        console.print("  Moved to: Tasks/Completed/")
     except TaskNotFoundError:
         console.print(f"[red]Task not found:[/red] {query}")
-        raise click.Abort()
+        raise click.Abort() from None
     except AmbiguousMatchError as e:
         console.print(f"[red]Multiple matches for '{query}':[/red]")
         for match_id in e.matches:
             console.print(f"  - {match_id}")
         console.print("\nUse the task ID to be more specific.")
-        raise click.Abort()
+        raise click.Abort() from None

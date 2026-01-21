@@ -291,7 +291,6 @@ class TaskService:
         Returns:
             The updated task.
         """
-        old_status = task.status
         old_filepath = self._find_task_file_by_id(task.id)
         if not old_filepath:
             raise TaskNotFoundError(f"Task file not found: {task.id}")
@@ -366,7 +365,9 @@ class TaskService:
                                             if metadata.get("id", "").upper() == task_id:
                                                 return filepath
                                         except Exception as e:
-                                            logger.debug("Failed to read task file %s: %s", filepath, e)
+                                            logger.debug(
+                                                "Failed to read task file %s: %s", filepath, e
+                                            )
 
         return None
 

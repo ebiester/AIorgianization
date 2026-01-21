@@ -3,6 +3,7 @@
 Handles syncing Jira issues to local task files in the vault.
 """
 
+import contextlib
 import json
 import os
 from datetime import date, datetime
@@ -232,7 +233,10 @@ class JiraSyncService:
                                     for filepath in month_dir.glob("*.md"):
                                         try:
                                             task = self.tasks._read_task_file(filepath)
-                                            if task.jira_key and task.jira_key.upper() == jira_key.upper():
+                                            if (
+                                                task.jira_key
+                                                and task.jira_key.upper() == jira_key.upper()
+                                            ):
                                                 return task
                                         except Exception:
                                             continue
@@ -250,10 +254,8 @@ class JiraSyncService:
         # Parse due date
         due_date: date | None = None
         if issue.due_date:
-            try:
+            with contextlib.suppress(ValueError):
                 due_date = date.fromisoformat(issue.due_date)
-            except ValueError:
-                pass
 
         # Determine status
         status = self.map_jira_status(issue.status)
@@ -329,10 +331,8 @@ class JiraSyncService:
 
         # Update due date
         if issue.due_date:
-            try:
+            with contextlib.suppress(ValueError):
                 task.due = date.fromisoformat(issue.due_date)
-            except ValueError:
-                pass
         else:
             task.due = None
 

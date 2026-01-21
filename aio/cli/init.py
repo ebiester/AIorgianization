@@ -45,4 +45,4 @@ def init(vault_path: Path) -> None:
         console.print("  3. Find 'AIorgianization' and toggle it on")
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
-        raise click.Abort()
+        raise click.Abort() from None

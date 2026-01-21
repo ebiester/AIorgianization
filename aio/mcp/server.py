@@ -5,14 +5,13 @@ Exposes vault operations to Claude/Cursor via the Model Context Protocol.
 
 import asyncio
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 
-from aio.exceptions import AioError, AmbiguousMatchError, InvalidDateError, JiraError
+from aio.exceptions import AioError, InvalidDateError, JiraError
 from aio.models.context_pack import ContextPackCategory
 from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
@@ -209,7 +208,10 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "status": {
                         "type": "string",
-                        "enum": ["inbox", "next", "waiting", "scheduled", "someday", "today", "overdue"],
+                        "enum": [
+                            "inbox", "next", "waiting", "scheduled",
+                            "someday", "today", "overdue",
+                        ],
                         "description": "Filter by status",
                     },
                     "project": {"type": "string", "description": "Filter by project ID or name"},
@@ -288,7 +290,10 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="aio_sync_jira",
-            description="Sync tasks from Jira. Imports issues assigned to you from configured projects.",
+            description=(
+                "Sync tasks from Jira. "
+                "Imports issues assigned to you from configured projects."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -337,7 +342,10 @@ async def list_tools() -> list[Tool]:
                     },
                     "section": {
                         "type": "string",
-                        "description": "Section heading to append under (e.g., 'Key Concepts'). If not specified, appends to end.",
+                        "description": (
+                            "Section heading to append under (e.g., 'Key Concepts'). "
+                            "If not specified, appends to end."
+                        ),
                     },
                 },
                 "required": ["pack", "content"],
@@ -355,7 +363,10 @@ async def list_tools() -> list[Tool]:
                     },
                     "file": {
                         "type": "string",
-                        "description": "Path to the file in the vault (e.g., 'ADRs/2024-01-payment-provider.md')",
+                        "description": (
+                            "Path to the file in the vault "
+                            "(e.g., 'ADRs/2024-01-payment-provider.md')"
+                        ),
                     },
                     "section": {
                         "type": "string",
@@ -378,7 +389,10 @@ async def list_tools() -> list[Tool]:
                     "category": {
                         "type": "string",
                         "enum": ["domain", "system", "operating"],
-                        "description": "Pack category: 'domain' for business domains, 'system' for technical systems, 'operating' for processes",
+                        "description": (
+                            "Pack category: 'domain' for business domains, "
+                            "'system' for technical systems, 'operating' for processes"
+                        ),
                     },
                     "content": {
                         "type": "string",

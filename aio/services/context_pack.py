@@ -49,10 +49,7 @@ class ContextPackService:
         self.vault.ensure_initialized()
         packs: list[ContextPack] = []
 
-        if category:
-            categories = [category]
-        else:
-            categories = list(ContextPackCategory)
+        categories = [category] if category else list(ContextPackCategory)
 
         for cat in categories:
             folder = self.context_packs_folder(cat)

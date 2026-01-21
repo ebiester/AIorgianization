@@ -11,7 +11,9 @@ class JiraConfig(BaseModel):
 
     enabled: bool = Field(default=False, description="Whether Jira sync is enabled")
     base_url: str | None = Field(
-        default=None, alias="baseUrl", description="Jira instance URL, e.g. https://company.atlassian.net"
+        default=None,
+        alias="baseUrl",
+        description="Jira instance URL, e.g. https://company.atlassian.net",
     )
     email: str | None = Field(default=None, description="Jira account email")
     projects: list[str] = Field(
@@ -42,7 +44,9 @@ class JiraIssue(BaseModel):
     priority: str | None = Field(default=None, description="Priority name")
     assignee_email: str | None = Field(default=None, alias="assigneeEmail")
     assignee_name: str | None = Field(default=None, alias="assigneeName")
-    due_date: str | None = Field(default=None, alias="dueDate", description="Due date in YYYY-MM-DD format")
+    due_date: str | None = Field(
+        default=None, alias="dueDate", description="Due date in YYYY-MM-DD format"
+    )
     project_key: str = Field(alias="projectKey", description="Project key")
     description: str | None = Field(default=None, description="Issue description")
     labels: list[str] = Field(default_factory=list)

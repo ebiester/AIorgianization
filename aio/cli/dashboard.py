@@ -41,7 +41,7 @@ def dashboard(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
             for_date = parse_date(date_str)
         except InvalidDateError as e:
             console.print(f"[red]Invalid date:[/red] {e}")
-            raise click.Abort()
+            raise click.Abort() from None
 
     if stdout:
         content = dashboard_service.generate(for_date)

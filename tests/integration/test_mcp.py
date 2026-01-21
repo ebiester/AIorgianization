@@ -11,14 +11,14 @@ from aio.mcp.server import (
     call_tool,
     get_registry,
     handle_add_task,
-    handle_list_tasks,
     handle_complete_task,
-    handle_start_task,
+    handle_create_person,
+    handle_create_project,
     handle_defer_task,
     handle_delegate_task,
     handle_get_dashboard,
-    handle_create_project,
-    handle_create_person,
+    handle_list_tasks,
+    handle_start_task,
 )
 from aio.services.dashboard import DashboardService
 from aio.services.person import PersonService

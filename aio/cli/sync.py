@@ -36,7 +36,7 @@ def sync_jira(ctx: click.Context, dry_run: bool) -> None:
     if dry_run:
         console.print("[yellow]Dry run mode - no changes will be made[/yellow]\n")
 
-    with console.status("[bold blue]Syncing with Jira...") as status:
+    with console.status("[bold blue]Syncing with Jira..."):
         result = jira_service.sync(dry_run=dry_run)
 
     # Display results
@@ -97,7 +97,8 @@ def sync_status(ctx: click.Context) -> None:
     table.add_row("Enabled", "[green]Yes[/green]" if status["enabled"] else "[red]No[/red]")
     table.add_row("Base URL", status["base_url"] or "[dim]Not set[/dim]")
     table.add_row("Email", status["email"] or "[dim]Not set[/dim]")
-    table.add_row("Projects", ", ".join(status["projects"]) if status["projects"] else "[dim]None[/dim]")
+    projects_str = ", ".join(status["projects"]) if status["projects"] else "[dim]None[/dim]"
+    table.add_row("Projects", projects_str)
 
     # Sync state
     table.add_row("", "")  # Separator

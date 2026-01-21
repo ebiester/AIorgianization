@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from aio.exceptions import AmbiguousMatchError, TaskNotFoundError
+from aio.exceptions import TaskNotFoundError
 from aio.models.task import Task, TaskStatus
 from aio.services.task import TaskService
 from aio.services.vault import VaultService

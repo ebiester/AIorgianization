@@ -33,15 +33,15 @@ def start(ctx: click.Context, query: str) -> None:
         task = task_service.start(query)
         console.print(f"[green]Started:[/green] {task.title}")
         console.print(f"  ID: [cyan]{task.id}[/cyan]")
-        console.print(f"  Status: [green]next[/green]")
+        console.print("  Status: [green]next[/green]")
     except TaskNotFoundError:
         console.print(f"[red]Task not found:[/red] {query}")
-        raise click.Abort()
+        raise click.Abort() from None
     except AmbiguousMatchError as e:
         console.print(f"[red]Multiple matches for '{query}':[/red]")
         for match_id in e.matches:
             console.print(f"  - {match_id}")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -64,15 +64,15 @@ def defer(ctx: click.Context, query: str) -> None:
         task = task_service.defer(query)
         console.print(f"[yellow]Deferred:[/yellow] {task.title}")
         console.print(f"  ID: [cyan]{task.id}[/cyan]")
-        console.print(f"  Status: [dim]someday[/dim]")
+        console.print("  Status: [dim]someday[/dim]")
     except TaskNotFoundError:
         console.print(f"[red]Task not found:[/red] {query}")
-        raise click.Abort()
+        raise click.Abort() from None
     except AmbiguousMatchError as e:
         console.print(f"[red]Multiple matches for '{query}':[/red]")
         for match_id in e.matches:
             console.print(f"  - {match_id}")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()

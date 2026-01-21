@@ -277,9 +277,15 @@ Before considering a task complete, verify the expected behavior:
   - For error handling changes, trigger the error condition and verify user-friendly output (no tracebacks unless `--debug`)
 - **Service/model changes**: Run relevant unit tests with `uv run pytest tests/unit/test_<module>.py`
 - **Integration changes**: Run `uv run pytest tests/integration/`
-- **Any code change**: Ensure `uv run ruff check .` and `uv run mypy aio` pass
+- **Linting (REQUIRED)**: Run `uv run ruff check .` and confirm **zero errors**. Fix any linting issues before considering the task complete.
+- **Type checking**: Run `uv run mypy aio` and ensure it passes
 
-A task is not complete until the expected output is observed. If verification fails, continue debugging until it passes.
+A task is not complete until:
+1. The expected output is observed
+2. Linting passes with no errors (`uv run ruff check .` shows "All checks passed!")
+3. Type checking passes
+
+If verification fails, continue debugging until it passes.
 
 ### Python Style
 

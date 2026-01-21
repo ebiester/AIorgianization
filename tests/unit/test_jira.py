@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from aio.exceptions import JiraAuthError, JiraConfigError
+from aio.exceptions import JiraConfigError
 from aio.models.jira import JiraConfig, JiraIssue, JiraSyncState, SyncResult
 from aio.models.task import TaskStatus
 from aio.services.jira import JIRA_STATUS_MAP, JiraSyncService

@@ -18,7 +18,9 @@ console = Console()
 @click.argument(
     "filter",
     required=False,
-    type=click.Choice(["inbox", "next", "waiting", "someday", "scheduled", "today", "overdue", "all"]),
+    type=click.Choice(
+        ["inbox", "next", "waiting", "someday", "scheduled", "today", "overdue", "all"]
+    ),
 )
 @click.option("-p", "--project", help="Filter by project")
 @click.option("--completed", is_flag=True, help="Include completed tasks")

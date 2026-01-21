@@ -54,9 +54,7 @@ def _serialize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """
     result: dict[str, Any] = {}
     for key, value in metadata.items():
-        if isinstance(value, datetime):
-            result[key] = value.isoformat()
-        elif isinstance(value, date):
+        if isinstance(value, (datetime, date)):
             result[key] = value.isoformat()
         elif isinstance(value, dict):
             result[key] = _serialize_metadata(value)

@@ -5,7 +5,6 @@ from typing import Any
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.tree import Tree
 
 from aio.services.vault import VaultService

@@ -35,7 +35,10 @@ TOOL_SCHEMAS = {
             "properties": {
                 "status": {
                     "type": "string",
-                    "enum": ["inbox", "next", "waiting", "scheduled", "someday", "today", "overdue"],
+                    "enum": [
+                        "inbox", "next", "waiting", "scheduled",
+                        "someday", "today", "overdue",
+                    ],
                     "description": "Filter by status",
                 },
                 "project": {"type": "string", "description": "Filter by project name"},
@@ -108,7 +111,10 @@ TOOL_SCHEMAS = {
         },
     },
     "aio_sync_jira": {
-        "description": "Sync tasks from Jira. Imports issues assigned to you from configured projects.",
+        "description": (
+            "Sync tasks from Jira. "
+            "Imports issues assigned to you from configured projects."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -155,7 +161,10 @@ TOOL_SCHEMAS = {
                 },
                 "section": {
                     "type": "string",
-                    "description": "Section heading to append under (e.g., 'Key Concepts'). If not specified, appends to end.",
+                    "description": (
+                        "Section heading to append under (e.g., 'Key Concepts'). "
+                        "If not specified, appends to end."
+                    ),
                 },
             },
             "required": ["pack", "content"],
@@ -172,7 +181,10 @@ TOOL_SCHEMAS = {
                 },
                 "file": {
                     "type": "string",
-                    "description": "Path to the file in the vault (e.g., 'ADRs/2024-01-payment-provider.md')",
+                    "description": (
+                        "Path to the file in the vault "
+                        "(e.g., 'ADRs/2024-01-payment-provider.md')"
+                    ),
                 },
                 "section": {
                     "type": "string",
@@ -194,7 +206,10 @@ TOOL_SCHEMAS = {
                 "category": {
                     "type": "string",
                     "enum": ["domain", "system", "operating"],
-                    "description": "Pack category: 'domain' for business domains, 'system' for technical systems, 'operating' for processes",
+                    "description": (
+                        "Pack category: 'domain' for business domains, "
+                        "'system' for technical systems, 'operating' for processes"
+                    ),
                 },
                 "content": {
                     "type": "string",
