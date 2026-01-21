@@ -168,8 +168,8 @@ aio sync jira
 | Task resources | Expose task lists as resources | Done |
 | Cursor skill file | .cursor/skills/aio.md instructions | Not Started |
 | MCP integration tests | Test tool invocations | Done |
-| MCP startup message | Display initialization message when server starts | Not Started |
-| MCP graceful shutdown | Handle Ctrl+C gracefully with clean exit message | Not Started |
+| MCP startup message | Display initialization message when server starts | Done |
+| MCP graceful shutdown | Handle Ctrl+C gracefully with clean exit message | Done |
 
 ### Verification
 
@@ -252,5 +252,5 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 11. [ ] Add background Jira sync with status bar indicator
 12. [ ] Add `delegate` as CLI alias for `wait` with required person argument
 13. [x] Add `aio_delegate_task` MCP tool (alias for wait with person)
-14. [ ] Add MCP server startup message showing initialization status
-15. [ ] Add graceful MCP server shutdown (handle Ctrl+C with clean exit message)
+14. [x] Add MCP server startup message showing initialization status
+15. [x] Add graceful MCP server shutdown (handle Ctrl+C with clean exit message)

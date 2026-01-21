@@ -4,6 +4,8 @@ Exposes vault operations to Claude/Cursor via the Model Context Protocol.
 """
 
 import asyncio
+import signal
+import sys
 from datetime import date
 from typing import Any
 
@@ -986,13 +988,32 @@ def _format_task_list(tasks: list[Any], title: str) -> str:
 
 async def run_server() -> None:
     """Run the MCP server."""
+    # Print startup message to stderr (stdout is reserved for MCP protocol)
+    print("AIO MCP server starting...", file=sys.stderr)
+
     async with stdio_server() as (read_stream, write_stream):
+        print("AIO MCP server ready", file=sys.stderr)
         await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+def _handle_shutdown(signum: int, frame: Any) -> None:
+    """Handle shutdown signals gracefully."""
+    print("\nAIO MCP server shutting down...", file=sys.stderr)
+    sys.exit(0)
 
 
 def main() -> None:
     """Entry point for aio-mcp command."""
-    asyncio.run(run_server())
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, _handle_shutdown)
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+
+    try:
+        asyncio.run(run_server())
+    except KeyboardInterrupt:
+        # Handle case where signal handler doesn't catch it
+        print("\nAIO MCP server shutting down...", file=sys.stderr)
+        sys.exit(0)
 
 
 if __name__ == "__main__":
