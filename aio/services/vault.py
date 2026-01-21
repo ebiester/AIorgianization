@@ -30,6 +30,7 @@ AIO_FOLDERS = [
     "AIO/Context-Packs/Systems",
     "AIO/Context-Packs/Operating",
     "AIO/ADRs",
+    "AIO/Backup",
     "AIO/Archive/Tasks/Inbox",
     "AIO/Archive/Tasks/Next",
     "AIO/Archive/Tasks/Waiting",
@@ -283,6 +284,14 @@ class VaultService:
         if status:
             return base / status.capitalize()
         return base
+
+    def backup_folder(self) -> Path:
+        """Get the backup folder path.
+
+        Returns:
+            Path to the AIO/Backup folder.
+        """
+        return self.aio_path / "Backup"
 
     def get_config(self) -> dict[str, Any]:
         """Read the vault configuration.

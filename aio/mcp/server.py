@@ -13,12 +13,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 
-from aio.exceptions import AioError, InvalidDateError, JiraError
+from aio.exceptions import AioError, FileOutsideVaultError, InvalidDateError, JiraError
 from aio.models.context_pack import ContextPackCategory
 from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
+from aio.services.file import FileService
 from aio.services.jira import JiraSyncService
 from aio.services.person import PersonService
 from aio.services.project import ProjectService
@@ -42,6 +43,7 @@ class ServiceRegistry:
         self._dashboard_service: DashboardService | None = None
         self._jira_service: JiraSyncService | None = None
         self._context_pack_service: ContextPackService | None = None
+        self._file_service: FileService | None = None
 
     def reset(self) -> None:
         """Reset all services. Useful for testing."""
@@ -52,6 +54,7 @@ class ServiceRegistry:
         self._dashboard_service = None
         self._jira_service = None
         self._context_pack_service = None
+        self._file_service = None
 
     def set_vault_service(self, service: VaultService) -> None:
         """Override the vault service. Useful for testing."""
@@ -76,6 +79,10 @@ class ServiceRegistry:
     def set_person_service(self, service: PersonService) -> None:
         """Override the person service. Useful for testing."""
         self._person_service = service
+
+    def set_file_service(self, service: FileService) -> None:
+        """Override the file service. Useful for testing."""
+        self._file_service = service
 
     @property
     def vault_service(self) -> VaultService:
@@ -128,6 +135,13 @@ class ServiceRegistry:
             self._context_pack_service = ContextPackService(self.vault_service)
         return self._context_pack_service
 
+    @property
+    def file_service(self) -> FileService:
+        """Get the file service, creating it lazily if needed."""
+        if self._file_service is None:
+            self._file_service = FileService(self.vault_service)
+        return self._file_service
+
 
 # Global registry instance
 _registry = ServiceRegistry()
@@ -171,6 +185,11 @@ def get_jira_service() -> JiraSyncService:
 def get_context_pack_service() -> ContextPackService:
     """Get the context pack service."""
     return _registry.context_pack_service
+
+
+def get_file_service() -> FileService:
+    """Get the file service."""
+    return _registry.file_service
 
 
 # Create MCP server
@@ -483,6 +502,51 @@ async def list_tools() -> list[Tool]:
                 "required": ["query", "person"],
             },
         ),
+        Tool(
+            name="aio_file_get",
+            description=(
+                "Get the contents of a file in the vault. "
+                "Query by file ID (4-char), title substring, or path."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "File ID (4-char), title substring, "
+                            "or path relative to vault root"
+                        ),
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="aio_file_set",
+            description=(
+                "Set file contents with automatic backup. "
+                "Query by file ID (4-char), title substring, or path. "
+                "Creates a timestamped backup before overwriting existing files."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "File ID (4-char), title substring, "
+                            "or path relative to vault root"
+                        ),
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New file contents",
+                    },
+                },
+                "required": ["query", "content"],
+            },
+        ),
     ]
 
 
@@ -522,8 +586,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_create_person(arguments)
         elif name == "aio_delegate_task":
             return await handle_delegate_task(arguments)
+        elif name == "aio_file_get":
+            return await handle_file_get(arguments)
+        elif name == "aio_file_set":
+            return await handle_file_set(arguments)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    except FileOutsideVaultError as e:
+        return [TextContent(type="text", text=f"Error: {e}")]
     except JiraError as e:
         return [TextContent(type="text", text=f"Jira error: {e}")]
     except AioError as e:
@@ -900,6 +970,44 @@ async def handle_delegate_task(args: dict[str, Any]) -> list[TextContent]:
         type="text",
         text=f"Delegated: {task.title} ({task.id})\nWaiting on: {person.name}\nStatus: waiting",
     )]
+
+
+async def handle_file_get(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_file_get tool."""
+    file_service = get_file_service()
+
+    query = args["query"]
+    content = file_service.get(query)
+
+    return [TextContent(type="text", text=content)]
+
+
+async def handle_file_set(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_file_set tool."""
+    file_service = get_file_service()
+    vault_service = get_vault_service()
+
+    query = args["query"]
+    content = args["content"]
+
+    resolved_path, backup_path = file_service.set(query, content)
+
+    # Show relative paths from vault root for cleaner output
+    try:
+        relative_file = resolved_path.relative_to(vault_service.vault_path)
+    except ValueError:
+        relative_file = resolved_path
+
+    if backup_path:
+        try:
+            relative_backup = backup_path.relative_to(vault_service.vault_path)
+            result = f"Backup created: {relative_backup}\nFile updated: {relative_file}"
+        except ValueError:
+            result = f"Backup created: {backup_path}\nFile updated: {relative_file}"
+    else:
+        result = f"File created: {relative_file} (no backup needed - new file)"
+
+    return [TextContent(type="text", text=result)]
 
 
 @server.list_resources()

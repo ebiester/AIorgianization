@@ -11,6 +11,7 @@ from aio.cli.archive import archive
 from aio.cli.config import config
 from aio.cli.dashboard import dashboard
 from aio.cli.done import done
+from aio.cli.file import file
 from aio.cli.init import init
 from aio.cli.list import list_tasks
 from aio.cli.status import defer, start, wait
@@ -53,6 +54,7 @@ cli.add_command(dashboard)
 cli.add_command(archive)
 cli.add_command(sync)
 cli.add_command(config)
+cli.add_command(file)
 
 
 def main() -> None:

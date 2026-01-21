@@ -106,3 +106,9 @@ class ContextPackExistsError(AioError):
     """Raised when trying to create a context pack that already exists."""
 
     pass
+
+
+class FileOutsideVaultError(AioError):
+    """Raised when a file path resolves to outside the vault."""
+
+    pass

@@ -196,3 +196,166 @@ class TestDashboardCommand:
 
         assert result.exit_code == 0
         assert "Dashboard saved:" in result.output
+
+
+class TestFileCommands:
+    """Tests for aio file get/set commands."""
+
+    def test_file_get_command(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """file get should output file contents."""
+        # Create a test file
+        test_file = initialized_vault / "AIO" / "test.md"
+        test_file.write_text("Hello from test file!", encoding="utf-8")
+
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "file", "get", "AIO/test.md"]
+        )
+
+        assert result.exit_code == 0
+        assert "Hello from test file!" in result.output
+
+    def test_file_get_not_found(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """file get should fail for missing files."""
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "file", "get", "nonexistent.md"]
+        )
+
+        assert result.exit_code != 0
+        assert "not found" in result.output.lower()
+
+    def test_file_set_command_with_backup(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """file set should create backup and update file."""
+        # Create original file
+        test_file = initialized_vault / "AIO" / "test.md"
+        test_file.write_text("original content", encoding="utf-8")
+
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "file", "set", "AIO/test.md",
+                "-c", "new content",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Backup created:" in result.output
+        assert "File updated:" in result.output
+
+        # Verify file was updated
+        assert test_file.read_text(encoding="utf-8") == "new content"
+
+        # Verify backup exists
+        backup_folder = initialized_vault / "AIO" / "Backup" / "AIO"
+        assert backup_folder.exists()
+        backup_files = list(backup_folder.glob("test-*.md"))
+        assert len(backup_files) == 1
+        assert backup_files[0].read_text(encoding="utf-8") == "original content"
+
+    def test_file_set_new_file_no_backup(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """file set should create new file without backup."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "file", "set", "AIO/new-file.md",
+                "-c", "brand new content",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "File updated:" in result.output
+        # Should not mention backup for new files
+        assert "Backup created:" not in result.output
+
+        # Verify file was created
+        new_file = initialized_vault / "AIO" / "new-file.md"
+        assert new_file.exists()
+        assert new_file.read_text(encoding="utf-8") == "brand new content"
+
+    def test_file_set_from_input_file(
+        self, runner: CliRunner, initialized_vault: Path, tmp_path: Path
+    ) -> None:
+        """file set should read content from input file."""
+        # Create source file
+        source_file = tmp_path / "source.txt"
+        source_file.write_text("content from source file", encoding="utf-8")
+
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "file", "set", "AIO/target.md",
+                "-f", str(source_file),
+            ],
+        )
+
+        assert result.exit_code == 0
+        target_file = initialized_vault / "AIO" / "target.md"
+        assert target_file.read_text(encoding="utf-8") == "content from source file"
+
+    def test_file_set_outside_vault_fails(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """file set should reject paths outside vault."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "file", "set", "../outside.txt",
+                "-c", "malicious content",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "outside vault" in result.output.lower()
+
+    def test_file_get_by_id(
+        self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
+    ) -> None:
+        """file get should work with task ID."""
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "file", "get", "AB2C"]
+        )
+
+        assert result.exit_code == 0
+        assert "Test Task" in result.output
+
+    def test_file_get_by_title(
+        self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
+    ) -> None:
+        """file get should work with title substring."""
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "file", "get", "Test Task"]
+        )
+
+        assert result.exit_code == 0
+        assert "id: AB2C" in result.output
+
+    def test_file_set_by_id(
+        self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
+    ) -> None:
+        """file set should work with task ID."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "file", "set", "AB2C",
+                "-c", "Updated by ID",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Backup created:" in result.output
+        assert "File updated:" in result.output
+
+        # Verify content was updated
+        assert "Updated by ID" in sample_task_file.read_text(encoding="utf-8")
