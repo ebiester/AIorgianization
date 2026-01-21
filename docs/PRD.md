@@ -59,6 +59,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Natural dates | "tomorrow", "next monday", "in 3 days" | Done |
 | Archiving | Archive tasks, projects, areas, people | Done |
 | Date-based archive | `aio archive tasks --before <date>` | Done |
+| Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
 
 ### P0: Project & Team Structure (Phase 2) ✓
 

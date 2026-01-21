@@ -164,6 +164,7 @@ aio sync jira
 | aio_sync_jira tool | Sync Jira via MCP | Done |
 | aio_jira_status tool | Get Jira status via MCP | Done |
 | Context pack tools | Create, list, append context packs | Done |
+| Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
 | Task resources | Expose task lists as resources | Done |
 | Cursor skill file | .cursor/skills/aio.md instructions | Not Started |
 | MCP integration tests | Test tool invocations | Done |
