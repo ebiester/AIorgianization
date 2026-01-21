@@ -24,7 +24,7 @@ class Person(BaseModel):
 
     def frontmatter(self) -> dict[str, Any]:
         """Convert to frontmatter dictionary."""
-        data: dict[str, Any] = {"id": self.id, "type": self.type}
+        data: dict[str, Any] = {"id": self.id, "type": self.type, "name": self.name}
 
         if self.team:
             data["team"] = self.team

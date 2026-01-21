@@ -12,7 +12,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 
-from aio.exceptions import AioError, InvalidDateError, JiraError
+from aio.exceptions import AioError, AmbiguousMatchError, InvalidDateError, JiraError
 from aio.models.context_pack import ContextPackCategory
 from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
@@ -191,7 +191,7 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Due date (e.g., 'tomorrow', 'friday', '2024-01-20')",
                     },
-                    "project": {"type": "string", "description": "Project name"},
+                    "project": {"type": "string", "description": "Project ID or name"},
                     "status": {
                         "type": "string",
                         "enum": ["inbox", "next", "scheduled", "someday"],
@@ -212,7 +212,7 @@ async def list_tools() -> list[Tool]:
                         "enum": ["inbox", "next", "waiting", "scheduled", "someday", "today", "overdue"],
                         "description": "Filter by status",
                     },
-                    "project": {"type": "string", "description": "Filter by project name"},
+                    "project": {"type": "string", "description": "Filter by project ID or name"},
                 },
             },
         ),
@@ -512,15 +512,13 @@ async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
 
     project_link = None
     if project:
-        # Validate that the project exists before creating the task
-        project_service.validate_or_suggest(project)
-
-        if not project.startswith("[["):
-            # Use slug to match actual filename
-            project_slug = project_service.get_slug(project)
-            project_link = f"[[AIO/Projects/{project_slug}]]"
-        else:
+        # Find project by ID or name
+        if project.startswith("[["):
             project_link = project
+        else:
+            found_project = project_service.find(project)
+            project_slug = project_service.get_slug(found_project.title)
+            project_link = f"[[AIO/Projects/{project_slug}]]"
 
     task = task_service.create(
         title=title,

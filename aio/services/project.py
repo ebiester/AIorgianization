@@ -1,14 +1,17 @@
 """Project service for operations on project markdown files."""
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any
 
-from aio.exceptions import ProjectNotFoundError
+from aio.exceptions import AmbiguousMatchError, ProjectNotFoundError
 from aio.models.project import Project, ProjectStatus
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
-from aio.utils.frontmatter import write_frontmatter
+from aio.utils.frontmatter import read_frontmatter, write_frontmatter
+from aio.utils.ids import is_valid_id, normalize_id
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +114,152 @@ class ProjectService:
 
         suggestions = self.find_similar(name)
         raise ProjectNotFoundError(name, suggestions)
+
+    def get(self, project_id: str) -> Project:
+        """Get a project by ID.
+
+        Args:
+            project_id: The 4-character project ID.
+
+        Returns:
+            The project.
+
+        Raises:
+            ProjectNotFoundError: If the project is not found.
+        """
+        project_id = normalize_id(project_id)
+        project = self._find_project_by_id(project_id)
+        if not project:
+            raise ProjectNotFoundError(project_id)
+        return project
+
+    def find(self, query: str) -> Project:
+        """Find a project by ID or name substring.
+
+        Args:
+            query: Project ID (4 chars) or name substring.
+
+        Returns:
+            The matching project.
+
+        Raises:
+            ProjectNotFoundError: If no project matches.
+            AmbiguousMatchError: If multiple projects match.
+        """
+        # If it looks like an ID, try ID lookup first
+        if is_valid_id(query):
+            try:
+                return self.get(query)
+            except ProjectNotFoundError:
+                pass  # Fall through to name search
+
+        # Search by name
+        matches = self._find_projects_by_name(query)
+        if not matches:
+            suggestions = self.find_similar(query)
+            raise ProjectNotFoundError(query, suggestions)
+        if len(matches) > 1:
+            raise AmbiguousMatchError(query, [p.id for p in matches])
+        return matches[0]
+
+    def _find_project_by_id(self, project_id: str) -> Project | None:
+        """Find a project by its ID.
+
+        Args:
+            project_id: The project ID to find (normalized).
+
+        Returns:
+            The Project, or None if not found.
+        """
+        project_id = project_id.upper()
+        projects_folder = self.vault.projects_folder()
+
+        if not projects_folder.exists():
+            return None
+
+        for filepath in projects_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                if metadata.get("id", "").upper() == project_id:
+                    return self._read_project(filepath, metadata, content)
+            except Exception as e:
+                logger.debug("Failed to read project file %s: %s", filepath, e)
+
+        return None
+
+    def _find_projects_by_name(self, query: str) -> list[Project]:
+        """Find projects by name substring.
+
+        Args:
+            query: Name substring to search for.
+
+        Returns:
+            List of matching projects.
+        """
+        query_lower = query.lower()
+        matches: list[Project] = []
+        projects_folder = self.vault.projects_folder()
+
+        if not projects_folder.exists():
+            return matches
+
+        for filepath in projects_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                # Check both filename (stem) and title in frontmatter
+                title = metadata.get("title", filepath.stem)
+                if query_lower in title.lower() or query_lower in filepath.stem.lower():
+                    matches.append(self._read_project(filepath, metadata, content))
+            except Exception as e:
+                logger.debug("Failed to read project file %s: %s", filepath, e)
+
+        return matches
+
+    def _read_project(
+        self, filepath: Path, metadata: dict[str, Any], content: str
+    ) -> Project:
+        """Read a project from parsed file data.
+
+        Args:
+            filepath: Path to the project file.
+            metadata: Parsed frontmatter.
+            content: File content.
+
+        Returns:
+            The Project object.
+        """
+        # Parse target_date if present
+        target_date_val = metadata.get("targetDate")
+        target_date = None
+        if target_date_val:
+            if isinstance(target_date_val, date):
+                target_date = target_date_val
+            elif isinstance(target_date_val, str):
+                target_date = date.fromisoformat(target_date_val)
+
+        # Parse created datetime
+        created_val = metadata.get("created")
+        created = datetime.now()
+        if created_val:
+            if isinstance(created_val, datetime):
+                created = created_val
+            elif isinstance(created_val, str):
+                created = datetime.fromisoformat(created_val.replace("Z", "+00:00"))
+                if created.tzinfo:
+                    created = created.replace(tzinfo=None)
+
+        return Project(
+            id=metadata.get("id", "????"),
+            type=metadata.get("type", "project"),
+            status=ProjectStatus(metadata.get("status", "active")),
+            category=metadata.get("category", "project"),
+            title=metadata.get("title", filepath.stem),
+            body=content,
+            team=metadata.get("team"),
+            target_date=target_date,
+            jira_epic=metadata.get("jiraEpic"),
+            created=created,
+        )
 
     def create(
         self,

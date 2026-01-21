@@ -106,33 +106,36 @@ def wait(
     person_link = None
     if person:
         # Extract person name from wikilink if provided
-        person_name = person
+        person_query = person
         if person.startswith("[[") and person.endswith("]]"):
             # Extract name from [[People/Name]] or [[Name]]
             inner = person[2:-2]
-            person_name = inner.split("/")[-1] if "/" in inner else inner
+            person_query = inner.split("/")[-1] if "/" in inner else inner
 
-        # Check if person exists
-        if not person_service.exists(person_name):
+        # Try to find person by ID or name
+        try:
+            found_person = person_service.find(person_query)
+            person_slug = person_service.get_slug(found_person.name)
+            person_link = f"[[AIO/People/{person_slug}]]"
+        except PersonNotFoundError as e:
             if create_person:
-                # Create the person
-                person_service.create(person_name)
-                console.print(f"[green]Created person:[/green] {person_name}")
+                # Create the person with the query as name
+                person_service.create(person_query)
+                console.print(f"[green]Created person:[/green] {person_query}")
+                person_slug = person_service.get_slug(person_query)
+                person_link = f"[[AIO/People/{person_slug}]]"
             else:
-                # Error with suggestions
-                try:
-                    person_service.validate_or_suggest(person_name)
-                except PersonNotFoundError as e:
-                    console.print(f"[red]Error:[/red] {e}")
-                    console.print(
-                        f"\nTo create this person, use:\n"
-                        f'  aio wait "{query}" "{person_name}" --create-person'
-                    )
-                    raise click.Abort() from None
-
-        # Format as wikilink using the slug (matches actual filename)
-        person_slug = person_service.get_slug(person_name)
-        person_link = f"[[AIO/People/{person_slug}]]"
+                console.print(f"[red]Error:[/red] {e}")
+                console.print(
+                    f"\nTo create this person, use:\n"
+                    f'  aio wait "{query}" "{person_query}" --create-person'
+                )
+                raise click.Abort() from None
+        except AmbiguousMatchError as e:
+            console.print(f"[red]Multiple people match '{person_query}':[/red]")
+            for match_id in e.matches:
+                console.print(f"  - {match_id}")
+            raise click.Abort() from None
 
     try:
         task = task_service.wait(query, person_link)

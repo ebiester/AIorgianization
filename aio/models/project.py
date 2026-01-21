@@ -46,6 +46,7 @@ class Project(BaseModel):
         data: dict[str, Any] = {
             "id": self.id,
             "type": self.type,
+            "title": self.title,
             "status": self.status,
             "category": self.category,
         }

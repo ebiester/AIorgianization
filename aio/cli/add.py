@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from aio.exceptions import InvalidDateError, ProjectNotFoundError
+from aio.exceptions import AmbiguousMatchError, InvalidDateError, ProjectNotFoundError
 from aio.models.task import TaskStatus
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
@@ -70,33 +70,36 @@ def add(
     project_link = None
     if project:
         # Extract project name from wikilink if provided
-        project_name = project
+        project_query = project
         if project.startswith("[[") and project.endswith("]]"):
             # Extract name from [[Projects/Name]] or [[Name]]
             inner = project[2:-2]
-            project_name = inner.split("/")[-1] if "/" in inner else inner
+            project_query = inner.split("/")[-1] if "/" in inner else inner
 
-        # Check if project exists
-        if not project_service.exists(project_name):
+        # Try to find project by ID or name
+        try:
+            found_project = project_service.find(project_query)
+            project_slug = project_service.get_slug(found_project.title)
+            project_link = f"[[AIO/Projects/{project_slug}]]"
+        except ProjectNotFoundError as e:
             if create_project:
-                # Create the project
-                project_service.create(project_name)
-                console.print(f"[green]Created project:[/green] {project_name}")
+                # Create the project with the query as name
+                project_service.create(project_query)
+                console.print(f"[green]Created project:[/green] {project_query}")
+                project_slug = project_service.get_slug(project_query)
+                project_link = f"[[AIO/Projects/{project_slug}]]"
             else:
-                # Error with suggestions
-                try:
-                    project_service.validate_or_suggest(project_name)
-                except ProjectNotFoundError as e:
-                    console.print(f"[red]Error:[/red] {e}")
-                    console.print(
-                        f"\nTo create this project, use:\n"
-                        f"  aio add \"{title}\" -p \"{project_name}\" --create-project"
-                    )
-                    raise click.Abort() from None
-
-        # Format as wikilink using the slug (matches actual filename)
-        project_slug = project_service.get_slug(project_name)
-        project_link = f"[[AIO/Projects/{project_slug}]]"
+                console.print(f"[red]Error:[/red] {e}")
+                console.print(
+                    f"\nTo create this project, use:\n"
+                    f'  aio add "{title}" -p "{project_query}" --create-project'
+                )
+                raise click.Abort() from None
+        except AmbiguousMatchError as e:
+            console.print(f"[red]Multiple projects match '{project_query}':[/red]")
+            for match_id in e.matches:
+                console.print(f"  - {match_id}")
+            raise click.Abort() from None
 
     # Create task
     task = task_service.create(

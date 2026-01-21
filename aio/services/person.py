@@ -2,12 +2,15 @@
 
 import logging
 from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any
 
-from aio.exceptions import PersonNotFoundError
+from aio.exceptions import AmbiguousMatchError, PersonNotFoundError
 from aio.models.person import Person
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
-from aio.utils.frontmatter import write_frontmatter
+from aio.utils.frontmatter import read_frontmatter, write_frontmatter
+from aio.utils.ids import is_valid_id, normalize_id
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +113,130 @@ class PersonService:
 
         suggestions = self.find_similar(name)
         raise PersonNotFoundError(name, suggestions)
+
+    def get(self, person_id: str) -> Person:
+        """Get a person by ID.
+
+        Args:
+            person_id: The 4-character person ID.
+
+        Returns:
+            The person.
+
+        Raises:
+            PersonNotFoundError: If the person is not found.
+        """
+        person_id = normalize_id(person_id)
+        person = self._find_person_by_id(person_id)
+        if not person:
+            raise PersonNotFoundError(person_id)
+        return person
+
+    def find(self, query: str) -> Person:
+        """Find a person by ID or name substring.
+
+        Args:
+            query: Person ID (4 chars) or name substring.
+
+        Returns:
+            The matching person.
+
+        Raises:
+            PersonNotFoundError: If no person matches.
+            AmbiguousMatchError: If multiple people match.
+        """
+        # If it looks like an ID, try ID lookup first
+        if is_valid_id(query):
+            try:
+                return self.get(query)
+            except PersonNotFoundError:
+                pass  # Fall through to name search
+
+        # Search by name
+        matches = self._find_people_by_name(query)
+        if not matches:
+            suggestions = self.find_similar(query)
+            raise PersonNotFoundError(query, suggestions)
+        if len(matches) > 1:
+            raise AmbiguousMatchError(query, [p.id for p in matches])
+        return matches[0]
+
+    def _find_person_by_id(self, person_id: str) -> Person | None:
+        """Find a person by their ID.
+
+        Args:
+            person_id: The person ID to find (normalized).
+
+        Returns:
+            The Person, or None if not found.
+        """
+        person_id = person_id.upper()
+        people_folder = self.vault.people_folder()
+
+        if not people_folder.exists():
+            return None
+
+        for filepath in people_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                if metadata.get("id", "").upper() == person_id:
+                    return self._read_person(filepath, metadata, content)
+            except Exception as e:
+                logger.debug("Failed to read person file %s: %s", filepath, e)
+
+        return None
+
+    def _find_people_by_name(self, query: str) -> list[Person]:
+        """Find people by name substring.
+
+        Args:
+            query: Name substring to search for.
+
+        Returns:
+            List of matching people.
+        """
+        query_lower = query.lower()
+        matches: list[Person] = []
+        people_folder = self.vault.people_folder()
+
+        if not people_folder.exists():
+            return matches
+
+        for filepath in people_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                # Check both filename (stem) and name in frontmatter
+                name = metadata.get("name", filepath.stem)
+                if query_lower in name.lower() or query_lower in filepath.stem.lower():
+                    matches.append(self._read_person(filepath, metadata, content))
+            except Exception as e:
+                logger.debug("Failed to read person file %s: %s", filepath, e)
+
+        return matches
+
+    def _read_person(
+        self, filepath: Path, metadata: dict[str, Any], content: str
+    ) -> Person:
+        """Read a person from parsed file data.
+
+        Args:
+            filepath: Path to the person file.
+            metadata: Parsed frontmatter.
+            content: File content.
+
+        Returns:
+            The Person object.
+        """
+        return Person(
+            id=metadata.get("id", "????"),
+            type=metadata.get("type", "person"),
+            name=metadata.get("name", filepath.stem),
+            body=content,
+            team=metadata.get("team"),
+            role=metadata.get("role"),
+            email=metadata.get("email"),
+            jira_account_id=metadata.get("jiraAccountId"),
+        )
 
     def create(
         self,
