@@ -1,16 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MockApp, MockTFile, MockTFolder, normalizePath } from './mocks/obsidian';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { MockApp, MockTFile } from './mocks/obsidian';
 import { ID_CHARS, DEFAULT_SETTINGS, AioSettings } from '../src/types';
-
-// We need to mock the obsidian module before importing TaskService
-vi.mock('obsidian', () => ({
-  App: vi.fn(),
-  TFile: vi.fn(),
-  TFolder: vi.fn(),
-  normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/|\/$/g, ''),
-}));
-
-// Import TaskService after mocking
 import { TaskService } from '../src/services/TaskService';
 
 describe('TaskService', () => {

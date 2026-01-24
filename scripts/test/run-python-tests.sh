@@ -18,6 +18,17 @@ set -euo pipefail
 export UV_NATIVE_TLS=1
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/claude/uv-cache}"
 
+# Error handling helper
+die() {
+    echo "ERROR: $1" >&2
+    exit 1
+}
+
+# Check for required commands
+if ! command -v uv &> /dev/null; then
+    die "uv is not installed. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh (or 'brew install uv')"
+fi
+
 OUTPUT_FILE=""
 COVERAGE_FILE=""
 WITH_COVERAGE=false
@@ -48,13 +59,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "Failed to determine script directory"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)" || die "Failed to determine project root"
 
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT" || die "Failed to change to project root: $PROJECT_ROOT"
+
+# Check tests directory exists
+if [ ! -d "$PROJECT_ROOT/tests" ]; then
+    die "Tests directory not found: $PROJECT_ROOT/tests"
+fi
+
+# Ensure dependencies are installed
+if [ "$VERBOSE" = true ]; then
+    echo "Ensuring dependencies are installed..."
+fi
+uv sync --all-extras --quiet || die "Failed to sync dependencies with uv"
 
 # Ensure test-results directory exists
-mkdir -p "$PROJECT_ROOT/test-results"
+mkdir -p "$PROJECT_ROOT/test-results" || die "Failed to create test-results directory"
 
 # Set default output paths
 if [ -z "$OUTPUT_FILE" ]; then
@@ -84,22 +106,17 @@ if [ "$WITH_COVERAGE" = true ]; then
     )
 fi
 
-# Run pytest - prefer venv if available, fall back to uv run
+# Run pytest using uv run (dependencies already synced above)
 echo "Running Python tests..."
 
-if [ -f "$PROJECT_ROOT/.venv/bin/pytest" ]; then
-    PYTEST_CMD="$PROJECT_ROOT/.venv/bin/pytest"
-    if [ "$VERBOSE" = true ]; then
-        echo "Command: $PYTEST_CMD ${PYTEST_ARGS[*]} tests/"
-    fi
-    "$PYTEST_CMD" "${PYTEST_ARGS[@]}" tests/
-else
-    if [ "$VERBOSE" = true ]; then
-        echo "Command: uv run pytest ${PYTEST_ARGS[*]} tests/"
-    fi
-    uv run pytest "${PYTEST_ARGS[@]}" tests/
+if [ "$VERBOSE" = true ]; then
+    echo "Command: uv run pytest ${PYTEST_ARGS[*]} tests/"
 fi
+
+set +e  # Temporarily allow command failure to capture exit code
+uv run pytest "${PYTEST_ARGS[@]}" tests/
 exit_code=$?
+set -e  # Re-enable strict mode
 
 # Output summary
 echo ""

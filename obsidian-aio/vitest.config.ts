@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Mock the obsidian module to avoid resolution errors
+      obsidian: path.resolve(__dirname, 'tests/mocks/obsidian-module.ts'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',

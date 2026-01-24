@@ -84,7 +84,11 @@ export function parseDate(dateStr: string): Date {
     const targetDay = days.indexOf(nextDayMatch[2]);
     const currentDay = today.getDay();
     let daysAhead = targetDay - currentDay;
-    if (daysAhead <= 0 || nextDayMatch[1]) {
+    if (daysAhead <= 0) {
+      daysAhead += 7;
+    }
+    // "next [day]" means the week after the immediate upcoming day
+    if (nextDayMatch[1]) {
       daysAhead += 7;
     }
     const targetDate = new Date(today);
@@ -157,10 +161,13 @@ export function isDueThisWeek(d: Date): boolean {
 }
 
 /**
- * Format a date as ISO 8601 (YYYY-MM-DD).
+ * Format a date as ISO 8601 (YYYY-MM-DD) in local time.
  */
 export function formatIsoDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Helper: Get start of day (midnight)

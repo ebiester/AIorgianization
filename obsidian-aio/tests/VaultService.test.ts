@@ -1,15 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MockApp, MockTFolder, normalizePath as mockNormalizePath } from './mocks/obsidian';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { MockApp } from './mocks/obsidian';
 import { DEFAULT_SETTINGS, AioSettings } from '../src/types';
-
-// We need to mock the obsidian module before importing VaultService
-vi.mock('obsidian', () => ({
-  App: vi.fn(),
-  TFolder: vi.fn(),
-  normalizePath: (path: string) => path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/|\/$/g, ''),
-}));
-
-// Import VaultService after mocking
 import { VaultService } from '../src/services/VaultService';
 
 describe('VaultService', () => {

@@ -141,7 +141,7 @@ describe('parseDate', () => {
 });
 
 describe('formatRelativeDate', () => {
-  const mockDate = new Date('2024-06-15T12:00:00');
+  const mockDate = new Date(2024, 5, 15, 12, 0, 0);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -153,41 +153,42 @@ describe('formatRelativeDate', () => {
   });
 
   it('formats today', () => {
-    expect(formatRelativeDate(new Date('2024-06-15'))).toBe('today');
+    // Use Date constructor with components to ensure local time
+    expect(formatRelativeDate(new Date(2024, 5, 15))).toBe('today');
   });
 
   it('formats tomorrow', () => {
-    expect(formatRelativeDate(new Date('2024-06-16'))).toBe('tomorrow');
+    expect(formatRelativeDate(new Date(2024, 5, 16))).toBe('tomorrow');
   });
 
   it('formats yesterday', () => {
-    expect(formatRelativeDate(new Date('2024-06-14'))).toBe('yesterday');
+    expect(formatRelativeDate(new Date(2024, 5, 14))).toBe('yesterday');
   });
 
   it('formats days ago', () => {
-    expect(formatRelativeDate(new Date('2024-06-10'))).toContain('days ago');
+    expect(formatRelativeDate(new Date(2024, 5, 10))).toContain('days ago');
   });
 
   it('formats day name for dates within 7 days', () => {
     // June 17, 2024 is a Monday
-    const result = formatRelativeDate(new Date('2024-06-17'));
+    const result = formatRelativeDate(new Date(2024, 5, 17));
     expect(result).toBe('Monday');
   });
 
   it('formats "next [day]" for dates 7-14 days out', () => {
     // June 22, 2024 is a Saturday (7 days from June 15)
-    const result = formatRelativeDate(new Date('2024-06-22'));
+    const result = formatRelativeDate(new Date(2024, 5, 22));
     expect(result).toContain('Saturday');
   });
 
   it('formats month/day for dates beyond 14 days', () => {
-    const result = formatRelativeDate(new Date('2024-07-15'));
+    const result = formatRelativeDate(new Date(2024, 6, 15));
     expect(result).toMatch(/Jul 15|July 15/);
   });
 });
 
 describe('isOverdue', () => {
-  const mockDate = new Date('2024-06-15T12:00:00');
+  const mockDate = new Date(2024, 5, 15, 12, 0, 0);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -199,22 +200,22 @@ describe('isOverdue', () => {
   });
 
   it('returns true for past dates', () => {
-    expect(isOverdue(new Date('2024-06-14'))).toBe(true);
-    expect(isOverdue(new Date('2024-06-01'))).toBe(true);
+    expect(isOverdue(new Date(2024, 5, 14))).toBe(true);
+    expect(isOverdue(new Date(2024, 5, 1))).toBe(true);
   });
 
   it('returns false for today', () => {
-    expect(isOverdue(new Date('2024-06-15'))).toBe(false);
+    expect(isOverdue(new Date(2024, 5, 15))).toBe(false);
   });
 
   it('returns false for future dates', () => {
-    expect(isOverdue(new Date('2024-06-16'))).toBe(false);
-    expect(isOverdue(new Date('2024-12-31'))).toBe(false);
+    expect(isOverdue(new Date(2024, 5, 16))).toBe(false);
+    expect(isOverdue(new Date(2024, 11, 31))).toBe(false);
   });
 });
 
 describe('isDueToday', () => {
-  const mockDate = new Date('2024-06-15T12:00:00');
+  const mockDate = new Date(2024, 5, 15, 12, 0, 0);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -226,19 +227,19 @@ describe('isDueToday', () => {
   });
 
   it('returns true for today', () => {
-    expect(isDueToday(new Date('2024-06-15'))).toBe(true);
-    expect(isDueToday(new Date('2024-06-15T23:59:59'))).toBe(true);
-    expect(isDueToday(new Date('2024-06-15T00:00:00'))).toBe(true);
+    expect(isDueToday(new Date(2024, 5, 15))).toBe(true);
+    expect(isDueToday(new Date(2024, 5, 15, 23, 59, 59))).toBe(true);
+    expect(isDueToday(new Date(2024, 5, 15, 0, 0, 0))).toBe(true);
   });
 
   it('returns false for other dates', () => {
-    expect(isDueToday(new Date('2024-06-14'))).toBe(false);
-    expect(isDueToday(new Date('2024-06-16'))).toBe(false);
+    expect(isDueToday(new Date(2024, 5, 14))).toBe(false);
+    expect(isDueToday(new Date(2024, 5, 16))).toBe(false);
   });
 });
 
 describe('isDueThisWeek', () => {
-  const mockDate = new Date('2024-06-15T12:00:00');
+  const mockDate = new Date(2024, 5, 15, 12, 0, 0);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -250,34 +251,34 @@ describe('isDueThisWeek', () => {
   });
 
   it('returns true for today', () => {
-    expect(isDueThisWeek(new Date('2024-06-15'))).toBe(true);
+    expect(isDueThisWeek(new Date(2024, 5, 15))).toBe(true);
   });
 
   it('returns true for dates within 7 days', () => {
-    expect(isDueThisWeek(new Date('2024-06-18'))).toBe(true);
-    expect(isDueThisWeek(new Date('2024-06-22'))).toBe(true);
+    expect(isDueThisWeek(new Date(2024, 5, 18))).toBe(true);
+    expect(isDueThisWeek(new Date(2024, 5, 22))).toBe(true);
   });
 
   it('returns false for dates beyond 7 days', () => {
-    expect(isDueThisWeek(new Date('2024-06-23'))).toBe(false);
-    expect(isDueThisWeek(new Date('2024-07-01'))).toBe(false);
+    expect(isDueThisWeek(new Date(2024, 5, 23))).toBe(false);
+    expect(isDueThisWeek(new Date(2024, 6, 1))).toBe(false);
   });
 
   it('returns false for past dates', () => {
-    expect(isDueThisWeek(new Date('2024-06-14'))).toBe(false);
+    expect(isDueThisWeek(new Date(2024, 5, 14))).toBe(false);
   });
 });
 
 describe('formatIsoDate', () => {
   it('formats date as YYYY-MM-DD', () => {
-    expect(formatIsoDate(new Date('2024-06-15T12:30:45'))).toBe('2024-06-15');
+    expect(formatIsoDate(new Date(2024, 5, 15, 12, 30, 45))).toBe('2024-06-15');
   });
 
   it('handles dates at midnight', () => {
-    expect(formatIsoDate(new Date('2024-01-01T00:00:00'))).toBe('2024-01-01');
+    expect(formatIsoDate(new Date(2024, 0, 1, 0, 0, 0))).toBe('2024-01-01');
   });
 
   it('handles dates just before midnight', () => {
-    expect(formatIsoDate(new Date('2024-12-31T23:59:59'))).toBe('2024-12-31');
+    expect(formatIsoDate(new Date(2024, 11, 31, 23, 59, 59))).toBe('2024-12-31');
   });
 });
