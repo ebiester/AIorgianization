@@ -182,7 +182,6 @@ class VaultService:
         if not config_file.exists():
             default_config = {
                 "vault": {"path": str(vault_path)},
-                "jira": {"enabled": False},
             }
             with open(config_file, "w", encoding="utf-8") as f:
                 yaml.dump(default_config, f, default_flow_style=False)

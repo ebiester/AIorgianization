@@ -110,29 +110,6 @@ TOOL_SCHEMAS = {
             "required": ["packs"],
         },
     },
-    "aio_sync_jira": {
-        "description": (
-            "Sync tasks from Jira. "
-            "Imports issues assigned to you from configured projects."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "If true, show what would be synced without making changes",
-                    "default": False,
-                },
-            },
-        },
-    },
-    "aio_jira_status": {
-        "description": "Get Jira sync status and configuration",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-        },
-    },
     "aio_list_context_packs": {
         "description": "List available context packs for AI assistance",
         "inputSchema": {

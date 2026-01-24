@@ -15,12 +15,7 @@ AIorgianization is an Obsidian-native task and context management system for eng
     │Obsidian │          │   CLI   │          │  Claude │
     │ Plugin  │          │  (aio)  │          │   MCP   │
     │  (UI)   │          │(capture)│          │  (AI)   │
-    └─────────┘          └────┬────┘          └─────────┘
-                              │
-                         ┌────┴────┐
-                         │  Jira   │
-                         │  Sync   │
-                         └─────────┘
+    └─────────┘          └─────────┘          └─────────┘
 ```
 
 **Key principle:** The Obsidian vault is the single source of truth. All tools read and write markdown files. No separate database.
@@ -34,8 +29,7 @@ The CLI initializes this structure via `aio init <vault-path>`:
 ```
 Vault/
 ├── .aio/                          # AIorgianization config & cache
-│   ├── config.yaml                # Settings (Jira, sync, etc.)
-│   └── jira-cache.json            # Cached Jira state for sync
+│   └── config.yaml                # Settings
 │
 ├── AIO/                           # All AIorgianization content
 │   ├── Dashboard/                 # Daily dashboards (generated)
@@ -117,7 +111,6 @@ tags:
   - backend
   - api
 timeEstimate: 2h
-jiraKey: PLAT-123     # Linked Jira issue
 created: 2024-01-15T10:00:00
 updated: 2024-01-15T14:30:00
 completed: null
@@ -222,7 +215,7 @@ Examples:
 
 ## Project File Format
 
-Projects are markdown files that serve as the central hub for a body of work, linking to external tools (Jira, Slack), internal docs, timeline milestones, and live task queries.
+Projects are markdown files that serve as the central hub for a body of work, linking to external tools (Slack, etc.), internal docs, timeline milestones, and live task queries.
 
 ```markdown
 ---
@@ -231,7 +224,6 @@ status: active        # active | on-hold | completed | archived
 category: project     # project | area (PARA)
 team: "[[People/Team-Platform]]"
 targetDate: 2024-03-31
-jiraEpic: PLAT-500
 created: 2024-01-01
 ---
 
@@ -246,9 +238,6 @@ Migrate payment processing to new platform with zero downtime.
 
 | Resource | Link |
 |----------|------|
-| Jira Epic | [PLAT-500](https://company.atlassian.net/browse/PLAT-500) |
-| Jira Board | [Platform Board](https://company.atlassian.net/jira/software/projects/PLAT/boards/42) |
-| Backlog | [Filtered Backlog](https://company.atlassian.net/jira/software/projects/PLAT/boards/42/backlog?epics=PLAT-500) |
 | Tech Spec | [[Specs/Platform-Migration-Spec]] |
 | PRD | [[PRDs/Platform-Migration-PRD]] |
 | Slack Channel | [#platform-migration](https://company.slack.com/archives/C123ABC) |
@@ -326,7 +315,6 @@ WHERE contains(project, this.file.link) AND status = "completed" AND completed >
 type: person
 team: Platform
 email: sarah@company.com
-jiraAccountId: 5f4d3c2b1a
 role: Senior Engineer
 ---
 
@@ -498,7 +486,6 @@ obsidian-aio/
 │   ├── services/
 │   │   ├── TaskService.ts         # CRUD operations on task files
 │   │   ├── ProjectService.ts      # Project file operations
-│   │   ├── JiraSync.ts            # Jira synchronization
 │   │   └── FileUtils.ts           # Markdown parsing/generation
 │   └── types/
 │       └── index.ts               # TypeScript interfaces
@@ -518,7 +505,6 @@ obsidian-aio/
 | Status change | Right-click menu + commands |
 | Filtering | Dataview integration or custom query |
 | Weekly review | Multi-step modal wizard |
-| Jira sync | Background job + status bar |
 
 ### Commands (Command Palette)
 
@@ -531,7 +517,6 @@ AIo: Start task
 AIo: Defer task
 AIo: Move to waiting
 AIo: Start weekly review
-AIo: Sync with Jira
 AIo: Open task list
 AIo: Open inbox
 AIo: Show delegated tasks
@@ -549,13 +534,6 @@ adrFolder: "ADRs"
 completedSubfolders: true    # Organize by YYYY/MM
 defaultPriority: "P2"
 defaultContext: "@work"
-jira:
-  enabled: true
-  baseUrl: "https://company.atlassian.net"
-  email: "user@company.com"
-  # Token stored in env or Obsidian secrets
-  projectKeys: ["PLAT", "ALPHA"]
-  syncInterval: 15  # minutes
 ```
 
 ---
@@ -577,13 +555,11 @@ aio/
 │   ├── archive.py                 # Archive tasks/projects
 │   ├── dashboard.py               # Generate dashboard
 │   ├── status.py                  # Start, defer, wait commands
-│   ├── sync.py                    # Jira sync
 │   └── config.py                  # Configuration management
 ├── services/                      # Core business logic
 │   ├── __init__.py
 │   ├── vault.py                   # Find and read vault
 │   ├── task.py                    # Parse/write task markdown
-│   ├── jira.py                    # Jira sync service
 │   ├── dashboard.py               # Dashboard generation
 │   └── context_pack.py            # Context pack operations
 ├── models/                        # Pydantic data models
@@ -591,7 +567,6 @@ aio/
 │   ├── task.py                    # Task model
 │   ├── project.py                 # Project model
 │   ├── person.py                  # Person model
-│   ├── jira.py                    # Jira models
 │   └── context_pack.py            # Context pack model
 ├── utils/
 │   ├── __init__.py
@@ -636,14 +611,9 @@ aio archive tasks --before <date>    # Archive tasks completed before date
 aio archive tasks --before "6 months ago"  # Natural language dates supported
 aio archive tasks --before 2024-01-01 --dry-run  # Preview without archiving
 
-# Sync
-aio sync jira
-aio sync status
-
 # Config
 aio config show
 aio config set vault.path /path/to/vault
-aio config set jira.baseUrl https://company.atlassian.net
 ```
 
 ### Vault Discovery
@@ -654,53 +624,6 @@ CLI finds the vault via (in order):
 3. `.aio/config.yaml` in current directory
 4. Walk up to find `.obsidian` folder
 5. `~/.aio/config.yaml` global config
-
----
-
-## Jira Sync Architecture
-
-### Sync Strategy
-
-```
-┌─────────────────┐                    ┌─────────────────┐
-│  Obsidian Vault │                    │   Jira Cloud    │
-│                 │                    │                 │
-│  Tasks/*.md     │◄────── Sync ──────►│  Issues         │
-│  - jiraKey      │                    │  - key          │
-│  - status       │   Mapping:         │  - status       │
-│  - assignedTo   │   To Do → inbox    │  - assignee     │
-│                 │   In Prog → next   │                 │
-└─────────────────┘   Done → completed └─────────────────┘
-```
-
-### Sync Rules
-
-1. **Import:** Jira issues assigned to you → Task files created/updated
-2. **Status sync:** Jira status changes → Task file moved to appropriate folder
-3. **No export (MVP):** Local tasks don't push to Jira (avoids complexity)
-4. **Conflict:** If both changed, Jira wins (it's the team system of record)
-
-### Sync Flow
-
-```
-1. Query Jira: assignee = currentUser() AND status != Done
-2. For each issue:
-   a. Find task file by jiraKey frontmatter
-   b. If not found → create new task file
-   c. If found → update frontmatter (status, title, etc.)
-   d. Move file to correct status folder if status changed
-3. Cache sync timestamp in .aio/jira-cache.json
-```
-
-### Status Mapping
-
-| Jira Status | Task Folder |
-|-------------|-------------|
-| To Do | Tasks/Inbox/ or Tasks/Next/ |
-| In Progress | Tasks/Next/ |
-| In Review | Tasks/Waiting/ |
-| Blocked | Tasks/Waiting/ |
-| Done | Tasks/Completed/ |
 
 ---
 
@@ -855,20 +778,6 @@ User: Right-click task → "Start working"
 5. View refreshes
 ```
 
-### Jira Sync
-
-```
-User: aio sync jira (or plugin sync button)
-
-1. Fetch issues from Jira API
-2. For each issue:
-   - Search vault for file with jiraKey=PLAT-123
-   - If found: update frontmatter, move if status changed
-   - If not found: create new task file
-3. Update .aio/jira-cache.json with sync timestamp
-4. Report: "Synced 5 tasks (2 new, 3 updated)"
-```
-
 ### AI Task Breakdown
 
 ```
@@ -893,7 +802,6 @@ User: (via Claude) "Break down the Q4 Migration project"
 | Task storage | Markdown + YAML frontmatter | Human-readable, git-friendly, Obsidian-native |
 | Plugin | TypeScript + Obsidian API | Required for Obsidian plugins |
 | CLI | Python + Click | Type-safe, excellent CLI framework |
-| Jira client | jira (Python) | Well-maintained Python library |
 | MCP server | mcp (Python SDK) | Official Python SDK |
 | YAML parsing | python-frontmatter | Standard for frontmatter |
 | Date parsing | dateparser | Natural language dates |
@@ -904,10 +812,9 @@ User: (via Claude) "Break down the Q4 Migration project"
 
 ## Security Considerations
 
-1. **Jira token:** Stored in environment variable or Obsidian encrypted settings, never in vault files
-2. **Vault permissions:** CLI respects filesystem permissions
-3. **MCP scope:** Read-only by default, write operations require explicit tool calls
-4. **No cloud sync:** All data stays local (Obsidian Sync is user's choice)
+1. **Vault permissions:** CLI respects filesystem permissions
+2. **MCP scope:** Read-only by default, write operations require explicit tool calls
+3. **No cloud sync:** All data stays local (Obsidian Sync is user's choice)
 
 ---
 
@@ -930,4 +837,3 @@ The Phase 1 prototype used SQLite. Migration is complete:
 2. **Templater integration:** Task templates for common patterns
 3. **Mobile:** Obsidian mobile app provides cross-device access
 4. **Sharing:** Export context packs to Confluence when ready
-5. **Bidirectional Jira sync:** Push local tasks to Jira (requires careful conflict handling)

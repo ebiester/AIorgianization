@@ -49,8 +49,7 @@ AIorgianization/
 │   │   ├── vault.py        # Vault discovery & file operations
 │   │   ├── task.py         # Task CRUD (markdown files)
 │   │   ├── project.py      # Project file operations
-│   │   ├── dashboard.py    # Dashboard generation
-│   │   └── jira.py         # Jira sync (future)
+│   │   └── dashboard.py    # Dashboard generation
 │   ├── models/             # Data models (Pydantic)
 │   │   ├── __init__.py
 │   │   ├── task.py
@@ -168,7 +167,6 @@ location:
 tags:
   - backend
 timeEstimate: 2h
-jiraKey: PLAT-123
 created: 2024-01-15T10:00:00
 updated: 2024-01-15T14:30:00
 completed: null
@@ -475,7 +473,6 @@ Since this is built for one user:
 - CLI can assume interactive terminal (colors, prompts)
 - No need for i18n
 - Can use Eric's typical folder locations as defaults
-- Jira integration assumes Eric's company instance
 
 ## Key Files to Know
 

@@ -235,7 +235,6 @@ class PersonService:
             team=metadata.get("team"),
             role=metadata.get("role"),
             email=metadata.get("email"),
-            jira_account_id=metadata.get("jiraAccountId"),
         )
 
     def create(

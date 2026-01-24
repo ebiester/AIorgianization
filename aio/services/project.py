@@ -257,7 +257,6 @@ class ProjectService:
             body=content,
             team=metadata.get("team"),
             target_date=target_date,
-            jira_epic=metadata.get("jiraEpic"),
             created=created,
         )
 

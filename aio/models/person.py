@@ -18,7 +18,6 @@ class Person(BaseModel):
     team: str | None = None
     role: str | None = None
     email: str | None = None
-    jira_account_id: str | None = Field(default=None, alias="jiraAccountId")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -32,8 +31,6 @@ class Person(BaseModel):
             data["role"] = self.role
         if self.email:
             data["email"] = self.email
-        if self.jira_account_id:
-            data["jiraAccountId"] = self.jira_account_id
 
         return data
 

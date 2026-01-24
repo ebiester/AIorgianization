@@ -13,14 +13,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 
-from aio.exceptions import AioError, FileOutsideVaultError, InvalidDateError, JiraError
+from aio.exceptions import AioError, FileOutsideVaultError, InvalidDateError
 from aio.models.context_pack import ContextPackCategory
 from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
 from aio.services.file import FileService
-from aio.services.jira import JiraSyncService
 from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
@@ -41,7 +40,6 @@ class ServiceRegistry:
         self._project_service: ProjectService | None = None
         self._person_service: PersonService | None = None
         self._dashboard_service: DashboardService | None = None
-        self._jira_service: JiraSyncService | None = None
         self._context_pack_service: ContextPackService | None = None
         self._file_service: FileService | None = None
 
@@ -52,7 +50,6 @@ class ServiceRegistry:
         self._project_service = None
         self._person_service = None
         self._dashboard_service = None
-        self._jira_service = None
         self._context_pack_service = None
         self._file_service = None
 
@@ -67,10 +64,6 @@ class ServiceRegistry:
     def set_dashboard_service(self, service: DashboardService) -> None:
         """Override the dashboard service. Useful for testing."""
         self._dashboard_service = service
-
-    def set_jira_service(self, service: JiraSyncService) -> None:
-        """Override the Jira service. Useful for testing."""
-        self._jira_service = service
 
     def set_context_pack_service(self, service: ContextPackService) -> None:
         """Override the context pack service. Useful for testing."""
@@ -122,13 +115,6 @@ class ServiceRegistry:
         return self._dashboard_service
 
     @property
-    def jira_service(self) -> JiraSyncService:
-        """Get the Jira service, creating it lazily if needed."""
-        if self._jira_service is None:
-            self._jira_service = JiraSyncService(self.vault_service, self.task_service)
-        return self._jira_service
-
-    @property
     def context_pack_service(self) -> ContextPackService:
         """Get the context pack service, creating it lazily if needed."""
         if self._context_pack_service is None:
@@ -175,11 +161,6 @@ def get_person_service() -> PersonService:
 def get_dashboard_service() -> DashboardService:
     """Get the dashboard service."""
     return _registry.dashboard_service
-
-
-def get_jira_service() -> JiraSyncService:
-    """Get the Jira sync service."""
-    return _registry.jira_service
 
 
 def get_context_pack_service() -> ContextPackService:
@@ -311,30 +292,6 @@ async def list_tools() -> list[Tool]:
                     },
                 },
                 "required": ["packs"],
-            },
-        ),
-        Tool(
-            name="aio_sync_jira",
-            description=(
-                "Sync tasks from Jira. "
-                "Imports issues assigned to you from configured projects."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "dry_run": {
-                        "type": "boolean",
-                        "description": "If true, show what would be synced without making changes",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="aio_jira_status",
-            description="Get Jira sync status and configuration",
-            inputSchema={
-                "type": "object",
-                "properties": {},
             },
         ),
         Tool(
@@ -572,10 +529,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_get_dashboard(arguments)
         elif name == "aio_get_context":
             return await handle_get_context(arguments)
-        elif name == "aio_sync_jira":
-            return await handle_sync_jira(arguments)
-        elif name == "aio_jira_status":
-            return await handle_jira_status(arguments)
         elif name == "aio_list_context_packs":
             return await handle_list_context_packs(arguments)
         elif name == "aio_add_to_context_pack":
@@ -598,8 +551,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except FileOutsideVaultError as e:
         return [TextContent(type="text", text=f"Error: {e}")]
-    except JiraError as e:
-        return [TextContent(type="text", text=f"Jira error: {e}")]
     except AioError as e:
         return [TextContent(type="text", text=f"Error: {e}")]
     except Exception as e:
@@ -764,75 +715,6 @@ async def handle_get_context(args: dict[str, Any]) -> list[TextContent]:
                 content_parts.append(f"# Context: {pack_name}\n\n(Not found)")
 
     return [TextContent(type="text", text="\n\n---\n\n".join(content_parts))]
-
-
-async def handle_sync_jira(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_sync_jira tool."""
-    jira_service = get_jira_service()
-    dry_run = args.get("dry_run", False)
-
-    result = jira_service.sync(dry_run=dry_run)
-
-    lines = []
-    if dry_run:
-        lines.append("Dry run - no changes made")
-        lines.append("")
-
-    lines.append(result.summary())
-
-    if result.created > 0:
-        lines.append(f"\nCreated {result.created} task(s):")
-        for task_id in result.created_tasks:
-            lines.append(f"  - {task_id}")
-
-    if result.updated > 0:
-        lines.append(f"\nUpdated {result.updated} task(s):")
-        for task_id in result.updated_tasks:
-            lines.append(f"  - {task_id}")
-
-    if result.has_errors:
-        lines.append("\nErrors:")
-        for error in result.errors:
-            lines.append(f"  - {error}")
-
-    return [TextContent(type="text", text="\n".join(lines))]
-
-
-async def handle_jira_status(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_jira_status tool."""
-    jira_service = get_jira_service()
-    status = jira_service.get_status()
-
-    lines = ["Jira Sync Status", ""]
-
-    if status["configured"]:
-        lines.append("Status: Configured")
-    elif status["enabled"]:
-        lines.append("Status: Partially configured")
-    else:
-        lines.append("Status: Not configured")
-
-    lines.append(f"Enabled: {'Yes' if status['enabled'] else 'No'}")
-    lines.append(f"Base URL: {status['base_url'] or 'Not set'}")
-    lines.append(f"Email: {status['email'] or 'Not set'}")
-    lines.append(f"Projects: {', '.join(status['projects']) if status['projects'] else 'None'}")
-    lines.append(f"Last Sync: {status['last_sync'] or 'Never'}")
-    lines.append(f"Synced Issues: {status['synced_count']}")
-
-    if status["recent_errors"]:
-        lines.append("\nRecent Errors:")
-        for error in status["recent_errors"]:
-            lines.append(f"  - {error}")
-
-    if not status["configured"]:
-        lines.append("\nTo configure Jira sync:")
-        lines.append("  aio config set jira.enabled true")
-        lines.append("  aio config set jira.baseUrl https://your-company.atlassian.net")
-        lines.append("  aio config set jira.email your@email.com")
-        lines.append("  aio config set jira.projects PROJ1,PROJ2")
-        lines.append("  export JIRA_API_TOKEN=your-api-token")
-
-    return [TextContent(type="text", text="\n".join(lines))]
 
 
 async def handle_list_context_packs(args: dict[str, Any]) -> list[TextContent]:

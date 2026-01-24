@@ -10,7 +10,6 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 - **UI:** Obsidian plugin for viewing/editing tasks
 - **CLI:** Python (Click) for quick capture when not in Obsidian
 - **MCP:** Python MCP server for Cursor CLI integration
-- **Integrations:** Jira sync
 - **Testing:** pytest (unit, integration, e2e)
 
 ---
@@ -21,9 +20,8 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 |-------|------|--------|-------|
 | 1 | Foundation | Done | Vault structure, CLI basics |
 | 2 | Obsidian Plugin Core | Done | Task views, commands |
-| 3 | Jira Integration | Done | Sync assigned issues |
-| 4 | AI Integration | Done | MCP server for Cursor CLI |
-| 5 | Polish | Not Started | Weekly review, refinements |
+| 3 | AI Integration | Done | MCP server for Cursor CLI |
+| 4 | Polish | Not Started | Weekly review, refinements |
 
 ---
 
@@ -114,37 +112,7 @@ aio archive tasks --before 2024-01-01
 
 ---
 
-## Phase 3: Jira Integration
-
-**Objective:** Sync Jira issues to vault as task files.
-
-### Deliverables
-
-| Item | Description | Status |
-|------|-------------|--------|
-| Jira settings | URL, email, project keys in config | Done |
-| JiraSyncService | Fetch issues via jira library | Done |
-| Issue → Task mapping | Convert Jira issue to task file | Done |
-| Status mapping | Map Jira statuses to folders | Done |
-| Sync command (CLI) | `aio sync jira` | Done |
-| Sync command (MCP) | `aio_sync_jira` tool | Done |
-| Background sync | Periodic sync with status bar | Not Started |
-| Sync cache | Track last sync, avoid duplicates | Done |
-
-### Verification
-
-```bash
-aio sync jira
-# Output: Synced 5 tasks (2 new, 3 updated)
-
-# Check vault:
-# Tasks/Next/2024-01-15-plat-123-fix-bug.md exists
-# Frontmatter has jiraKey: PLAT-123
-```
-
----
-
-## Phase 4: AI Integration
+## Phase 3: AI Integration
 
 **Objective:** MCP server exposing vault to Cursor CLI for AI assistance.
 
@@ -161,8 +129,6 @@ aio sync jira
 | aio_delegate_task tool | Delegate task (alias for wait with person) via MCP | Done |
 | aio_get_context tool | Read context packs | Done |
 | aio_get_dashboard tool | Get daily dashboard | Done |
-| aio_sync_jira tool | Sync Jira via MCP | Done |
-| aio_jira_status tool | Get Jira status via MCP | Done |
 | Context pack tools | Create, list, append context packs | Done |
 | Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
 | Task resources | Expose task lists as resources | Done |
@@ -180,7 +146,7 @@ aio sync jira
 
 ---
 
-## Phase 5: Polish
+## Phase 4: Polish
 
 **Objective:** Weekly review workflow and refinements.
 
@@ -204,23 +170,21 @@ aio sync jira
 | Phase | Work |
 |-------|------|
 | 1 | Project setup, VaultService, TaskService, CLI (add/list/done), tests |
-| 3 | JiraSyncService |
-| 4 | MCP server, tools, resources |
-| 5 | Polish, better output |
+| 3 | MCP server, tools, resources |
+| 4 | Polish, better output |
 
 ### Obsidian Plugin (obsidian-aio/)
 
 | Phase | Work |
 |-------|------|
 | 2 | All plugin features (TypeScript) |
-| 3 | Jira sync UI, settings |
-| 5 | Weekly review, polish |
+| 4 | Weekly review, polish |
 
 ### Cursor Integration
 
 | Phase | Work |
 |-------|------|
-| 4 | MCP config, skill file (.cursor/skills/aio.md) |
+| 3 | MCP config, skill file (.cursor/skills/aio.md) |
 
 ---
 
@@ -237,7 +201,7 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 
 ## Next Actions
 
-**Phase 5 (Polish) - Not Started:**
+**Phase 4 (Polish) - Not Started:**
 
 1. [ ] Implement weekly review wizard in Obsidian plugin
 2. [ ] Add review tracking (record completion timestamps)
@@ -249,8 +213,7 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 8. [ ] Add subtask progress display
 9. [ ] Create Cursor skill file (.cursor/skills/aio.md)
 10. [x] Write MCP integration tests
-11. [ ] Add background Jira sync with status bar indicator
-12. [ ] Add `delegate` as CLI alias for `wait` with required person argument
+11. [ ] Add `delegate` as CLI alias for `wait` with required person argument
 13. [x] Add `aio_delegate_task` MCP tool (alias for wait with person)
 14. [x] Add MCP server startup message showing initialization status
 15. [x] Add graceful MCP server shutdown (handle Ctrl+C with clean exit message)

@@ -443,7 +443,6 @@ class TaskService:
             location=location,
             tags=metadata.get("tags", []),
             time_estimate=metadata.get("timeEstimate"),
-            jira_key=metadata.get("jiraKey"),
             created=created,
             updated=updated,
             completed=completed,

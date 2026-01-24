@@ -485,73 +485,9 @@ Before running any tests:
 
 ---
 
-## Phase 3: Jira Integration
+## Phase 3: MCP Server Integration
 
-### UAT-028: Jira Configuration
-
-**Objective:** Verify Jira settings can be configured.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `aio config set jira.baseUrl https://company.atlassian.net` | Success |
-| 2 | Run `aio config set jira.email your@email.com` | Success |
-| 3 | Run `aio config set jira.projects PLAT,ALPHA` | Success |
-| 4 | Set `JIRA_API_TOKEN` environment variable | Token set |
-| 5 | Run `aio config show` | Shows Jira configuration |
-
-**Pass Criteria:** Jira settings stored and displayed.
-
----
-
-### UAT-029: Jira Sync (Requires Live Jira)
-
-**Objective:** Verify Jira sync imports issues.
-
-**Prerequisite:** Valid Jira credentials and assigned issues.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `aio sync jira` | Output: "Synced X tasks (Y new, Z updated)" |
-| 2 | Check Tasks folder | New task files with `jiraKey:` in frontmatter |
-| 3 | Run `aio sync jira` again | No duplicates created (idempotent) |
-| 4 | Verify task content | Title matches Jira issue summary |
-
-**Pass Criteria:** Issues sync correctly, no duplicates.
-
----
-
-### UAT-030: Jira Sync - Status Mapping
-
-**Objective:** Verify Jira statuses map to correct folders.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Jira issue with "To Do" status | Task in Inbox or Next |
-| 2 | Jira issue with "In Progress" status | Task in Next |
-| 3 | Jira issue with "In Review" status | Task in Waiting |
-| 4 | Jira issue with "Done" status | Task in Completed |
-
-**Pass Criteria:** Status mapping follows documented rules.
-
----
-
-### UAT-031: Jira Sync - Auth Failure
-
-**Objective:** Verify error handling for Jira auth issues.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Set invalid `JIRA_API_TOKEN` | |
-| 2 | Run `aio sync jira` | Clear error message with remediation steps |
-| 3 | Exit code | Non-zero |
-
-**Pass Criteria:** User-friendly auth error message.
-
----
-
-## Phase 4: MCP Server Integration
-
-### UAT-032: MCP Server Startup
+### UAT-028: MCP Server Startup
 
 **Objective:** Verify MCP server can start.
 
@@ -564,7 +500,7 @@ Before running any tests:
 
 ---
 
-### UAT-033: MCP Tool - Add Task
+### UAT-029: MCP Tool - Add Task
 
 **Objective:** Verify MCP add task tool.
 
@@ -579,7 +515,7 @@ Before running any tests:
 
 ---
 
-### UAT-033a: MCP Tool - Add Task with Assign
+### UAT-029a: MCP Tool - Add Task with Assign
 
 **Objective:** Verify MCP add task tool with delegation.
 
@@ -595,7 +531,7 @@ Before running any tests:
 
 ---
 
-### UAT-034: MCP Tool - List Tasks
+### UAT-030: MCP Tool - List Tasks
 
 **Objective:** Verify MCP list tasks tool.
 
@@ -608,7 +544,7 @@ Before running any tests:
 
 ---
 
-### UAT-035: MCP Tool - Complete Task
+### UAT-031: MCP Tool - Complete Task
 
 **Objective:** Verify MCP complete task tool.
 
@@ -622,7 +558,7 @@ Before running any tests:
 
 ---
 
-### UAT-036: MCP Tool - Start Task
+### UAT-032: MCP Tool - Start Task
 
 **Objective:** Verify MCP start task tool.
 
@@ -635,7 +571,7 @@ Before running any tests:
 
 ---
 
-### UAT-037: MCP Tool - Defer Task
+### UAT-033: MCP Tool - Defer Task
 
 **Objective:** Verify MCP defer task tool.
 
@@ -648,7 +584,7 @@ Before running any tests:
 
 ---
 
-### UAT-038: MCP Tool - Get Dashboard
+### UAT-034: MCP Tool - Get Dashboard
 
 **Objective:** Verify MCP dashboard tool.
 
@@ -661,20 +597,7 @@ Before running any tests:
 
 ---
 
-### UAT-039: MCP Tool - Jira Sync
-
-**Objective:** Verify MCP Jira sync tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_sync_jira()` | Returns sync result |
-| 2 | Response includes | Count of new/updated tasks |
-
-**Pass Criteria:** Jira sync works via MCP.
-
----
-
-### UAT-040: MCP Resources
+### UAT-035: MCP Resources
 
 **Objective:** Verify MCP resource endpoints.
 
@@ -691,9 +614,9 @@ Before running any tests:
 
 ---
 
-## Phase 2: Obsidian Plugin
+## Phase 4: Obsidian Plugin
 
-### UAT-041: Plugin Installation
+### UAT-036: Plugin Installation
 
 **Objective:** Verify plugin can be installed in Obsidian.
 
@@ -707,7 +630,7 @@ Before running any tests:
 
 ---
 
-### UAT-042: Plugin Settings
+### UAT-037: Plugin Settings
 
 **Objective:** Verify plugin settings tab.
 
@@ -715,13 +638,12 @@ Before running any tests:
 |------|--------|-----------------|
 | 1 | Open Settings → Community Plugins → AIo | Settings tab opens |
 | 2 | Configure folder paths | Paths saved |
-| 3 | Configure Jira settings (if applicable) | Settings saved |
 
 **Pass Criteria:** Settings persist after Obsidian restart.
 
 ---
 
-### UAT-043: Task List View
+### UAT-038: Task List View
 
 **Objective:** Verify task list custom pane.
 
@@ -736,7 +658,7 @@ Before running any tests:
 
 ---
 
-### UAT-044: Quick Add Modal
+### UAT-039: Quick Add Modal
 
 **Objective:** Verify quick add command.
 
@@ -751,7 +673,7 @@ Before running any tests:
 
 ---
 
-### UAT-045: Add to Inbox Modal
+### UAT-040: Add to Inbox Modal
 
 **Objective:** Verify minimal inbox add.
 
@@ -764,7 +686,7 @@ Before running any tests:
 
 ---
 
-### UAT-046: Task Edit Modal
+### UAT-041: Task Edit Modal
 
 **Objective:** Verify task editing in plugin.
 
@@ -781,7 +703,7 @@ Before running any tests:
 
 ---
 
-### UAT-047: Status Commands
+### UAT-042: Status Commands
 
 **Objective:** Verify status commands from plugin.
 
@@ -796,7 +718,7 @@ Before running any tests:
 
 ---
 
-### UAT-048: Inbox Processing View
+### UAT-043: Inbox Processing View
 
 **Objective:** Verify inbox processing workflow.
 
@@ -812,23 +734,9 @@ Before running any tests:
 
 ---
 
-### UAT-049: Manual Jira Sync Command
-
-**Objective:** Verify manual sync from plugin.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Cmd+P → "AIo: Sync Jira" | Sync triggers |
-| 2 | Progress indicator | Shows sync in progress |
-| 3 | Completion | Shows sync results |
-
-**Pass Criteria:** Manual sync works from Obsidian.
-
----
-
 ## Task File Format Validation
 
-### UAT-050: Task File Frontmatter
+### UAT-044: Task File Frontmatter
 
 **Objective:** Verify task files have correct format.
 
@@ -844,7 +752,7 @@ Before running any tests:
 
 ---
 
-### UAT-051: Waiting-For Task Format
+### UAT-045: Waiting-For Task Format
 
 **Objective:** Verify delegated task format and Person file integration.
 
@@ -861,7 +769,7 @@ Before running any tests:
 
 ---
 
-### UAT-052: Task with Subtasks
+### UAT-046: Task with Subtasks
 
 **Objective:** Verify subtask format in task body.
 
@@ -875,7 +783,7 @@ Before running any tests:
 
 ---
 
-### UAT-053: Task with Location
+### UAT-047: Task with Location
 
 **Objective:** Verify location linking in tasks.
 
@@ -889,7 +797,7 @@ Before running any tests:
 
 ---
 
-### UAT-054: Task with Dependencies
+### UAT-048: Task with Dependencies
 
 **Objective:** Verify dependency linking format.
 
@@ -906,7 +814,7 @@ Before running any tests:
 
 ## Workflow Tests
 
-### UAT-055: Daily Workflow - Morning
+### UAT-049: Daily Workflow - Morning
 
 **Objective:** Verify morning workflow per User Manual.
 
@@ -922,7 +830,7 @@ Before running any tests:
 
 ---
 
-### UAT-056: Daily Workflow - Capture
+### UAT-050: Daily Workflow - Capture
 
 **Objective:** Verify capture workflow.
 
@@ -936,7 +844,7 @@ Before running any tests:
 
 ---
 
-### UAT-057: Daily Workflow - Status Updates
+### UAT-051: Daily Workflow - Status Updates
 
 **Objective:** Verify working on tasks.
 
@@ -951,7 +859,7 @@ Before running any tests:
 
 ---
 
-### UAT-058: Weekly Review Workflow
+### UAT-052: Weekly Review Workflow
 
 **Objective:** Verify weekly review steps.
 
@@ -970,7 +878,7 @@ Before running any tests:
 
 ## Edge Cases and Error Handling
 
-### UAT-059: Empty Vault Operations
+### UAT-053: Empty Vault Operations
 
 **Objective:** Verify commands work with no tasks.
 
@@ -986,7 +894,7 @@ Before running any tests:
 
 ---
 
-### UAT-060: Special Characters in Task Title
+### UAT-054: Special Characters in Task Title
 
 **Objective:** Verify handling of special characters.
 
@@ -1001,7 +909,7 @@ Before running any tests:
 
 ---
 
-### UAT-061: Unicode in Task Title
+### UAT-055: Unicode in Task Title
 
 **Objective:** Verify unicode support.
 
@@ -1015,7 +923,7 @@ Before running any tests:
 
 ---
 
-### UAT-062: Very Long Task Title
+### UAT-056: Very Long Task Title
 
 **Objective:** Verify handling of long titles.
 
@@ -1030,7 +938,7 @@ Before running any tests:
 
 ---
 
-### UAT-063: Concurrent Operations
+### UAT-057: Concurrent Operations
 
 **Objective:** Verify handling of rapid commands.
 
@@ -1044,7 +952,7 @@ Before running any tests:
 
 ---
 
-### UAT-064: Exit Codes
+### UAT-058: Exit Codes
 
 **Objective:** Verify proper exit codes.
 
@@ -1058,7 +966,7 @@ Before running any tests:
 
 ---
 
-### UAT-065: No Stack Traces in Normal Use
+### UAT-059: No Stack Traces in Normal Use
 
 **Objective:** Verify user-friendly error messages.
 

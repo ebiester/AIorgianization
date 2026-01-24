@@ -15,7 +15,6 @@ from aio.cli.file import file
 from aio.cli.init import init
 from aio.cli.list import list_tasks
 from aio.cli.status import defer, start, wait
-from aio.cli.sync import sync
 from aio.exceptions import AioError
 
 console = Console()
@@ -52,7 +51,6 @@ cli.add_command(defer)
 cli.add_command(wait)
 cli.add_command(dashboard)
 cli.add_command(archive)
-cli.add_command(sync)
 cli.add_command(config)
 cli.add_command(file)
 

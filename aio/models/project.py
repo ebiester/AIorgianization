@@ -33,9 +33,6 @@ class Project(BaseModel):
     team: str | None = Field(default=None, description="Wikilink to team")
     target_date: date | None = Field(default=None, alias="targetDate")
 
-    # Jira integration
-    jira_epic: str | None = Field(default=None, alias="jiraEpic")
-
     # Timestamps
     created: datetime = Field(default_factory=datetime.now)
 
@@ -55,8 +52,6 @@ class Project(BaseModel):
             data["team"] = self.team
         if self.target_date:
             data["targetDate"] = self.target_date
-        if self.jira_epic:
-            data["jiraEpic"] = self.jira_epic
         data["created"] = self.created
 
         return data

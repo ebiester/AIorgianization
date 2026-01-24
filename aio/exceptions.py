@@ -70,32 +70,6 @@ class PersonNotFoundError(AioError):
         super().__init__(msg)
 
 
-class JiraError(AioError):
-    """Base exception for Jira-related errors."""
-
-    pass
-
-
-class JiraAuthError(JiraError):
-    """Raised when Jira authentication fails."""
-
-    pass
-
-
-class JiraConfigError(JiraError):
-    """Raised when Jira configuration is missing or invalid."""
-
-    pass
-
-
-class JiraSyncError(JiraError):
-    """Raised when Jira sync fails."""
-
-    def __init__(self, message: str, failed_issues: list[str] | None = None) -> None:
-        self.failed_issues = failed_issues or []
-        super().__init__(message)
-
-
 class ContextPackNotFoundError(AioError):
     """Raised when a context pack cannot be found."""
 

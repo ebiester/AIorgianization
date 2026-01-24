@@ -203,15 +203,6 @@ aio config show
 # Shows: vault.path = /path/to/your/obsidian/vault
 ```
 
-### Configure Jira Integration (Optional)
-
-```bash
-aio config set jira.baseUrl https://company.atlassian.net
-aio config set jira.email your@email.com
-aio config set jira.projects PLAT,ALPHA
-export JIRA_API_TOKEN=your-token-here
-```
-
 ---
 
 ## Core Concepts
@@ -380,42 +371,6 @@ aio config set <key> <val> # Set configuration value
 
 ## Integrations
 
-### Jira Integration
-
-Sync your assigned Jira issues to the vault.
-
-#### Setup
-
-```bash
-aio config set jira.baseUrl https://company.atlassian.net
-aio config set jira.email your@email.com
-aio config set jira.projects PLAT,ALPHA
-export JIRA_API_TOKEN=your-token-here
-```
-
-#### Syncing
-
-```bash
-aio sync jira
-```
-
-This:
-1. Fetches issues assigned to you
-2. Creates/updates task files with `jiraKey` in frontmatter
-3. Maps Jira statuses to task folders
-
-#### Status Mapping
-
-| Jira Status | Task Folder |
-|-------------|-------------|
-| To Do | `Tasks/Inbox/` or `Tasks/Next/` |
-| In Progress | `Tasks/Next/` |
-| In Review | `Tasks/Waiting/` |
-| Blocked | `Tasks/Waiting/` |
-| Done | `Tasks/Completed/` |
-
-**Note:** Jira is the source of truth. If you change status locally, the next sync will overwrite it.
-
 ### MCP Server Integration
 
 The MCP server allows AI assistants to interact with your vault programmatically.
@@ -446,8 +401,6 @@ aio-mcp
 | `aio_create_context_pack` | Create a new context pack |
 | `aio_add_to_context_pack` | Append content to an existing context pack |
 | `aio_add_file_to_context_pack` | Copy a file's content into a context pack |
-| `aio_sync_jira` | Sync tasks from Jira (imports assigned issues) |
-| `aio_jira_status` | Get Jira sync status and configuration |
 
 #### Available MCP Resources
 
@@ -540,7 +493,6 @@ type: project
 status: active
 team: "[[People/Team-Platform]]"
 targetDate: 2026-03-31
-jiraEpic: PLAT-500
 ---
 
 # Q4 Platform Migration
@@ -552,7 +504,6 @@ Migrate payment processing to new platform with zero downtime.
 
 | Resource | Link |
 |----------|------|
-| Jira Epic | [PLAT-500](https://company.atlassian.net/browse/PLAT-500) |
 | Tech Spec | [[Specs/Platform-Migration-Spec]] |
 | Slack | [#platform-migration](https://slack.com/...) |
 
@@ -678,11 +629,6 @@ Ensure the task's `project` field uses wikilink syntax:
 ```yaml
 project: "[[Projects/Q4-Migration]]"
 ```
-
-### Jira Issues
-
-**Jira sync creates duplicates**
-Check that existing task files have the correct `jiraKey` in frontmatter.
 
 ### MCP Issues
 

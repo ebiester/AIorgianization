@@ -75,7 +75,6 @@ class Task(BaseModel):
     # Metadata
     tags: list[str] = Field(default_factory=list)
     time_estimate: str | None = Field(default=None, alias="timeEstimate")
-    jira_key: str | None = Field(default=None, alias="jiraKey")
 
     model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
@@ -114,8 +113,6 @@ class Task(BaseModel):
             data["tags"] = self.tags
         if self.time_estimate:
             data["timeEstimate"] = self.time_estimate
-        if self.jira_key:
-            data["jiraKey"] = self.jira_key
 
         # Always include timestamps
         data["created"] = self.created

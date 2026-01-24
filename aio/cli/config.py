@@ -17,7 +17,7 @@ def _get_nested_value(d: dict[str, Any], key: str) -> Any:
 
     Args:
         d: The dictionary to search.
-        key: Dot-separated key path, e.g. "jira.baseUrl".
+        key: Dot-separated key path, e.g. "dashboard.showOverdue".
 
     Returns:
         The value if found, None otherwise.
@@ -36,7 +36,7 @@ def _set_nested_value(d: dict[str, Any], key: str, value: Any) -> None:
 
     Args:
         d: The dictionary to modify.
-        key: Dot-separated key path, e.g. "jira.baseUrl".
+        key: Dot-separated key path, e.g. "dashboard.showOverdue".
         value: The value to set.
     """
     parts = key.split(".")
@@ -130,8 +130,8 @@ def config_show(ctx: click.Context, key: str | None) -> None:
 
     Examples:
         aio config show              # Show all config
-        aio config show jira         # Show jira section
-        aio config show jira.baseUrl # Show specific value
+        aio config show vault        # Show vault section
+        aio config show vault.path   # Show specific value
     """
     vault_path = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
@@ -168,11 +168,7 @@ def config_set(ctx: click.Context, key: str, value: str) -> None:
 
     Examples:
         aio config set vault ./my-vault
-        aio config set jira.enabled true
-        aio config set jira.baseUrl https://company.atlassian.net
-        aio config set jira.email user@company.com
-        aio config set jira.projects PLAT,ALPHA
-        aio config set jira.syncInterval 15
+        aio config set dashboard.showOverdue true
     """
     vault_path = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
@@ -202,7 +198,7 @@ def config_unset(ctx: click.Context, key: str) -> None:
     """Remove a configuration value.
 
     Examples:
-        aio config unset jira.email
+        aio config unset dashboard.showOverdue
     """
     vault_path = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)

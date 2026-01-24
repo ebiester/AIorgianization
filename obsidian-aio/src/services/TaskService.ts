@@ -146,7 +146,6 @@ export class TaskService {
       location: frontmatter.location,
       tags: frontmatter.tags || [],
       timeEstimate: frontmatter.timeEstimate,
-      jiraKey: frontmatter.jiraKey,
       created: frontmatter.created || new Date().toISOString(),
       updated: frontmatter.updated || new Date().toISOString(),
       completed: frontmatter.completed,
@@ -408,7 +407,6 @@ export class TaskService {
     if (task.location) frontmatter.location = task.location;
     frontmatter.tags = task.tags;
     if (task.timeEstimate) frontmatter.timeEstimate = task.timeEstimate;
-    if (task.jiraKey) frontmatter.jiraKey = task.jiraKey;
     frontmatter.created = task.created;
     frontmatter.updated = task.updated;
     if (task.completed) frontmatter.completed = task.completed;

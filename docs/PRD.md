@@ -9,7 +9,7 @@ AIorgianization is a personal task and deadline management system designed for e
 Engineering managers face unique productivity challenges:
 
 1. **Multiple deadline streams**: Personal commitments, deadlines given to direct reports, and team-level milestones all compete for attention
-2. **Tool fragmentation**: Jira tracks team work, personal notes live in Obsidian/Notion, and todos scatter across apps
+2. **Tool fragmentation**: Team work, personal notes, and todos scatter across apps
 3. **Context switching**: Moving between strategic planning and tactical execution requires different views of the same work
 4. **Delegation tracking**: "Waiting for" items easily fall through cracks when not systematically tracked
 5. **Project decomposition**: Vague initiatives need breakdown into concrete next actions, ideally with AI assistance
@@ -23,7 +23,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Manages 2-4 teams (5-20 direct/indirect reports)
 - Familiar with GTD concepts (inbox zero, next actions, weekly review)
 - Uses Obsidian or similar for notes and documentation
-- Team uses Jira for sprint/project tracking
 - Comfortable with command-line tools
 - Wants AI assistance for task breakdown and prioritization
 
@@ -32,13 +31,12 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 1. **Unified view**: See all deadlines (personal, delegated, team) in one place
 2. **Fast capture**: Add tasks in <5 seconds from terminal
 3. **Smart organization**: GTD-style workflow with contexts, projects, and reviews
-4. **Integration**: Pull from Jira, reference Obsidian notes
+4. **Integration**: Reference Obsidian notes
 5. **AI-powered**: Claude helps break down projects and suggests prioritization
 6. **Visual dashboard**: Obsidian plugin for daily/weekly planning and reviews
 
 ## Non-Goals
 
-- Replacing Jira for team sprint management
 - Full calendar/scheduling functionality
 - Mobile app (CLI + web dashboard is sufficient)
 - Multi-user collaboration (this is a personal tool)
@@ -89,7 +87,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Location navigation | Click to open file/URL from task view | Not Started |
 | Subtask progress | Track and display completion of subtasks within tasks | Not Started |
 | Template system | Customizable templates for tasks, projects, people from template directory | Not Started |
-| Jira sync | Background sync with status bar indicator | Not Started |
 
 #### Obsidian Plugin Detailed Requirements
 
@@ -116,7 +113,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | AIo: Move to waiting | Set waiting status, prompt for person |
 | AIo: Open task list | Show task list pane |
 | AIo: Start weekly review | Launch review wizard |
-| AIo: Sync Jira | Trigger manual sync |
 
 **Quick Add Modal:**
 - Title input with natural language parsing
@@ -148,8 +144,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 **Settings Tab:**
 - Folder paths (Tasks, Projects, People, etc.)
 - Default settings
-- Jira configuration (URL, email, projects)
-- Sync interval
 - Completed task archiving (by month/year)
 - Template directory path (default: `AIO/Templates/`)
 - Template selection for each entity type (task, project, person, etc.)
@@ -161,17 +155,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Templates support Obsidian's template variables ({{date}}, {{time}}, etc.)
 - Default templates provided on init, user can customize or add new ones
 
-### P1: Jira Integration (Phase 4) ✓
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Jira import | Sync assigned issues to vault as task files | Done |
-| Status mapping | Map Jira statuses to task folders | Done |
-| Automatic sync | Background sync at configurable interval | Not Started |
-| Manual sync | Command to trigger immediate sync | Done |
-| Conflict handling | Jira wins (team system of record) | Done |
-
-### P2: AI Features (Phase 5) ✓
+### P1: AI Features (Phase 4) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -181,7 +165,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Context injection | Use Obsidian notes in breakdown | Done (context packs) |
 | Priority suggestions | AI-assisted daily planning | Not Started |
 
-### P2: Polish (Phase 6)
+### P2: Polish (Phase 5)
 
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -224,15 +208,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - AI reads linked Obsidian notes for context
 - Outputs concrete next actions with estimates
 - User confirms before tasks are created
-
-### Jira Integration
-> As an EM, I want my Jira assignments to appear in my task list so I have one source of truth.
-
-**Acceptance criteria:**
-- `aio sync jira` imports assigned issues
-- Status changes sync bidirectionally
-- Conflicts flagged for manual resolution
-- Can filter local list to show/hide Jira items
 
 ## Use Cases (Test Scenarios)
 
@@ -376,24 +351,7 @@ These use cases are designed to drive automated test development.
 - Overdue tasks included in "today" view
 - Visual indicator (red) for overdue
 
-### UC-010: Jira Sync (Import)
-
-**Preconditions:** Jira configured, issues assigned to user exist
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `aio sync jira` | Issues imported as tasks |
-| 2 | Check imported task | jiraIssueKey set, title matches |
-| 3 | Run `aio sync jira` again | No duplicates created |
-| 4 | Update issue in Jira | Local task updated on next sync |
-
-**Test assertions:**
-- jiraIssueKey is unique constraint
-- Sync is idempotent
-- Status mapping applied correctly
-- Sync log records success/failure
-
-### UC-011: Obsidian Note Linking
+### UC-010: Obsidian Note Linking
 
 **Preconditions:** Obsidian vault configured, note exists at `1-Projects/Migration.md`
 
@@ -408,7 +366,7 @@ These use cases are designed to drive automated test development.
 - Note content readable from vault
 - Missing note handled gracefully
 
-### UC-012: Weekly Review Workflow
+### UC-011: Weekly Review Workflow
 
 **Preconditions:** Inbox has items, projects exist, waiting-for items exist
 
@@ -425,7 +383,7 @@ These use cases are designed to drive automated test development.
 - Review can be resumed if interrupted
 - Completion timestamp recorded
 
-### UC-013: AI Task Breakdown
+### UC-012: AI Task Breakdown
 
 **Preconditions:** Task exists, Obsidian note linked
 
@@ -441,7 +399,7 @@ These use cases are designed to drive automated test development.
 - Subtasks inherit project from parent
 - Each subtask is actionable (has verb)
 
-### UC-014: MCP Tool Invocation
+### UC-013: MCP Tool Invocation
 
 **Preconditions:** MCP server running
 
@@ -457,7 +415,7 @@ These use cases are designed to drive automated test development.
 - Errors return structured error objects
 - Tool descriptions accurate
 
-### UC-015: Vault Initialization
+### UC-014: Vault Initialization
 
 **Preconditions:** Obsidian vault exists, AIO structure not yet created
 
@@ -473,21 +431,20 @@ These use cases are designed to drive automated test development.
 - Idempotent (running again doesn't break)
 - Works with existing Obsidian vault (.obsidian folder present)
 
-### UC-016: Error Handling
+### UC-015: Error Handling
 
 | Scenario | Expected Behavior |
 |----------|-------------------|
 | Invalid date format | Error message, task not created |
 | Non-existent task ID | "Task not found" error |
 | Vault not initialized | Clear error with `aio init` instructions |
-| Jira auth failure | Clear error with remediation steps |
 
 **Test assertions:**
 - All errors are user-friendly (no stack traces in normal use)
 - Exit codes: 0=success, 1=error
 - Errors written to stderr
 
-### UC-017: Obsidian Plugin - View Tasks
+### UC-016: Obsidian Plugin - View Tasks
 
 **Preconditions:** Plugin enabled, task files exist in vault
 
@@ -504,7 +461,7 @@ These use cases are designed to drive automated test development.
 - Modal opens/closes without page reload
 - Task data matches markdown file content
 
-### UC-018: Obsidian Plugin - Edit Task Inline
+### UC-017: Obsidian Plugin - Edit Task Inline
 
 **Preconditions:** Task file exists, plugin loaded
 
@@ -521,7 +478,7 @@ These use cases are designed to drive automated test development.
 - Rollback on API error with error message
 - updatedAt timestamp changes
 
-### UC-019: Obsidian Plugin - Edit Task Modal
+### UC-018: Obsidian Plugin - Edit Task Modal
 
 **Preconditions:** Task exists with all fields populated
 
@@ -539,7 +496,7 @@ These use cases are designed to drive automated test development.
 - Save disabled while submitting
 - Keyboard shortcuts work (Esc=close, Cmd+Enter=save)
 
-### UC-020: Obsidian Plugin - Quick Add
+### UC-019: Obsidian Plugin - Quick Add
 
 **Preconditions:** Plugin loaded in Obsidian
 
@@ -556,7 +513,7 @@ These use cases are designed to drive automated test development.
 - New task appears without page reload
 - Input clears after successful add
 
-### UC-021: Obsidian Plugin - Status Transitions
+### UC-020: Obsidian Plugin - Status Transitions
 
 **Preconditions:** Task in inbox status
 
@@ -573,7 +530,7 @@ These use cases are designed to drive automated test development.
 - Completed tasks hidden from default view
 - Undo available for 5 seconds after complete
 
-### UC-022: Obsidian Plugin - Bulk Actions
+### UC-021: Obsidian Plugin - Bulk Actions
 
 **Preconditions:** Multiple tasks exist
 
@@ -591,7 +548,7 @@ These use cases are designed to drive automated test development.
 - Confirmation required for destructive actions
 - Undo works for bulk operations
 
-### UC-023: Obsidian Plugin - Filtering
+### UC-022: Obsidian Plugin - Filtering
 
 **Preconditions:** Tasks exist with various projects, dates
 
@@ -609,7 +566,7 @@ These use cases are designed to drive automated test development.
 - Filter state persists on navigation
 - Count updates to show "5 of 23 tasks"
 
-### UC-024: Obsidian Plugin - Drag and Drop
+### UC-023: Obsidian Plugin - Drag and Drop
 
 **Preconditions:** Multiple tasks in next_action status
 
@@ -625,7 +582,7 @@ These use cases are designed to drive automated test development.
 - Order persists after refresh
 - Status change triggers on cross-list drop
 
-### UC-025: Obsidian Plugin - Weekly Review Flow
+### UC-024: Obsidian Plugin - Weekly Review Flow
 
 **Preconditions:** Inbox has items, projects exist
 
@@ -646,7 +603,7 @@ These use cases are designed to drive automated test development.
 - Review completion timestamp saved
 - "Last review: 3 days ago" shown on dashboard
 
-### UC-026: Obsidian Plugin - Responsive Layout
+### UC-025: Obsidian Plugin - Responsive Layout
 
 **Preconditions:** Plugin loaded in Obsidian
 
@@ -662,7 +619,7 @@ These use cases are designed to drive automated test development.
 - No horizontal scroll
 - Quick add accessible on all sizes
 
-### UC-027: Obsidian Plugin - Keyboard Navigation
+### UC-026: Obsidian Plugin - Keyboard Navigation
 
 **Preconditions:** Plugin loaded in Obsidian with task list
 
@@ -690,7 +647,7 @@ These use cases are designed to drive automated test development.
 | Inbox zero | Daily | Zero inbox items at end of day |
 | Weekly review | Weekly | Review completed each week |
 | Delegation visibility | 100% | All delegated items tracked |
-| Integration adoption | 80% | Jira items synced, notes linked |
+| Integration adoption | 80% | Notes linked, MCP tools used |
 
 ## Technical Constraints
 

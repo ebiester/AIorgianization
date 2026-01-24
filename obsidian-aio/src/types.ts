@@ -42,8 +42,6 @@ export interface Task {
   tags: string[];
   /** Time estimate (e.g., "2h", "30m") */
   timeEstimate?: string;
-  /** Jira issue key */
-  jiraKey?: string;
   /** Creation timestamp ISO datetime */
   created: string;
   /** Last update timestamp ISO datetime */
