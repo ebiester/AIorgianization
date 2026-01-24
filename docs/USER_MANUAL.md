@@ -14,8 +14,9 @@ A personal task and deadline management system for engineering managers, built o
 6. [Integrations](#integrations)
 7. [File Formats](#file-formats)
 8. [Tips](#tips)
-9. [Troubleshooting](#troubleshooting)
-10. [Reference](#reference)
+9. [Development](#development)
+10. [Troubleshooting](#troubleshooting)
+11. [Reference](#reference)
 
 ---
 
@@ -600,6 +601,51 @@ Set these up in Obsidian's hotkey settings:
 | Open today's dashboard | `Cmd+Shift+D` |
 | Quick add task | `Cmd+Shift+A` |
 | Open inbox folder | `Cmd+Shift+I` |
+
+---
+
+## Development
+
+### Running Tests
+
+The project includes a comprehensive test runner that orchestrates Python, TypeScript, and MCP server tests:
+
+```bash
+# Run all tests
+./scripts/test/run-tests.sh
+
+# Run specific test suites
+./scripts/test/run-tests.sh --python-only      # Python tests only
+./scripts/test/run-tests.sh --typescript-only  # TypeScript plugin tests only
+./scripts/test/run-tests.sh --mcp-only         # MCP server protocol tests only
+
+# Additional options
+./scripts/test/run-tests.sh --skip-coverage    # Skip coverage generation
+./scripts/test/run-tests.sh --verbose          # Verbose output
+```
+
+### Test Reports
+
+After running tests, reports are generated in `test-results/`:
+
+| Report | Description |
+|--------|-------------|
+| `combined-report.md` | Human-readable summary with UAT coverage |
+| `uat-coverage.json` | Machine-readable UAT mapping |
+| `manual-test-checklist.md` | Checklist for Obsidian plugin manual tests |
+
+### UAT Coverage
+
+Tests are mapped to UAT cases using pytest markers:
+
+```python
+@pytest.mark.uat("UAT-003")
+def test_add_task(runner, initialized_vault):
+    """add should create a task."""
+    ...
+```
+
+The report generator extracts these markers to produce UAT coverage reports.
 
 ---
 

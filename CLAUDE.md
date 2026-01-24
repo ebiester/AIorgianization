@@ -75,7 +75,16 @@ AIorgianization/
 │       ├── test_workflows.py
 │       └── fixtures/       # Test vault fixtures
 ├── obsidian-aio/           # Obsidian plugin (TypeScript)
-│   └── ...
+│   ├── src/                # Plugin source code
+│   └── tests/              # Vitest tests with mocked Obsidian API
+├── scripts/
+│   └── test/               # Comprehensive test runner
+│       ├── run-tests.sh    # Main orchestrator
+│       ├── run-python-tests.sh
+│       ├── run-typescript-tests.sh
+│       ├── run-mcp-tests.sh
+│       ├── setup-test-vault.sh
+│       └── generate-report.py
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── PRD.md
@@ -113,6 +122,14 @@ aio add "Task" -d tomorrow        # Quick add
 aio list inbox                    # List inbox tasks
 aio done <id>                     # Complete task
 aio dashboard                     # Generate dashboard
+
+# Comprehensive test runner (Python + TypeScript + MCP)
+./scripts/test/run-tests.sh                    # Run all tests
+./scripts/test/run-tests.sh --python-only      # Python tests only
+./scripts/test/run-tests.sh --typescript-only  # TypeScript tests only
+./scripts/test/run-tests.sh --mcp-only         # MCP server tests only
+./scripts/test/run-tests.sh --skip-coverage    # Skip coverage generation
+./scripts/test/run-tests.sh --verbose          # Verbose output
 ```
 
 ## CLI Commands Reference
@@ -257,6 +274,45 @@ def test_add_task_with_duplicate_id_retries(temp_vault):
 - Unit tests: 90%+ coverage on services/ and utils/
 - Integration tests: All CLI commands
 - E2E tests: Core workflows (add → list → done, archive, dashboard)
+
+### Comprehensive Test Runner
+
+The `scripts/test/` directory contains a language-agnostic test orchestrator that runs Python, TypeScript, and MCP server tests together:
+
+```bash
+./scripts/test/run-tests.sh                    # Run all tests
+./scripts/test/run-tests.sh --python-only      # Python tests only
+./scripts/test/run-tests.sh --typescript-only  # TypeScript tests only
+./scripts/test/run-tests.sh --mcp-only         # MCP server tests only
+./scripts/test/run-tests.sh --verbose          # Verbose output
+```
+
+**Scripts:**
+- `run-tests.sh` - Main orchestrator
+- `run-python-tests.sh` - Runs pytest with JSON report and coverage
+- `run-typescript-tests.sh` - Runs vitest for Obsidian plugin
+- `run-mcp-tests.sh` - Spawns MCP server and tests JSON-RPC protocol
+- `setup-test-vault.sh` - Creates isolated test vault with .obsidian structure
+- `generate-report.py` - Aggregates results, extracts UAT coverage
+
+**Generated Reports** (`test-results/`):
+- `combined-report.md` - Human-readable summary with UAT coverage
+- `uat-coverage.json` - Machine-readable UAT mapping
+- `manual-test-checklist.md` - Checklist for Obsidian plugin manual tests
+
+### UAT Markers
+
+Use pytest markers to map tests to UAT cases:
+
+```python
+@pytest.mark.uat("UAT-003")
+def test_add_task(runner, initialized_vault):
+    """add should create a task."""
+    result = runner.invoke(cli, ["--vault", str(initialized_vault), "add", "Test Task"])
+    assert result.exit_code == 0
+```
+
+The report generator extracts these markers from source files to produce UAT coverage reports.
 
 ## Coding Conventions
 

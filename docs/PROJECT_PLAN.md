@@ -51,6 +51,9 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | Unit tests | Test services, utils, models | Done |
 | Integration tests | Test CLI commands | Done |
 | E2E tests | Test full workflows with fixtures | Done |
+| Comprehensive test runner | Language-agnostic test orchestrator (Python + TypeScript + MCP) | Done |
+| UAT markers | pytest markers for UAT tracking with report generation | Done |
+| TypeScript tests | Vitest tests for Obsidian plugin with mocked API | Done |
 
 ### Verification
 

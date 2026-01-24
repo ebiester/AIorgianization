@@ -17,6 +17,7 @@ def runner() -> CliRunner:
 class TestInitCommand:
     """Tests for aio init command."""
 
+    @pytest.mark.uat("UAT-001")
     def test_init_creates_structure(self, runner: CliRunner, temp_vault: Path) -> None:
         """init should create AIO directory structure."""
         result = runner.invoke(cli, ["init", str(temp_vault)])
@@ -25,6 +26,7 @@ class TestInitCommand:
         assert "Initialized AIO structure" in result.output
         assert (temp_vault / "AIO" / "Tasks" / "Inbox").is_dir()
 
+    @pytest.mark.uat("UAT-027")
     def test_init_not_a_vault(self, runner: CliRunner, tmp_path: Path) -> None:
         """init should fail for non-vault directories."""
         not_a_vault = tmp_path / "not_a_vault"
@@ -38,6 +40,7 @@ class TestInitCommand:
 class TestAddCommand:
     """Tests for aio add command."""
 
+    @pytest.mark.uat("UAT-003")
     def test_add_task(self, runner: CliRunner, initialized_vault: Path) -> None:
         """add should create a task."""
         result = runner.invoke(
@@ -48,6 +51,7 @@ class TestAddCommand:
         assert "Created task:" in result.output
         assert "Test Task" in result.output
 
+    @pytest.mark.uat("UAT-004")
     def test_add_task_with_due(self, runner: CliRunner, initialized_vault: Path) -> None:
         """add should accept due date."""
         result = runner.invoke(
@@ -58,6 +62,7 @@ class TestAddCommand:
         assert result.exit_code == 0
         assert "Due:" in result.output
 
+    @pytest.mark.uat("UAT-006")
     def test_add_task_with_project(
         self, runner: CliRunner, initialized_vault: Path
     ) -> None:
@@ -75,6 +80,7 @@ class TestAddCommand:
         assert result.exit_code == 0
         assert "Project:" in result.output
 
+    @pytest.mark.uat("UAT-007a")
     def test_add_task_with_assign(
         self, runner: CliRunner, initialized_vault: Path
     ) -> None:
@@ -102,6 +108,7 @@ class TestAddCommand:
         assert "Status: waiting" in result.output
         assert "Waiting on:" in result.output
 
+    @pytest.mark.uat("UAT-007a")
     def test_add_task_with_assign_person_not_found(
         self, runner: CliRunner, initialized_vault: Path
     ) -> None:
@@ -122,6 +129,7 @@ class TestAddCommand:
 class TestListCommand:
     """Tests for aio list command."""
 
+    @pytest.mark.uat("UAT-053")
     def test_list_empty(self, runner: CliRunner, initialized_vault: Path) -> None:
         """list should show message when no tasks."""
         result = runner.invoke(cli, ["--vault", str(initialized_vault), "list"])
@@ -129,6 +137,7 @@ class TestListCommand:
         assert result.exit_code == 0
         assert "No tasks found" in result.output
 
+    @pytest.mark.uat("UAT-008")
     def test_list_with_task(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -139,6 +148,7 @@ class TestListCommand:
         assert "AB2C" in result.output
         assert "Test Task" in result.output
 
+    @pytest.mark.uat("UAT-009")
     def test_list_inbox(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -152,6 +162,8 @@ class TestListCommand:
 class TestDoneCommand:
     """Tests for aio done command."""
 
+    @pytest.mark.uat("UAT-012")
+    @pytest.mark.uat("UAT-016")
     def test_done_by_id(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -161,6 +173,8 @@ class TestDoneCommand:
         assert result.exit_code == 0
         assert "Completed:" in result.output
 
+    @pytest.mark.uat("UAT-012")
+    @pytest.mark.uat("UAT-017")
     def test_done_by_title(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -172,6 +186,7 @@ class TestDoneCommand:
         assert result.exit_code == 0
         assert "Completed:" in result.output
 
+    @pytest.mark.uat("UAT-018")
     def test_done_not_found(self, runner: CliRunner, initialized_vault: Path) -> None:
         """done should fail for unknown task."""
         result = runner.invoke(
@@ -185,6 +200,8 @@ class TestDoneCommand:
 class TestStatusCommands:
     """Tests for status change commands."""
 
+    @pytest.mark.uat("UAT-011")
+    @pytest.mark.uat("UAT-013")
     def test_start_command(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -196,6 +213,7 @@ class TestStatusCommands:
         assert result.exit_code == 0
         assert "Started:" in result.output
 
+    @pytest.mark.uat("UAT-014")
     def test_defer_command(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -207,6 +225,7 @@ class TestStatusCommands:
         assert result.exit_code == 0
         assert "Deferred:" in result.output
 
+    @pytest.mark.uat("UAT-015")
     def test_wait_command(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
     ) -> None:
@@ -222,6 +241,7 @@ class TestStatusCommands:
 class TestDashboardCommand:
     """Tests for aio dashboard command."""
 
+    @pytest.mark.uat("UAT-020")
     def test_dashboard_stdout(self, runner: CliRunner, initialized_vault: Path) -> None:
         """dashboard --stdout should print content."""
         result = runner.invoke(
@@ -231,6 +251,7 @@ class TestDashboardCommand:
         assert result.exit_code == 0
         assert "Quick Links" in result.output
 
+    @pytest.mark.uat("UAT-020")
     def test_dashboard_save(self, runner: CliRunner, initialized_vault: Path) -> None:
         """dashboard should save file."""
         result = runner.invoke(

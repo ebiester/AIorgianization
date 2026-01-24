@@ -8,6 +8,14 @@ import pytest
 from aio.services.vault import VaultService
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers for UAT test tracking."""
+    config.addinivalue_line(
+        "markers",
+        "uat(id): Mark test with UAT case ID (e.g., @pytest.mark.uat('UAT-003'))",
+    )
+
+
 @pytest.fixture
 def temp_vault(tmp_path: Path) -> Path:
     """Create a temporary vault with .obsidian folder.

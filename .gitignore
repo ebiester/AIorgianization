@@ -34,6 +34,10 @@ ENV/
 htmlcov/
 .tox/
 .nox/
+test-results/
+
+# Node.js
+node_modules/
 
 # Type checking
 .mypy_cache/
