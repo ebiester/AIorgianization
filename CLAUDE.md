@@ -123,12 +123,15 @@ aio dashboard                     # Generate dashboard
 aio init <vault-path>             # Create AIO directory structure in vault
 
 # Task management
-aio add "Task title" [-d due] [-p project]
+aio add "Task title" [-d due] [-p project] [-a person]
 aio list [inbox|next|waiting|someday|today|overdue|all]
 aio done <task-id-or-query>       # Complete task
 aio start <task>                  # Move to Next status
 aio defer <task>                  # Move to Someday
 aio wait <task> [person]          # Move to Waiting
+
+# The -a/--assign flag creates task and delegates immediately:
+# aio add "Review API" --assign Sarah  # Creates in Waiting status
 
 # Dashboard
 aio dashboard                     # Generate/update today's dashboard
@@ -284,8 +287,42 @@ A task is not complete until:
 1. The expected output is observed
 2. Linting passes with no errors (`uv run ruff check .` shows "All checks passed!")
 3. Type checking passes
+4. Documentation is updated (see below)
 
 If verification fails, continue debugging until it passes.
+
+### Documentation Requirements
+
+**After completing any feature or significant change, update the following:**
+
+1. **Project Plan (`docs/PROJECT_PLAN.md`)**:
+   - Mark completed tasks/milestones as done
+   - Add new tasks if the feature revealed additional work needed
+
+2. **PRD (`docs/PRD.md`)**:
+   - Add new features or capabilities to the appropriate section
+   - Update use cases if behavior changed
+
+3. **User Manual (`docs/USER_MANUAL.md`)**:
+   - Document new CLI commands, flags, or options
+   - Add examples showing the new functionality
+   - Update MCP tools table if MCP tools changed
+   - Add troubleshooting entries if relevant
+
+4. **UAT Plan (`docs/UAT_PLAN.md`)**:
+   - Add acceptance test cases for the new feature
+   - Include both happy path and error scenarios
+
+5. **CLAUDE.md** (this file):
+   - Update CLI Commands Reference if commands changed
+   - Update MCP Available Tools if tools changed
+
+**Example checklist for a new CLI flag:**
+- [ ] Feature implemented and tested
+- [ ] `docs/USER_MANUAL.md` - Added flag to CLI Reference with examples
+- [ ] `docs/UAT_PLAN.md` - Added test case for the new flag
+- [ ] `CLAUDE.md` - Updated CLI Commands Reference
+- [ ] `docs/PROJECT_PLAN.md` - Marked task complete (if applicable)
 
 ### Python Style
 
@@ -383,11 +420,11 @@ Add to your Cursor MCP config (`~/.cursor/mcp.json` or project-level):
 
 ```python
 # Task Management
-aio_add_task(title, due?, project?)  → task_id
-aio_list_tasks(status?, project?)    → Task[]
-aio_complete_task(id)                → success
-aio_start_task(id)                   → success
-aio_defer_task(id)                   → success
+aio_add_task(title, due?, project?, assign?)  → task_id  # assign delegates immediately
+aio_list_tasks(status?, project?)             → Task[]
+aio_complete_task(id)                         → success
+aio_start_task(id)                            → success
+aio_defer_task(id)                            → success
 
 # Context
 aio_get_context(packs)               → content
@@ -425,6 +462,7 @@ When the user asks about tasks, deadlines, or project management:
 Example prompts:
 - "What's on my plate today?" → aio_get_dashboard()
 - "Add a task to review the PR by Friday" → aio_add_task("Review PR", due="friday")
+- "Add a task for Sarah to update docs" → aio_add_task("Update docs", assign="Sarah")
 - "Show my inbox" → aio_list_tasks(status="inbox")
 ```
 

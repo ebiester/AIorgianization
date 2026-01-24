@@ -217,6 +217,10 @@ async def list_tools() -> list[Tool]:
                         "enum": ["inbox", "next", "scheduled", "someday"],
                         "description": "Initial status (default: inbox)",
                     },
+                    "assign": {
+                        "type": "string",
+                        "description": "Person to delegate task to (moves to Waiting status)",
+                    },
                 },
                 "required": ["title"],
             },
@@ -606,6 +610,7 @@ async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
     """Handle aio_add_task tool."""
     task_service = get_task_service()
     project_service = get_project_service()
+    person_service = get_person_service()
 
     title = args["title"]
     due_str = args.get("due")
@@ -636,7 +641,18 @@ async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
         status=TaskStatus(status_str),
     )
 
-    result = f"Created task: {task.title}\nID: {task.id}\nStatus: {task.status}"
+    # Delegate task if assign provided
+    if assign := args.get("assign"):
+        person = person_service.find(assign)
+        person_slug = person_service.get_slug(person.name)
+        person_link = f"[[AIO/People/{person_slug}]]"
+        task = task_service.wait(task.id, person_link)
+
+    # Handle status display (may be TaskStatus enum or string)
+    status_display = task.status.value if hasattr(task.status, "value") else task.status
+    result = f"Created task: {task.title}\nID: {task.id}\nStatus: {status_display}"
+    if task.waiting_on:
+        result += f"\nWaiting on: {task.waiting_on}"
     if due_date:
         result += f"\nDue: {due_date.isoformat()}"
     if project_link:

@@ -5,8 +5,14 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from aio.exceptions import AmbiguousMatchError, InvalidDateError, ProjectNotFoundError
+from aio.exceptions import (
+    AmbiguousMatchError,
+    InvalidDateError,
+    PersonNotFoundError,
+    ProjectNotFoundError,
+)
 from aio.models.task import TaskStatus
+from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
@@ -32,6 +38,11 @@ console = Console()
     help="Initial status (default: inbox)",
 )
 @click.option("-t", "--tag", multiple=True, help="Add tag(s)")
+@click.option(
+    "-a",
+    "--assign",
+    help="Delegate task to a person (moves to Waiting status)",
+)
 @click.pass_context
 def add(
     ctx: click.Context,
@@ -41,6 +52,7 @@ def add(
     create_project: bool,
     status: str,
     tag: tuple[str, ...],
+    assign: str | None,
 ) -> None:
     """Add a new task.
 
@@ -51,6 +63,7 @@ def add(
         aio add "Team meeting prep" -d tomorrow
         aio add "Design API" -d friday -p "Q4 Migration"
         aio add "New feature" -p "New Project" --create-project
+        aio add "Review PR" --assign Sarah
     """
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
@@ -110,10 +123,31 @@ def add(
         tags=list(tag),
     )
 
+    # Delegate task if --assign provided
+    if assign:
+        person_service = PersonService(vault_service)
+        try:
+            person = person_service.find(assign)
+        except PersonNotFoundError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise click.Abort() from None
+        except AmbiguousMatchError as e:
+            console.print(f"[red]Multiple people match '{assign}':[/red]")
+            for match_id in e.matches:
+                console.print(f"  - {match_id}")
+            raise click.Abort() from None
+        person_slug = person_service.get_slug(person.name)
+        person_link = f"[[AIO/People/{person_slug}]]"
+        task = task_service.wait(task.id, person_link)
+
     # Display result
     console.print(f"[green]Created task:[/green] {task.title}")
     console.print(f"  ID: [cyan]{task.id}[/cyan]")
-    console.print(f"  Status: {task.status}")
+    # Cast to str in case status is TaskStatus enum (after wait())
+    status_display = task.status.value if hasattr(task.status, "value") else task.status
+    console.print(f"  Status: {status_display}")
+    if task.waiting_on:
+        console.print(f"  Waiting on: {task.waiting_on}")
     if due_date:
         console.print(f"  Due: {format_relative_date(due_date)}")
     if project_link:

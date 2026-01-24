@@ -151,6 +151,52 @@ class TestAddTaskTool:
         assert len(result) == 1
         assert "Invalid date" in result[0].text
 
+    def test_add_task_with_assign(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_add_task should delegate task when assign is provided."""
+        # First create a person
+        asyncio.run(handle_create_person({"name": "Sarah Test"}))
+
+        result = asyncio.run(handle_add_task({
+            "title": "Task with assign",
+            "assign": "Sarah Test",
+        }))
+
+        assert len(result) == 1
+        assert "Created task:" in result[0].text
+        assert "Task with assign" in result[0].text
+        assert "Status: waiting" in result[0].text
+        assert "Waiting on:" in result[0].text
+
+    def test_add_task_with_assign_person_not_found(
+        self, mcp_registry: ServiceRegistry
+    ) -> None:
+        """aio_add_task with assign should raise error for unknown person."""
+        from aio.exceptions import PersonNotFoundError
+
+        with pytest.raises(PersonNotFoundError) as exc_info:
+            asyncio.run(handle_add_task({
+                "title": "Task for unknown person",
+                "assign": "Unknown Person",
+            }))
+
+        assert "Unknown Person" in str(exc_info.value)
+
+    def test_add_task_with_assign_via_call_tool(
+        self, mcp_registry: ServiceRegistry
+    ) -> None:
+        """aio_add_task with assign should work via generic call_tool handler."""
+        # First create a person
+        asyncio.run(handle_create_person({"name": "Bob Assign"}))
+
+        result = asyncio.run(call_tool("aio_add_task", {
+            "title": "Task via call_tool",
+            "assign": "Bob Assign",
+        }))
+
+        assert len(result) == 1
+        assert "Created task:" in result[0].text
+        assert "Status: waiting" in result[0].text
+
 
 class TestListTasksTool:
     """Tests for the aio_list_tasks MCP tool."""

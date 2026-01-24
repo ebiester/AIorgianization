@@ -75,6 +75,49 @@ class TestAddCommand:
         assert result.exit_code == 0
         assert "Project:" in result.output
 
+    def test_add_task_with_assign(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """add --assign should create task and delegate to person."""
+        # First create a person
+        from aio.services.person import PersonService
+        from aio.services.vault import VaultService
+
+        vault_service = VaultService(initialized_vault)
+        person_service = PersonService(vault_service)
+        person_service.create("Sarah")
+
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "add", "Review PR",
+                "--assign", "Sarah",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Created task:" in result.output
+        assert "Review PR" in result.output
+        assert "Status: waiting" in result.output
+        assert "Waiting on:" in result.output
+
+    def test_add_task_with_assign_person_not_found(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """add --assign should fail if person doesn't exist."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "add", "Review PR",
+                "--assign", "NonExistentPerson",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "Person not found" in result.output
+
 
 class TestListCommand:
     """Tests for aio list command."""

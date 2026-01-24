@@ -310,9 +310,16 @@ aio add "Quarterly planning" -d 2026-02-01
 # With project
 aio add "Design API" -p "Q4 Migration"
 
+# Delegate immediately (creates task in Waiting status)
+aio add "Review API design" --assign Sarah
+aio add "Update docs" -a Bob -d friday
+
 # Combined
 aio add "Review spec" -d friday -p "Q4 Migration"
+aio add "Design schema" -p "Q4 Migration" --assign Sarah -d "next monday"
 ```
+
+The `--assign` (or `-a`) flag creates the task and immediately delegates it to a person, moving it to Waiting status. This is equivalent to running `aio add` followed by `aio wait`.
 
 ### Listing Tasks
 
@@ -428,7 +435,7 @@ aio-mcp
 
 | Tool | Description |
 |------|-------------|
-| `aio_add_task` | Create a new task with optional due date and project |
+| `aio_add_task` | Create a new task with optional due date, project, and delegation |
 | `aio_list_tasks` | List tasks filtered by status or project |
 | `aio_complete_task` | Mark a task as completed |
 | `aio_start_task` | Move a task to Next status |
@@ -459,6 +466,7 @@ Once configured, you can ask your AI assistant:
 
 - "What's on my plate today?" → Uses `aio_get_dashboard`
 - "Add a task to review the PR by Friday" → Uses `aio_add_task`
+- "Add a task for Sarah to update the docs" → Uses `aio_add_task` with `assign`
 - "Show my inbox" → Uses `aio_list_tasks`
 - "Mark the auth bug task as done" → Uses `aio_complete_task`
 

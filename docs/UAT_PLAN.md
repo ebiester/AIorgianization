@@ -153,6 +153,27 @@ Before running any tests:
 
 ---
 
+### UAT-007a: Quick Task Add (With Assign)
+
+**Objective:** Verify task creation with immediate delegation using `--assign` flag.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Create a person first: `aio add "Setup task" && aio wait <id> Sarah --create-person` | Person "Sarah" created |
+| 2 | Run `aio add "Review API design" --assign Sarah` | Success message with task ID, status: waiting |
+| 3 | Check output | Shows "Status: waiting" and "Waiting on: [[AIO/People/Sarah]]" |
+| 4 | Check `AIO/Tasks/Waiting/` | Task file exists (not in Inbox) |
+| 5 | Open task file | `status: waiting`, `waitingOn: "[[AIO/People/Sarah]]"` in frontmatter |
+| 6 | Run `aio add "Update docs" -a Bob` (person doesn't exist) | Error: "Person not found: Bob" |
+| 7 | Run `aio add "Design schema" -p "Q4 Migration" --assign Sarah -d friday` | Task created with project, due date, AND delegation |
+| 8 | Check created file | All fields present: `project`, `due`, `waitingOn`, `status: waiting` |
+
+**Pass Criteria:** `--assign` creates task directly in Waiting status with person link. Combines correctly with other options. Fails cleanly if person doesn't exist.
+
+**MCP Equivalent:** `aio_add_task({title: "Review API", assign: "Sarah"})` should produce the same result.
+
+---
+
 ### UAT-008: Task Listing (Basic)
 
 **Objective:** Verify task listing commands.
@@ -555,6 +576,22 @@ Before running any tests:
 | 2 | Check vault | Task file created in Inbox |
 
 **Pass Criteria:** MCP tool creates task successfully.
+
+---
+
+### UAT-033a: MCP Tool - Add Task with Assign
+
+**Objective:** Verify MCP add task tool with delegation.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Create person first: `aio_create_person({name: "Alice"})` | Person created |
+| 2 | Call `aio_add_task({title: "Delegated via MCP", assign: "Alice"})` | Returns task ID with status: waiting |
+| 3 | Response includes | "Status: waiting" and "Waiting on:" fields |
+| 4 | Check vault | Task file in `Tasks/Waiting/` (not Inbox) |
+| 5 | Call `aio_add_task({title: "Unknown person", assign: "Nobody"})` | Returns error: "Person not found" |
+
+**Pass Criteria:** MCP assign parameter creates delegated task. Fails cleanly for unknown person.
 
 ---
 
@@ -1045,6 +1082,7 @@ Before running any tests:
 - [x] ~~UAT-005: Quick Task Add (With Priority)~~ [DELETED]
 - [ ] UAT-006: Quick Task Add (With Project)
 - [ ] UAT-007: Quick Task Add (Combined Options)
+- [ ] UAT-007a: Quick Task Add (With Assign)
 - [ ] UAT-008: Task Listing (Basic)
 - [ ] UAT-009: Task Listing (By Status)
 - [ ] UAT-010: Task Listing (All Including Completed)
@@ -1075,6 +1113,7 @@ Before running any tests:
 ### Phase 4: MCP Server
 - [ ] UAT-032: MCP Server Startup
 - [ ] UAT-033: MCP Tool - Add Task
+- [ ] UAT-033a: MCP Tool - Add Task with Assign
 - [ ] UAT-034: MCP Tool - List Tasks
 - [ ] UAT-035: MCP Tool - Complete Task
 - [ ] UAT-036: MCP Tool - Start Task
