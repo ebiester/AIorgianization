@@ -5,6 +5,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from aio.cli.client import DaemonClient, DaemonError, DaemonUnavailableError
+from aio.daemon.protocol import ErrorCode
 from aio.exceptions import AmbiguousMatchError, PersonNotFoundError, TaskNotFoundError
 from aio.services.person import PersonService
 from aio.services.task import TaskService
@@ -25,6 +27,39 @@ def start(ctx: click.Context, query: str) -> None:
         aio start AB2C
         aio start "design API"
     """
+    # Try daemon first
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _start_via_daemon(client, query)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _start_direct(ctx, query)
+
+
+def _start_via_daemon(client: DaemonClient, query: str) -> None:
+    """Start task via daemon."""
+    try:
+        result = client.start_task(query)
+        task = result["task"]
+        console.print(f"[green]Started:[/green] {task['title']}")
+        console.print(f"  ID: [cyan]{task['id']}[/cyan]")
+        console.print("  Status: [green]next[/green]")
+    except DaemonError as e:
+        if e.code == ErrorCode.TASK_NOT_FOUND:
+            console.print(f"[red]Task not found:[/red] {query}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print(f"[red]Multiple matches for '{query}':[/red]")
+            raise click.Abort() from None
+        raise
+
+
+def _start_direct(ctx: click.Context, query: str) -> None:
+    """Start task via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     task_service = TaskService(vault_service)
@@ -56,6 +91,39 @@ def defer(ctx: click.Context, query: str) -> None:
         aio defer AB2C
         aio defer "refactor"
     """
+    # Try daemon first
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _defer_via_daemon(client, query)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _defer_direct(ctx, query)
+
+
+def _defer_via_daemon(client: DaemonClient, query: str) -> None:
+    """Defer task via daemon."""
+    try:
+        result = client.defer_task(query)
+        task = result["task"]
+        console.print(f"[yellow]Deferred:[/yellow] {task['title']}")
+        console.print(f"  ID: [cyan]{task['id']}[/cyan]")
+        console.print("  Status: [dim]someday[/dim]")
+    except DaemonError as e:
+        if e.code == ErrorCode.TASK_NOT_FOUND:
+            console.print(f"[red]Task not found:[/red] {query}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print(f"[red]Multiple matches for '{query}':[/red]")
+            raise click.Abort() from None
+        raise
+
+
+def _defer_direct(ctx: click.Context, query: str) -> None:
+    """Defer task via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     task_service = TaskService(vault_service)
@@ -97,6 +165,61 @@ def wait(
         aio wait "design" John
         aio wait AB2C "New Person" --create-person
     """
+    # For --create-person, always use direct (needs multiple service calls)
+    if create_person:
+        _wait_direct(ctx, query, person, create_person)
+        return
+
+    # Try daemon first for simple delegate case
+    client = DaemonClient()
+    try:
+        if client.is_running() and person:
+            _wait_via_daemon(client, query, person)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _wait_direct(ctx, query, person, create_person)
+
+
+def _wait_via_daemon(client: DaemonClient, query: str, person: str) -> None:
+    """Delegate task via daemon."""
+    # Extract person name from wikilink if provided
+    person_query = person
+    if person.startswith("[[") and person.endswith("]]"):
+        inner = person[2:-2]
+        person_query = inner.split("/")[-1] if "/" in inner else inner
+
+    try:
+        result = client.delegate_task(query, person_query)
+        task = result["task"]
+        delegated_to = result.get("delegated_to", person_query)
+        console.print(f"[yellow]Waiting:[/yellow] {task['title']}")
+        console.print(f"  ID: [cyan]{task['id']}[/cyan]")
+        console.print("  Status: [yellow]waiting[/yellow]")
+        console.print(f"  Waiting on: {delegated_to}")
+    except DaemonError as e:
+        if e.code == ErrorCode.TASK_NOT_FOUND:
+            console.print(f"[red]Task not found:[/red] {query}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print(f"[red]Multiple matches for '{query}':[/red]")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.PERSON_NOT_FOUND:
+            console.print(f"[red]Person not found:[/red] {person_query}")
+            console.print(
+                f"\nTo create this person, use:\n"
+                f'  aio wait "{query}" "{person_query}" --create-person'
+            )
+            raise click.Abort() from None
+        raise
+
+
+def _wait_direct(
+    ctx: click.Context, query: str, person: str | None, create_person: bool
+) -> None:
+    """Wait on task via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     task_service = TaskService(vault_service)

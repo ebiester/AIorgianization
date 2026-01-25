@@ -1,21 +1,71 @@
 """MCP server for AIorgianization.
 
 Exposes vault operations to Claude/Cursor via the Model Context Protocol.
+Uses shared handlers from the daemon for consistent business logic.
 """
 
 import asyncio
 import signal
 import sys
-from datetime import date
 from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
 
+from aio.daemon.cache import VaultCache
+from aio.daemon.handlers import (
+    HandlerContext,
+)
+from aio.daemon.handlers import (
+    handle_add_file_to_context_pack as daemon_add_file_to_context_pack,
+)
+from aio.daemon.handlers import (
+    handle_add_task as daemon_add_task,
+)
+from aio.daemon.handlers import (
+    handle_add_to_context_pack as daemon_add_to_context_pack,
+)
+from aio.daemon.handlers import (
+    handle_complete_task as daemon_complete_task,
+)
+from aio.daemon.handlers import (
+    handle_create_context_pack as daemon_create_context_pack,
+)
+from aio.daemon.handlers import (
+    handle_create_person as daemon_create_person,
+)
+from aio.daemon.handlers import (
+    handle_create_project as daemon_create_project,
+)
+from aio.daemon.handlers import (
+    handle_defer_task as daemon_defer_task,
+)
+from aio.daemon.handlers import (
+    handle_delegate_task as daemon_delegate_task,
+)
+from aio.daemon.handlers import (
+    handle_file_get as daemon_file_get,
+)
+from aio.daemon.handlers import (
+    handle_file_set as daemon_file_set,
+)
+from aio.daemon.handlers import (
+    handle_get_context as daemon_get_context,
+)
+from aio.daemon.handlers import (
+    handle_get_dashboard as daemon_get_dashboard,
+)
+from aio.daemon.handlers import (
+    handle_list_context_packs as daemon_list_context_packs,
+)
+from aio.daemon.handlers import (
+    handle_list_tasks as daemon_list_tasks,
+)
+from aio.daemon.handlers import (
+    handle_start_task as daemon_start_task,
+)
 from aio.exceptions import AioError, FileOutsideVaultError, InvalidDateError
-from aio.models.context_pack import ContextPackCategory
-from aio.models.project import ProjectStatus
 from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
@@ -24,7 +74,6 @@ from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
-from aio.utils.dates import parse_date
 
 
 class ServiceRegistry:
@@ -44,7 +93,8 @@ class ServiceRegistry:
         self._file_service: FileService | None = None
 
     def reset(self) -> None:
-        """Reset all services. Useful for testing."""
+        """Reset all services and cache. Useful for testing."""
+        global _cache
         self._vault_service = None
         self._task_service = None
         self._project_service = None
@@ -52,6 +102,8 @@ class ServiceRegistry:
         self._dashboard_service = None
         self._context_pack_service = None
         self._file_service = None
+        # Also reset the cache since it depends on services
+        _cache = None
 
     def set_vault_service(self, service: VaultService) -> None:
         """Override the vault service. Useful for testing."""
@@ -171,6 +223,54 @@ def get_context_pack_service() -> ContextPackService:
 def get_file_service() -> FileService:
     """Get the file service."""
     return _registry.file_service
+
+
+# Global cache instance (lazy initialized)
+_cache: VaultCache | None = None
+
+
+def reset_cache() -> None:
+    """Reset the global cache.
+
+    Call this when the registry is reset or the vault changes.
+    """
+    global _cache
+    _cache = None
+
+
+def get_cache() -> VaultCache:
+    """Get the vault cache, creating and populating it lazily if needed.
+
+    The MCP server uses a non-watching cache since each request is stateless.
+    The cache is populated on first access for performance but doesn't
+    automatically refresh.
+    """
+    global _cache
+    if _cache is None:
+        _cache = VaultCache(
+            _registry.vault_service,
+            _registry.task_service,
+        )
+        _cache.refresh_sync()  # Populate immediately
+    return _cache
+
+
+def get_handler_context() -> HandlerContext:
+    """Get a HandlerContext using the global registry and cache.
+
+    This bridges the ServiceRegistry pattern used by MCP with the
+    HandlerContext pattern used by daemon handlers.
+    """
+    return HandlerContext(
+        vault_service=_registry.vault_service,
+        task_service=_registry.task_service,
+        project_service=_registry.project_service,
+        person_service=_registry.person_service,
+        dashboard_service=_registry.dashboard_service,
+        context_pack_service=_registry.context_pack_service,
+        file_service=_registry.file_service,
+        cache=get_cache(),
+    )
 
 
 # Create MCP server
@@ -557,355 +657,232 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error: {e}")]
 
 
-async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_add_task tool."""
-    task_service = get_task_service()
-    project_service = get_project_service()
-    person_service = get_person_service()
-
-    title = args["title"]
-    due_str = args.get("due")
-    project = args.get("project")
-    status_str = args.get("status", "inbox")
-
-    due_date = None
-    if due_str:
-        try:
-            due_date = parse_date(due_str)
-        except InvalidDateError as e:
-            return [TextContent(type="text", text=f"Invalid date: {e}")]
-
-    project_link = None
-    if project:
-        # Find project by ID or name
-        if project.startswith("[["):
-            project_link = project
-        else:
-            found_project = project_service.find(project)
-            project_slug = project_service.get_slug(found_project.title)
-            project_link = f"[[AIO/Projects/{project_slug}]]"
-
-    task = task_service.create(
-        title=title,
-        due=due_date,
-        project=project_link,
-        status=TaskStatus(status_str),
-    )
-
-    # Delegate task if assign provided
-    if assign := args.get("assign"):
-        person = person_service.find(assign)
-        person_slug = person_service.get_slug(person.name)
-        person_link = f"[[AIO/People/{person_slug}]]"
-        task = task_service.wait(task.id, person_link)
-
-    # Handle status display (may be TaskStatus enum or string)
-    status_display = task.status.value if hasattr(task.status, "value") else task.status
-    result = f"Created task: {task.title}\nID: {task.id}\nStatus: {status_display}"
-    if task.waiting_on:
-        result += f"\nWaiting on: {task.waiting_on}"
-    if due_date:
-        result += f"\nDue: {due_date.isoformat()}"
-    if project_link:
-        result += f"\nProject: {project_link}"
-
-    return [TextContent(type="text", text=result)]
+# ============================================================================
+# Handler implementations - thin wrappers around daemon handlers
+# ============================================================================
+#
+# These handlers delegate to the shared daemon handlers and convert the
+# dict results to MCP's TextContent format. This eliminates duplicate
+# business logic between MCP and daemon.
 
 
-async def handle_list_tasks(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_list_tasks tool."""
-    task_service = get_task_service()
+def _format_task_result(task: dict[str, Any]) -> str:
+    """Format a task dict as human-readable text."""
+    lines = [f"Task: {task['title']}", f"ID: {task['id']}", f"Status: {task['status']}"]
+    if task.get("due"):
+        lines.append(f"Due: {task['due']}")
+    if task.get("project"):
+        lines.append(f"Project: {task['project']}")
+    if task.get("waiting_on"):
+        lines.append(f"Waiting on: {task['waiting_on']}")
+    return "\n".join(lines)
 
-    status_str = args.get("status")
-    project = args.get("project")
 
-    if status_str == "today":
-        tasks = task_service.list_today()
-    elif status_str == "overdue":
-        tasks = task_service.list_overdue()
-    elif status_str:
-        tasks = task_service.list_tasks(status=TaskStatus(status_str), project=project)
-    else:
-        tasks = task_service.list_tasks(project=project)
-
+def _format_task_list_result(result: dict[str, Any]) -> str:
+    """Format a list_tasks result as human-readable text."""
+    tasks = result.get("tasks", [])
     if not tasks:
-        return [TextContent(type="text", text="No tasks found.")]
+        return "No tasks found."
 
     lines = [f"Found {len(tasks)} task(s):", ""]
     for task in tasks:
-        due_str = f" (due: {task.due.isoformat()})" if task.due else ""
-        overdue = " [OVERDUE]" if task.is_overdue else ""
-        lines.append(f"- [{task.id}] {task.title} ({task.status}){due_str}{overdue}")
+        due_str = f" (due: {task['due']})" if task.get("due") else ""
+        overdue = " [OVERDUE]" if task.get("is_overdue") else ""
+        lines.append(f"- [{task['id']}] {task['title']} ({task['status']}){due_str}{overdue}")
+    return "\n".join(lines)
 
-    return [TextContent(type="text", text="\n".join(lines))]
+
+async def handle_add_task(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_add_task tool using daemon handler."""
+    ctx = get_handler_context()
+    try:
+        result = await daemon_add_task(ctx, args)
+    except InvalidDateError as e:
+        return [TextContent(type="text", text=f"Invalid date: {e}")]
+    task = result["task"]
+
+    text = f"Created task: {task['title']}\nID: {task['id']}\nStatus: {task['status']}"
+    if task.get("waiting_on"):
+        text += f"\nWaiting on: {task['waiting_on']}"
+    if task.get("due"):
+        text += f"\nDue: {task['due']}"
+    if task.get("project"):
+        text += f"\nProject: {task['project']}"
+
+    return [TextContent(type="text", text=text)]
+
+
+async def handle_list_tasks(args: dict[str, Any]) -> list[TextContent]:
+    """Handle aio_list_tasks tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_list_tasks(ctx, args)
+    return [TextContent(type="text", text=_format_task_list_result(result))]
 
 
 async def handle_complete_task(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_complete_task tool."""
-    task_service = get_task_service()
-    query = args["query"]
-
-    task = task_service.complete(query)
-    return [TextContent(type="text", text=f"Completed: {task.title} ({task.id})")]
+    """Handle aio_complete_task tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_complete_task(ctx, args)
+    task = result["task"]
+    return [TextContent(type="text", text=f"Completed: {task['title']} ({task['id']})")]
 
 
 async def handle_start_task(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_start_task tool."""
-    task_service = get_task_service()
-    query = args["query"]
-
-    task = task_service.start(query)
-    return [TextContent(type="text", text=f"Started: {task.title} ({task.id})\nStatus: next")]
+    """Handle aio_start_task tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_start_task(ctx, args)
+    task = result["task"]
+    return [TextContent(type="text", text=f"Started: {task['title']} ({task['id']})\nStatus: next")]
 
 
 async def handle_defer_task(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_defer_task tool."""
-    task_service = get_task_service()
-    query = args["query"]
-
-    task = task_service.defer(query)
-    return [TextContent(type="text", text=f"Deferred: {task.title} ({task.id})\nStatus: someday")]
+    """Handle aio_defer_task tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_defer_task(ctx, args)
+    task = result["task"]
+    return [TextContent(
+        type="text",
+        text=f"Deferred: {task['title']} ({task['id']})\nStatus: someday",
+    )]
 
 
 async def handle_get_dashboard(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_get_dashboard tool."""
-    dashboard_service = get_dashboard_service()
-
-    date_str = args.get("date")
-    for_date = date.today()
-    if date_str:
-        try:
-            for_date = parse_date(date_str)
-        except InvalidDateError:
-            for_date = date.today()
-
-    content = dashboard_service.generate(for_date)
-    return [TextContent(type="text", text=content)]
+    """Handle aio_get_dashboard tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_get_dashboard(ctx, args)
+    return [TextContent(type="text", text=result["content"])]
 
 
 async def handle_get_context(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_get_context tool."""
-    vault_service = get_vault_service()
-    packs = args.get("packs", [])
+    """Handle aio_get_context tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_get_context(ctx, args)
 
-    if not packs:
+    content = result.get("content", "")
+    if not content:
         return [TextContent(type="text", text="No context packs specified.")]
-
-    content_parts = []
-    context_base = vault_service.aio_path / "Context-Packs"
-
-    for pack_name in packs:
-        # Search in subdirectories
-        found = False
-        for subdir in ["Domains", "Systems", "Operating"]:
-            pack_path = context_base / subdir / f"{pack_name}.md"
-            if pack_path.exists():
-                content = pack_path.read_text(encoding="utf-8")
-                content_parts.append(f"# Context: {pack_name}\n\n{content}")
-                found = True
-                break
-
-        if not found:
-            # Try direct path
-            pack_path = context_base / f"{pack_name}.md"
-            if pack_path.exists():
-                content = pack_path.read_text(encoding="utf-8")
-                content_parts.append(f"# Context: {pack_name}\n\n{content}")
-            else:
-                content_parts.append(f"# Context: {pack_name}\n\n(Not found)")
-
-    return [TextContent(type="text", text="\n\n---\n\n".join(content_parts))]
+    return [TextContent(type="text", text=content)]
 
 
 async def handle_list_context_packs(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_list_context_packs tool."""
-    context_pack_service = get_context_pack_service()
+    """Handle aio_list_context_packs tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_list_context_packs(ctx, args)
 
-    category_str = args.get("category")
-    category = ContextPackCategory(category_str) if category_str else None
-
-    packs = context_pack_service.list_packs(category)
-
+    packs = result.get("packs", [])
     if not packs:
         return [TextContent(type="text", text="No context packs found.")]
 
     lines = [f"Found {len(packs)} context pack(s):", ""]
     for pack in packs:
-        desc = f" - {pack.description}" if pack.description else ""
-        tags = f" [{', '.join(pack.tags)}]" if pack.tags else ""
-        lines.append(f"- [{pack.category}] {pack.title} ({pack.id}){desc}{tags}")
+        desc = f" - {pack['description']}" if pack.get("description") else ""
+        tags = f" [{', '.join(pack['tags'])}]" if pack.get("tags") else ""
+        lines.append(f"- [{pack['category']}] {pack['title']} ({pack['id']}){desc}{tags}")
 
     return [TextContent(type="text", text="\n".join(lines))]
 
 
 async def handle_add_to_context_pack(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_add_to_context_pack tool."""
-    context_pack_service = get_context_pack_service()
+    """Handle aio_add_to_context_pack tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_add_to_context_pack(ctx, args)
 
-    pack_id = args["pack"]
-    content = args["content"]
-    section = args.get("section")
-
-    pack = context_pack_service.append(pack_id, content, section)
-
-    section_msg = f" under section '{section}'" if section else ""
+    section_msg = f" under section '{result['section']}'" if result.get("section") else ""
     return [TextContent(
         type="text",
-        text=f"Added content to context pack: {pack.title} ({pack.id}){section_msg}",
+        text=f"Added content to context pack: {result['title']} ({result['id']}){section_msg}",
     )]
 
 
 async def handle_add_file_to_context_pack(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_add_file_to_context_pack tool."""
-    context_pack_service = get_context_pack_service()
+    """Handle aio_add_file_to_context_pack tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_add_file_to_context_pack(ctx, args)
 
-    pack_id = args["pack"]
-    file_path = args["file"]
-    section = args.get("section")
-
-    pack = context_pack_service.append_file(pack_id, file_path, section)
-
-    section_msg = f" under section '{section}'" if section else ""
-    return [TextContent(
-        type="text",
-        text=f"Added file '{file_path}' to context pack: {pack.title} ({pack.id}){section_msg}",
-    )]
+    section_msg = f" under section '{result['section']}'" if result.get("section") else ""
+    file_path = result.get("file", args.get("file", ""))
+    pack_title = result["title"]
+    pack_id = result["id"]
+    text = f"Added file '{file_path}' to context pack: {pack_title} ({pack_id}){section_msg}"
+    return [TextContent(type="text", text=text)]
 
 
 async def handle_create_context_pack(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_create_context_pack tool."""
-    context_pack_service = get_context_pack_service()
+    """Handle aio_create_context_pack tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_create_context_pack(ctx, args)
 
-    title = args["title"]
-    category = ContextPackCategory(args["category"])
-    content = args.get("content")
-    description = args.get("description")
-    tags = args.get("tags")
+    pack_title = result["title"]
+    pack_id = result["id"]
+    pack_category = result["category"]
+    text = f"Created context pack: {pack_title}\nID: {pack_id}\nCategory: {pack_category}"
+    if result.get("description"):
+        text += f"\nDescription: {result['description']}"
+    if result.get("tags"):
+        text += f"\nTags: {', '.join(result['tags'])}"
 
-    pack = context_pack_service.create(
-        title=title,
-        category=category,
-        content=content,
-        description=description,
-        tags=tags,
-    )
-
-    result = f"Created context pack: {pack.title}\nID: {pack.id}\nCategory: {pack.category}"
-    if description:
-        result += f"\nDescription: {description}"
-    if tags:
-        result += f"\nTags: {', '.join(tags)}"
-
-    return [TextContent(type="text", text=result)]
+    return [TextContent(type="text", text=text)]
 
 
 async def handle_create_project(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_create_project tool."""
-    project_service = get_project_service()
+    """Handle aio_create_project tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_create_project(ctx, args)
 
-    name = args["name"]
-    status_str = args.get("status", "active")
-    team = args.get("team")
+    text = f"Created project: {result['title']}\nID: {result['id']}\nStatus: {result['status']}"
+    if result.get("team"):
+        text += f"\nTeam: {result['team']}"
 
-    status = ProjectStatus(status_str)
-
-    project = project_service.create(
-        name=name,
-        status=status,
-        team=team,
-    )
-
-    result = f"Created project: {project.title}\nID: {project.id}\nStatus: {project.status}"
-    if team:
-        result += f"\nTeam: {team}"
-
-    return [TextContent(type="text", text=result)]
+    return [TextContent(type="text", text=text)]
 
 
 async def handle_create_person(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_create_person tool."""
-    person_service = get_person_service()
+    """Handle aio_create_person tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_create_person(ctx, args)
 
-    name = args["name"]
-    team = args.get("team")
-    role = args.get("role")
-    email = args.get("email")
+    text = f"Created person: {result['name']}\nID: {result['id']}"
+    if result.get("team"):
+        text += f"\nTeam: {result['team']}"
+    if result.get("role"):
+        text += f"\nRole: {result['role']}"
+    if result.get("email"):
+        text += f"\nEmail: {result['email']}"
 
-    person = person_service.create(
-        name=name,
-        team=team,
-        role=role,
-        email=email,
-    )
-
-    result = f"Created person: {person.name}\nID: {person.id}"
-    if team:
-        result += f"\nTeam: {team}"
-    if role:
-        result += f"\nRole: {role}"
-    if email:
-        result += f"\nEmail: {email}"
-
-    return [TextContent(type="text", text=result)]
+    return [TextContent(type="text", text=text)]
 
 
 async def handle_delegate_task(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_delegate_task tool."""
-    task_service = get_task_service()
-    person_service = get_person_service()
+    """Handle aio_delegate_task tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_delegate_task(ctx, args)
+    task = result["task"]
+    person_name = result.get("delegated_to", task.get("waiting_on", ""))
 
-    query = args["query"]
-    person_query = args["person"]
-
-    # Find the person by ID or name
-    person = person_service.find(person_query)
-    person_link = f"[[AIO/People/{person_service.get_slug(person.name)}]]"
-
-    # Delegate the task (move to waiting with person)
-    task = task_service.wait(query, person_link)
-
-    return [TextContent(
-        type="text",
-        text=f"Delegated: {task.title} ({task.id})\nWaiting on: {person.name}\nStatus: waiting",
-    )]
+    task_title = task["title"]
+    task_id = task["id"]
+    text = f"Delegated: {task_title} ({task_id})\nWaiting on: {person_name}\nStatus: waiting"
+    return [TextContent(type="text", text=text)]
 
 
 async def handle_file_get(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_file_get tool."""
-    file_service = get_file_service()
-
-    query = args["query"]
-    content = file_service.get(query)
-
-    return [TextContent(type="text", text=content)]
+    """Handle aio_file_get tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_file_get(ctx, args)
+    return [TextContent(type="text", text=result["content"])]
 
 
 async def handle_file_set(args: dict[str, Any]) -> list[TextContent]:
-    """Handle aio_file_set tool."""
-    file_service = get_file_service()
-    vault_service = get_vault_service()
+    """Handle aio_file_set tool using daemon handler."""
+    ctx = get_handler_context()
+    result = await daemon_file_set(ctx, args)
 
-    query = args["query"]
-    content = args["content"]
-
-    resolved_path, backup_path = file_service.set(query, content)
-
-    # Show relative paths from vault root for cleaner output
-    try:
-        relative_file = resolved_path.relative_to(vault_service.vault_path)
-    except ValueError:
-        relative_file = resolved_path
-
-    if backup_path:
-        try:
-            relative_backup = backup_path.relative_to(vault_service.vault_path)
-            result = f"Backup created: {relative_backup}\nFile updated: {relative_file}"
-        except ValueError:
-            result = f"Backup created: {backup_path}\nFile updated: {relative_file}"
+    if result.get("backup"):
+        text = f"Backup created: {result['backup']}\nFile updated: {result['file']}"
     else:
-        result = f"File created: {relative_file} (no backup needed - new file)"
+        text = f"File created: {result['file']} (no backup needed - new file)"
 
-    return [TextContent(type="text", text=result)]
+    return [TextContent(type="text", text=text)]
 
 
 @server.list_resources()

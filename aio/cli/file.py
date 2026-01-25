@@ -6,6 +6,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from aio.cli.client import DaemonClient, DaemonError, DaemonUnavailableError
+from aio.daemon.protocol import ErrorCode
 from aio.exceptions import AmbiguousMatchError, FileOutsideVaultError
 from aio.services.file import FileService
 from aio.services.vault import VaultService
@@ -33,6 +35,41 @@ def file_get(ctx: click.Context, query: str) -> None:
       aio file get "Review PR"             # Get file by title
       aio file get AIO/Tasks/Inbox/task.md # Get file by path
     """
+    # Try daemon first
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _file_get_via_daemon(client, query)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _file_get_direct(ctx, query)
+
+
+def _file_get_via_daemon(client: DaemonClient, query: str) -> None:
+    """Get file via daemon."""
+    try:
+        result = client.call("file_get", {"query": query})
+        content = result.get("content", "")
+        print(content, end="")
+    except DaemonError as e:
+        if e.code == ErrorCode.TASK_NOT_FOUND:  # Used for file not found
+            console.print(f"[red]Error:[/red] File not found: {query}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.FILE_OUTSIDE_VAULT:
+            console.print(f"[red]Error:[/red] {e}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print(f"[red]Error:[/red] Multiple files match '{query}'")
+            console.print("\nUse a more specific query or the full path.")
+            raise click.Abort() from None
+        raise
+
+
+def _file_get_direct(ctx: click.Context, query: str) -> None:
+    """Get file via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     file_service = FileService(vault_service)
@@ -87,11 +124,7 @@ def file_set(
       aio file set AIO/new-file.md -c "content"    # Create new file by path
       cat file.md | aio file set AB2C              # Update from stdin
     """
-    vault_path: Path | None = ctx.obj.get("vault_path")
-    vault_service = VaultService(vault_path)
-    file_service = FileService(vault_service)
-
-    # Determine content source
+    # Determine content source first (local operation)
     if content is not None:
         file_content = content
     elif input_file is not None:
@@ -105,8 +138,51 @@ def file_set(
         )
         raise click.Abort()
 
+    # Try daemon first
+    client = DaemonClient()
     try:
-        resolved_path, backup_path = file_service.set(query, file_content)
+        if client.is_running():
+            _file_set_via_daemon(client, query, file_content)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _file_set_direct(ctx, query, file_content)
+
+
+def _file_set_via_daemon(client: DaemonClient, query: str, content: str) -> None:
+    """Set file via daemon."""
+    try:
+        result = client.call("file_set", {"query": query, "content": content})
+        file_path = result.get("file", "")
+        backup_path = result.get("backup")
+
+        if backup_path:
+            console.print(f"[green]Backup created:[/green] {backup_path}")
+        console.print(f"[green]File updated:[/green] {file_path}")
+    except DaemonError as e:
+        if e.code == ErrorCode.TASK_NOT_FOUND:  # Used for file not found
+            console.print(f"[red]Error:[/red] File not found: {query}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.FILE_OUTSIDE_VAULT:
+            console.print(f"[red]Error:[/red] {e}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print(f"[red]Error:[/red] Multiple files match '{query}'")
+            console.print("\nUse a more specific query or the full path.")
+            raise click.Abort() from None
+        raise
+
+
+def _file_set_direct(ctx: click.Context, query: str, content: str) -> None:
+    """Set file via direct service call."""
+    vault_path: Path | None = ctx.obj.get("vault_path")
+    vault_service = VaultService(vault_path)
+    file_service = FileService(vault_service)
+
+    try:
+        resolved_path, backup_path = file_service.set(query, content)
         # Show relative paths from vault root for cleaner output
         try:
             relative_file = resolved_path.relative_to(vault_service.vault_path)

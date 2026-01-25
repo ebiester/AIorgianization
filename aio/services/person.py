@@ -46,6 +46,29 @@ class PersonService:
 
         return sorted(people)
 
+    def list_all(self) -> list["Person"]:
+        """List all people as full objects.
+
+        Returns:
+            List of Person objects.
+        """
+        self.vault.ensure_initialized()
+        people_folder = self.vault.people_folder()
+
+        if not people_folder.exists():
+            return []
+
+        people: list[Person] = []
+        for filepath in people_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                person = self._read_person(filepath, metadata, content)
+                people.append(person)
+            except Exception as e:
+                logger.debug("Failed to read person file %s: %s", filepath, e)
+
+        return sorted(people, key=lambda p: p.name.lower())
+
     def exists(self, name: str) -> bool:
         """Check if a person exists.
 

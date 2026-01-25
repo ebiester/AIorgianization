@@ -47,6 +47,33 @@ class ProjectService:
 
         return sorted(projects)
 
+    def list_all(self, status: "ProjectStatus | None" = None) -> list["Project"]:
+        """List all projects as full objects.
+
+        Args:
+            status: Optional status to filter by.
+
+        Returns:
+            List of Project objects.
+        """
+        self.vault.ensure_initialized()
+        projects_folder = self.vault.projects_folder()
+
+        if not projects_folder.exists():
+            return []
+
+        projects: list[Project] = []
+        for filepath in projects_folder.glob("*.md"):
+            try:
+                metadata, content = read_frontmatter(filepath)
+                project = self._read_project(filepath, metadata, content)
+                if status is None or project.status == status:
+                    projects.append(project)
+            except Exception as e:
+                logger.debug("Failed to read project file %s: %s", filepath, e)
+
+        return sorted(projects, key=lambda p: p.title.lower())
+
     def exists(self, name: str) -> bool:
         """Check if a project exists.
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from aio.cli.client import DaemonClient, DaemonUnavailableError
 from aio.exceptions import InvalidDateError
 from aio.services.dashboard import DashboardService
 from aio.services.task import TaskService
@@ -29,6 +30,29 @@ def dashboard(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
         aio dashboard --date 2024-01-15  # Specific date
         aio dashboard --stdout           # Print without saving
     """
+    # For --stdout only, try daemon first
+    if stdout:
+        client = DaemonClient()
+        try:
+            if client.is_running():
+                _dashboard_via_daemon(client, date_str)
+                return
+        except DaemonUnavailableError:
+            pass
+
+    # Fallback or save mode: use direct
+    _dashboard_direct(ctx, date_str, stdout)
+
+
+def _dashboard_via_daemon(client: DaemonClient, date_str: str | None) -> None:
+    """Get dashboard via daemon (stdout only)."""
+    result = client.get_dashboard(date_str)
+    content = result.get("content", "")
+    console.print(content)
+
+
+def _dashboard_direct(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
+    """Generate dashboard via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     task_service = TaskService(vault_service)

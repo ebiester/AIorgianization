@@ -1,11 +1,14 @@
 """List command for AIorgianization CLI."""
 
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
 from rich.table import Table
 
+from aio.cli.client import DaemonClient, DaemonUnavailableError
 from aio.models.task import Task, TaskStatus
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
@@ -48,6 +51,69 @@ def list_tasks(
         aio list inbox        # Only inbox
         aio list today        # Due today + overdue
         aio list -p Migration # Tasks for a project
+    """
+    # Try daemon first for fast response
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _list_tasks_via_daemon(client, filter, project, completed)
+            return
+    except DaemonUnavailableError:
+        pass  # Fall through to direct execution
+
+    # Fallback: direct execution (slower but always works)
+    _list_tasks_direct(ctx, filter, project, completed)
+
+
+def _list_tasks_via_daemon(
+    client: DaemonClient,
+    filter: str | None,
+    project: str | None,
+    completed: bool,
+) -> None:
+    """List tasks using the daemon.
+
+    Args:
+        client: Connected daemon client.
+        filter: Status filter or special filter (today, overdue, all).
+        project: Optional project filter.
+        completed: Whether to include completed tasks.
+    """
+    # Build params for daemon call
+    params: dict[str, Any] = {}
+    if filter and filter not in ("all",):
+        params["status"] = filter
+    if project:
+        params["project"] = project
+
+    result = client.call("list_tasks", params if params else None)
+    tasks_data = result.get("tasks", [])
+
+    # Filter out completed if not requested (daemon doesn't have this filter)
+    if not completed:
+        tasks_data = [t for t in tasks_data if t.get("status") != "completed"]
+
+    if not tasks_data:
+        console.print("[dim]No tasks found[/dim]")
+        return
+
+    # Display using the same table format
+    _display_tasks_table_from_dicts(tasks_data, filter or "all")
+
+
+def _list_tasks_direct(
+    ctx: click.Context,
+    filter: str | None,
+    project: str | None,
+    completed: bool,
+) -> None:
+    """List tasks using direct service calls (fallback).
+
+    Args:
+        ctx: Click context with vault_path.
+        filter: Status filter or special filter.
+        project: Optional project filter.
+        completed: Whether to include completed tasks.
     """
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
@@ -102,7 +168,6 @@ def _display_tasks_table(tasks: list[Task], view_name: str) -> None:
                 due_str = f"[yellow]{due_str}[/yellow]"
 
         # Format status with color
-        status_str = task.status
         status_colors = {
             "inbox": "blue",
             "next": "green",
@@ -126,6 +191,65 @@ def _display_tasks_table(tasks: list[Task], view_name: str) -> None:
             task.id,
             status_str,
             task.title,
+            due_str,
+            project_str,
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]{len(tasks)} task(s)[/dim]")
+
+
+def _display_tasks_table_from_dicts(tasks: list[dict[str, Any]], view_name: str) -> None:
+    """Display tasks from daemon response as a rich table.
+
+    Args:
+        tasks: List of task dictionaries from daemon.
+        view_name: Name of the current view.
+    """
+    table = Table(title=f"Tasks ({view_name})")
+    table.add_column("ID", style="cyan", width=6)
+    table.add_column("Status", width=10)
+    table.add_column("Title", min_width=20)
+    table.add_column("Due", width=12)
+    table.add_column("Project", width=15)
+
+    for task in tasks:
+        # Format due date with color
+        due_str = ""
+        if due := task.get("due"):
+            # Parse ISO date string from daemon
+            due_date = date.fromisoformat(due) if isinstance(due, str) else due
+            due_str = format_relative_date(due_date)
+            if task.get("is_overdue"):
+                due_str = f"[red]{due_str}[/red]"
+            elif task.get("is_due_today"):
+                due_str = f"[yellow]{due_str}[/yellow]"
+
+        # Format status with color
+        status = task.get("status", "")
+        status_colors = {
+            "inbox": "blue",
+            "next": "green",
+            "waiting": "yellow",
+            "scheduled": "magenta",
+            "someday": "dim",
+            "completed": "dim",
+        }
+        color = status_colors.get(status, "white")
+        status_str = f"[{color}]{status}[/{color}]"
+
+        # Format project (strip wikilink brackets)
+        project_str = ""
+        if project := task.get("project"):
+            project_str = project.replace("[[", "").replace("]]", "")
+            # Shorten path
+            if "/" in project_str:
+                project_str = project_str.split("/")[-1]
+
+        table.add_row(
+            task.get("id", ""),
+            status_str,
+            task.get("title", ""),
             due_str,
             project_str,
         )

@@ -22,13 +22,15 @@ __export(main_exports, {
   default: () => AioPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
   aioFolderPath: "AIO",
   defaultStatus: "inbox",
-  dateFormat: "YYYY-MM-DD"
+  dateFormat: "YYYY-MM-DD",
+  daemonUrl: "http://localhost:7432",
+  useDaemon: true
 };
 var STATUS_FOLDERS = {
   inbox: "Inbox",
@@ -41,8 +43,247 @@ var STATUS_FOLDERS = {
 var ID_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 // src/settings.ts
+var import_obsidian2 = require("obsidian");
+
+// src/services/DaemonClient.ts
 var import_obsidian = require("obsidian");
-var AioSettingTab = class extends import_obsidian.PluginSettingTab {
+var DaemonUnavailableError = class extends Error {
+  constructor(message = "Daemon is not available") {
+    super(message);
+    this.name = "DaemonUnavailableError";
+  }
+};
+var DaemonApiError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "DaemonApiError";
+  }
+};
+var DaemonClient = class {
+  constructor(settings) {
+    this.settings = settings;
+    this._isConnected = false;
+    this._lastHealthCheck = null;
+    this.baseUrl = settings.daemonUrl;
+  }
+  /**
+   * Whether the daemon is currently connected.
+   */
+  get isConnected() {
+    return this._isConnected;
+  }
+  /**
+   * Last health check response.
+   */
+  get lastHealthCheck() {
+    return this._lastHealthCheck;
+  }
+  /**
+   * Update settings (e.g., when daemon URL changes).
+   */
+  updateSettings(settings) {
+    this.baseUrl = settings.daemonUrl;
+  }
+  /**
+   * Make an HTTP request to the daemon.
+   */
+  async request(method, path, body) {
+    const url = `${this.baseUrl}/api/v1${path}`;
+    const params = {
+      url,
+      method,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    };
+    if (body) {
+      params.body = JSON.stringify(body);
+    }
+    try {
+      const response = await (0, import_obsidian.requestUrl)(params);
+      const data = response.json;
+      if (!data.ok) {
+        throw new DaemonApiError(data.error.code, data.error.message);
+      }
+      return data.data;
+    } catch (e) {
+      if (e instanceof DaemonApiError) {
+        throw e;
+      }
+      this._isConnected = false;
+      throw new DaemonUnavailableError(
+        e instanceof Error ? e.message : "Failed to connect to daemon"
+      );
+    }
+  }
+  /**
+   * Check if daemon is available.
+   */
+  async checkHealth() {
+    try {
+      const health = await this.request("GET", "/health");
+      this._isConnected = true;
+      this._lastHealthCheck = health;
+      return health;
+    } catch (e) {
+      this._isConnected = false;
+      this._lastHealthCheck = null;
+      throw e;
+    }
+  }
+  /**
+   * Test connection to daemon.
+   * Returns true if connected, false otherwise.
+   */
+  async testConnection() {
+    try {
+      await this.checkHealth();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  // Task operations
+  /**
+   * List tasks with optional filtering.
+   */
+  async listTasks(status) {
+    const path = status ? `/tasks?status=${status}` : "/tasks";
+    const result = await this.request("GET", path);
+    return result.tasks.map(this.daemonTaskToTask.bind(this));
+  }
+  /**
+   * Get a single task by ID.
+   */
+  async getTask(id) {
+    try {
+      const result = await this.request("GET", `/tasks/${id}`);
+      return this.daemonTaskToTask(result.task);
+    } catch (e) {
+      if (e instanceof DaemonApiError && e.code === "TASK_NOT_FOUND") {
+        return null;
+      }
+      throw e;
+    }
+  }
+  /**
+   * Create a new task.
+   */
+  async createTask(title, options = {}) {
+    const body = { title };
+    if (options.due)
+      body.due = options.due;
+    if (options.project)
+      body.project = options.project;
+    if (options.status)
+      body.status = options.status;
+    if (options.tags)
+      body.tags = options.tags;
+    if (options.timeEstimate)
+      body.time_estimate = options.timeEstimate;
+    const result = await this.request("POST", "/tasks", body);
+    return this.daemonTaskToTask(result.task);
+  }
+  /**
+   * Complete a task.
+   */
+  async completeTask(id) {
+    const result = await this.request("POST", `/tasks/${id}/complete`);
+    return this.daemonTaskToTask(result.task);
+  }
+  /**
+   * Start a task (move to Next).
+   */
+  async startTask(id) {
+    const result = await this.request("POST", `/tasks/${id}/start`);
+    return this.daemonTaskToTask(result.task);
+  }
+  /**
+   * Defer a task (move to Someday).
+   */
+  async deferTask(id) {
+    const result = await this.request("POST", `/tasks/${id}/defer`);
+    return this.daemonTaskToTask(result.task);
+  }
+  /**
+   * Delegate a task to a person (move to Waiting).
+   */
+  async delegateTask(id, person) {
+    const result = await this.request(
+      "POST",
+      `/tasks/${id}/delegate`,
+      { person }
+    );
+    return this.daemonTaskToTask(result.task);
+  }
+  // Project operations
+  /**
+   * List all projects.
+   */
+  async listProjects(status) {
+    const path = status ? `/projects?status=${status}` : "/projects";
+    const result = await this.request("GET", path);
+    return result.projects;
+  }
+  /**
+   * Get project names for dropdown.
+   */
+  async getProjectNames() {
+    const projects = await this.listProjects("active");
+    return projects.map((p) => p.title);
+  }
+  // People operations
+  /**
+   * List all people.
+   */
+  async listPeople() {
+    const result = await this.request("GET", "/people");
+    return result.people;
+  }
+  /**
+   * Get people names for dropdown.
+   */
+  async getPeopleNames() {
+    const people = await this.listPeople();
+    return people.map((p) => p.name);
+  }
+  // Dashboard
+  /**
+   * Get dashboard content.
+   */
+  async getDashboard(date) {
+    const path = date ? `/dashboard?date=${date}` : "/dashboard";
+    return this.request("GET", path);
+  }
+  /**
+   * Convert a daemon task response to a Task object.
+   */
+  daemonTaskToTask(dt) {
+    return {
+      id: dt.id,
+      type: "task",
+      status: dt.status,
+      title: dt.title,
+      due: dt.due,
+      project: dt.project,
+      assignedTo: dt.assigned_to,
+      waitingOn: dt.waiting_on,
+      blockedBy: [],
+      blocks: [],
+      tags: dt.tags || [],
+      timeEstimate: dt.time_estimate,
+      created: dt.created,
+      updated: dt.updated,
+      completed: dt.completed,
+      content: "",
+      path: ""
+    };
+  }
+};
+
+// src/settings.ts
+var AioSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -52,24 +293,68 @@ var AioSettingTab = class extends import_obsidian.PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "AIorgianization Settings" });
     containerEl.createEl("h3", { text: "General" });
-    new import_obsidian.Setting(containerEl).setName("AIO Folder Path").setDesc("Path to the AIO folder relative to vault root. Change this if you move your vault or want to use a different folder structure.").addText((text) => text.setPlaceholder("AIO").setValue(this.plugin.settings.aioFolderPath).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("AIO Folder Path").setDesc("Path to the AIO folder relative to vault root. Change this if you move your vault or want to use a different folder structure.").addText((text) => text.setPlaceholder("AIO").setValue(this.plugin.settings.aioFolderPath).onChange(async (value) => {
       this.plugin.settings.aioFolderPath = value || "AIO";
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Default Status").setDesc("Default status for new tasks created via Quick Add").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("scheduled", "Scheduled").addOption("someday", "Someday").setValue(this.plugin.settings.defaultStatus).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("Default Status").setDesc("Default status for new tasks created via Quick Add").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("scheduled", "Scheduled").addOption("someday", "Someday").setValue(this.plugin.settings.defaultStatus).onChange(async (value) => {
       this.plugin.settings.defaultStatus = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Date Format").setDesc("Format for displaying dates (uses moment.js format)").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("Date Format").setDesc("Format for displaying dates (uses moment.js format)").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat).onChange(async (value) => {
       this.plugin.settings.dateFormat = value || "YYYY-MM-DD";
       await this.plugin.saveSettings();
+    }));
+    containerEl.createEl("h3", { text: "Daemon Connection" });
+    containerEl.createEl("p", {
+      text: "The AIO daemon provides fast task operations and synchronization across CLI, Cursor, and Obsidian. When connected, all changes go through the daemon for consistency.",
+      cls: "setting-item-description"
+    });
+    new import_obsidian2.Setting(containerEl).setName("Enable Daemon Mode").setDesc("Use the AIO daemon for task operations. When disabled or daemon unavailable, falls back to direct file access (read-only for mutations).").addToggle((toggle) => toggle.setValue(this.plugin.settings.useDaemon).onChange(async (value) => {
+      this.plugin.settings.useDaemon = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Daemon URL").setDesc("URL of the AIO daemon HTTP API").addText((text) => text.setPlaceholder("http://localhost:7432").setValue(this.plugin.settings.daemonUrl).onChange(async (value) => {
+      this.plugin.settings.daemonUrl = value || "http://localhost:7432";
+      await this.plugin.saveSettings();
+    }));
+    const statusSetting = new import_obsidian2.Setting(containerEl).setName("Connection Status").setDesc("Test the connection to the AIO daemon");
+    const statusEl = statusSetting.descEl.createEl("span", { cls: "aio-connection-status" });
+    this.updateConnectionStatus(statusEl);
+    statusSetting.addButton((button) => button.setButtonText("Test Connection").onClick(async () => {
+      button.setButtonText("Testing...");
+      button.setDisabled(true);
+      try {
+        const client = new DaemonClient(this.plugin.settings);
+        const connected = await client.testConnection();
+        if (connected) {
+          const health = client.lastHealthCheck;
+          new import_obsidian2.Notice(`Connected to AIO daemon v${(health == null ? void 0 : health.version) || "unknown"}`);
+          statusEl.setText(`Connected (${(health == null ? void 0 : health.cache.task_count) || 0} tasks)`);
+          statusEl.removeClass("aio-status-error");
+          statusEl.addClass("aio-status-ok");
+        } else {
+          new import_obsidian2.Notice("Failed to connect to daemon");
+          statusEl.setText("Not connected");
+          statusEl.removeClass("aio-status-ok");
+          statusEl.addClass("aio-status-error");
+        }
+      } catch (e) {
+        new import_obsidian2.Notice(`Connection error: ${e instanceof Error ? e.message : "Unknown error"}`);
+        statusEl.setText("Error");
+        statusEl.removeClass("aio-status-ok");
+        statusEl.addClass("aio-status-error");
+      } finally {
+        button.setButtonText("Test Connection");
+        button.setDisabled(false);
+      }
     }));
     containerEl.createEl("h3", { text: "Hotkeys" });
     containerEl.createEl("p", {
       text: "Configure keyboard shortcuts for AIO commands. Click the button below to open Obsidian's hotkey settings filtered to AIO commands.",
       cls: "setting-item-description"
     });
-    new import_obsidian.Setting(containerEl).setName("Configure Hotkeys").setDesc("Open Obsidian hotkey settings for AIO commands").addButton((button) => button.setButtonText("Open Hotkey Settings").onClick(() => {
+    new import_obsidian2.Setting(containerEl).setName("Configure Hotkeys").setDesc("Open Obsidian hotkey settings for AIO commands").addButton((button) => button.setButtonText("Open Hotkey Settings").onClick(() => {
       this.app.setting.open();
       this.app.setting.openTabById("hotkeys");
       setTimeout(() => {
@@ -94,7 +379,7 @@ var AioSettingTab = class extends import_obsidian.PluginSettingTab {
     ];
     for (const cmd of commands) {
       const hotkey = this.getHotkeyForCommand(`aio:${cmd.id}`);
-      new import_obsidian.Setting(commandList).setName(cmd.name).setDesc(cmd.desc).addExtraButton((button) => button.setIcon("keyboard-glyph").setTooltip(hotkey ? `Current: ${hotkey}` : "No hotkey assigned").onClick(() => {
+      new import_obsidian2.Setting(commandList).setName(cmd.name).setDesc(cmd.desc).addExtraButton((button) => button.setIcon("keyboard-glyph").setTooltip(hotkey ? `Current: ${hotkey}` : "No hotkey assigned").onClick(() => {
         this.app.setting.open();
         this.app.setting.openTabById("hotkeys");
         setTimeout(() => {
@@ -118,7 +403,44 @@ var AioSettingTab = class extends import_obsidian.PluginSettingTab {
       .aio-command-list .setting-item-name {
         font-weight: 500;
       }
+      .aio-connection-status {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        background: var(--background-modifier-border);
+      }
+      .aio-status-ok {
+        background: var(--background-modifier-success);
+        color: var(--text-success);
+      }
+      .aio-status-error {
+        background: var(--background-modifier-error);
+        color: var(--text-error);
+      }
     `;
+  }
+  /**
+   * Update the connection status display.
+   */
+  async updateConnectionStatus(statusEl) {
+    if (!this.plugin.settings.useDaemon) {
+      statusEl.setText("Daemon mode disabled");
+      statusEl.removeClass("aio-status-ok", "aio-status-error");
+      return;
+    }
+    const connected = this.plugin.taskService.isDaemonConnected;
+    if (connected) {
+      const health = this.plugin.taskService.daemon.lastHealthCheck;
+      statusEl.setText(`Connected (${(health == null ? void 0 : health.cache.task_count) || 0} tasks)`);
+      statusEl.removeClass("aio-status-error");
+      statusEl.addClass("aio-status-ok");
+    } else {
+      statusEl.setText("Not connected");
+      statusEl.removeClass("aio-status-ok");
+      statusEl.addClass("aio-status-error");
+    }
   }
   /**
    * Get the hotkey string for a command ID.
@@ -146,7 +468,7 @@ var AioSettingTab = class extends import_obsidian.PluginSettingTab {
 };
 
 // src/services/VaultService.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var VaultService = class {
   constructor(app, settings) {
     this.app = app;
@@ -162,55 +484,55 @@ var VaultService = class {
    * Get the Tasks folder path.
    */
   getTasksPath() {
-    return (0, import_obsidian2.normalizePath)(`${this.getAioPath()}/Tasks`);
+    return (0, import_obsidian3.normalizePath)(`${this.getAioPath()}/Tasks`);
   }
   /**
    * Get the folder path for a specific task status.
    */
   getStatusPath(status) {
     const folder = STATUS_FOLDERS[status];
-    return (0, import_obsidian2.normalizePath)(`${this.getTasksPath()}/${folder}`);
+    return (0, import_obsidian3.normalizePath)(`${this.getTasksPath()}/${folder}`);
   }
   /**
    * Get the completed tasks folder path for a specific year/month.
    */
   getCompletedPath(year, month) {
     const monthStr = month.toString().padStart(2, "0");
-    return (0, import_obsidian2.normalizePath)(`${this.getTasksPath()}/Completed/${year}/${monthStr}`);
+    return (0, import_obsidian3.normalizePath)(`${this.getTasksPath()}/Completed/${year}/${monthStr}`);
   }
   /**
    * Get the Projects folder path.
    */
   getProjectsPath() {
-    return (0, import_obsidian2.normalizePath)(`${this.getAioPath()}/Projects`);
+    return (0, import_obsidian3.normalizePath)(`${this.getAioPath()}/Projects`);
   }
   /**
    * Get the People folder path.
    */
   getPeoplePath() {
-    return (0, import_obsidian2.normalizePath)(`${this.getAioPath()}/People`);
+    return (0, import_obsidian3.normalizePath)(`${this.getAioPath()}/People`);
   }
   /**
    * Get the Dashboard folder path.
    */
   getDashboardPath() {
-    return (0, import_obsidian2.normalizePath)(`${this.getAioPath()}/Dashboard`);
+    return (0, import_obsidian3.normalizePath)(`${this.getAioPath()}/Dashboard`);
   }
   /**
    * Get the Archive folder path.
    */
   getArchivePath() {
-    return (0, import_obsidian2.normalizePath)(`${this.getAioPath()}/Archive`);
+    return (0, import_obsidian3.normalizePath)(`${this.getAioPath()}/Archive`);
   }
   /**
    * Ensure a folder exists, creating it if necessary.
    */
   async ensureFolderExists(path) {
-    const normalizedPath = (0, import_obsidian2.normalizePath)(path);
+    const normalizedPath = (0, import_obsidian3.normalizePath)(path);
     const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
     if (!folder) {
       await this.app.vault.createFolder(normalizedPath);
-    } else if (!(folder instanceof import_obsidian2.TFolder)) {
+    } else if (!(folder instanceof import_obsidian3.TFolder)) {
       throw new Error(`Path exists but is not a folder: ${normalizedPath}`);
     }
   }
@@ -226,7 +548,7 @@ var VaultService = class {
     await this.ensureFolderExists(this.getArchivePath());
     for (const status of Object.keys(STATUS_FOLDERS)) {
       if (status === "completed") {
-        await this.ensureFolderExists((0, import_obsidian2.normalizePath)(`${this.getTasksPath()}/Completed`));
+        await this.ensureFolderExists((0, import_obsidian3.normalizePath)(`${this.getTasksPath()}/Completed`));
       } else {
         await this.ensureFolderExists(this.getStatusPath(status));
       }
@@ -252,7 +574,7 @@ var VaultService = class {
   async getProjects() {
     const projectsPath = this.getProjectsPath();
     const folder = this.app.vault.getAbstractFileByPath(projectsPath);
-    if (!(folder instanceof import_obsidian2.TFolder)) {
+    if (!(folder instanceof import_obsidian3.TFolder)) {
       return [];
     }
     return folder.children.filter((f) => f.name.endsWith(".md")).map((f) => f.name.replace(".md", ""));
@@ -263,7 +585,7 @@ var VaultService = class {
   async getPeople() {
     const peoplePath = this.getPeoplePath();
     const folder = this.app.vault.getAbstractFileByPath(peoplePath);
-    if (!(folder instanceof import_obsidian2.TFolder)) {
+    if (!(folder instanceof import_obsidian3.TFolder)) {
       return [];
     }
     return folder.children.filter((f) => f.name.endsWith(".md")).map((f) => f.name.replace(".md", ""));
@@ -271,12 +593,44 @@ var VaultService = class {
 };
 
 // src/services/TaskService.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var TaskService = class {
   constructor(app, settings) {
     this.app = app;
     this.settings = settings;
     this.vaultService = new VaultService(app, settings);
+    this.daemonClient = new DaemonClient(settings);
+    this._useDaemon = settings.useDaemon;
+  }
+  /**
+   * Whether daemon mode is enabled and connected.
+   */
+  get isDaemonConnected() {
+    return this._useDaemon && this.daemonClient.isConnected;
+  }
+  /**
+   * Get the daemon client (for status checks).
+   */
+  get daemon() {
+    return this.daemonClient;
+  }
+  /**
+   * Update settings and reconnect if needed.
+   */
+  updateSettings(settings) {
+    this.settings = settings;
+    this._useDaemon = settings.useDaemon;
+    this.daemonClient.updateSettings(settings);
+    this.vaultService = new VaultService(this.app, settings);
+  }
+  /**
+   * Check daemon connection and update status.
+   */
+  async checkDaemonConnection() {
+    if (!this._useDaemon) {
+      return false;
+    }
+    return this.daemonClient.testConnection();
   }
   /**
    * Generate a unique 4-character task ID.
@@ -310,8 +664,22 @@ var TaskService = class {
    * List all tasks, optionally filtered by status.
    */
   async listTasks(status) {
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.listTasks(status);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    return this.listTasksFromFiles(status);
+  }
+  /**
+   * List tasks from files (fallback mode).
+   */
+  async listTasksFromFiles(status) {
     const tasks = [];
-    const tasksPath = this.vaultService.getTasksPath();
     const statuses = status ? [status] : ["inbox", "next", "waiting", "scheduled", "someday", "completed"];
     for (const s of statuses) {
       const folderPath = this.vaultService.getStatusPath(s);
@@ -326,7 +694,7 @@ var TaskService = class {
   async getTasksFromFolder(folderPath) {
     const tasks = [];
     const folder = this.app.vault.getAbstractFileByPath(folderPath);
-    if (!(folder instanceof import_obsidian3.TFolder)) {
+    if (!(folder instanceof import_obsidian4.TFolder)) {
       return tasks;
     }
     const files = this.getAllMarkdownFiles(folder);
@@ -348,9 +716,9 @@ var TaskService = class {
   getAllMarkdownFiles(folder) {
     const files = [];
     for (const child of folder.children) {
-      if (child instanceof import_obsidian3.TFile && child.extension === "md") {
+      if (child instanceof import_obsidian4.TFile && child.extension === "md") {
         files.push(child);
-      } else if (child instanceof import_obsidian3.TFolder) {
+      } else if (child instanceof import_obsidian4.TFolder) {
         files.push(...this.getAllMarkdownFiles(child));
       }
     }
@@ -478,13 +846,37 @@ var TaskService = class {
    * Get a task by ID.
    */
   async getTask(id) {
-    const tasks = await this.listTasks();
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getTask(id);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    const tasks = await this.listTasksFromFiles();
     return tasks.find((t) => t.id.toUpperCase() === id.toUpperCase()) || null;
   }
   /**
    * Create a new task.
    */
   async createTask(title, options = {}) {
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.createTask(title, options);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    return this.createTaskInFiles(title, options);
+  }
+  /**
+   * Create a task directly in files (fallback mode).
+   */
+  async createTaskInFiles(title, options = {}) {
     const id = await this.generateUniqueId();
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const status = options.status || this.settings.defaultStatus;
@@ -510,7 +902,7 @@ var TaskService = class {
     const folderPath = this.vaultService.getStatusPath(status);
     await this.vaultService.ensureFolderExists(folderPath);
     const filename = this.vaultService.generateTaskFilename(title);
-    task.path = (0, import_obsidian3.normalizePath)(`${folderPath}/${filename}`);
+    task.path = (0, import_obsidian4.normalizePath)(`${folderPath}/${filename}`);
     const content = this.serializeTask(task);
     await this.app.vault.create(task.path, content);
     return task;
@@ -522,7 +914,7 @@ var TaskService = class {
     task.updated = (/* @__PURE__ */ new Date()).toISOString();
     const content = this.serializeTask(task);
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (!(file instanceof import_obsidian3.TFile)) {
+    if (!(file instanceof import_obsidian4.TFile)) {
       throw new Error(`Task file not found: ${task.path}`);
     }
     await this.app.vault.modify(file, content);
@@ -531,6 +923,22 @@ var TaskService = class {
    * Mark a task as completed.
    */
   async completeTask(id) {
+    if (this._useDaemon) {
+      try {
+        await this.daemonClient.completeTask(id);
+        return;
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    await this.completeTaskInFiles(id);
+  }
+  /**
+   * Complete a task directly in files (fallback mode).
+   */
+  async completeTaskInFiles(id) {
     const task = await this.getTask(id);
     if (!task) {
       throw new Error(`Task not found: ${id}`);
@@ -545,10 +953,10 @@ var TaskService = class {
     await this.vaultService.ensureFolderExists(completedPath);
     const oldPath = task.path;
     const filename = oldPath.split("/").pop() || "";
-    task.path = (0, import_obsidian3.normalizePath)(`${completedPath}/${filename}`);
+    task.path = (0, import_obsidian4.normalizePath)(`${completedPath}/${filename}`);
     const content = this.serializeTask(task);
     const file = this.app.vault.getAbstractFileByPath(oldPath);
-    if (!(file instanceof import_obsidian3.TFile)) {
+    if (!(file instanceof import_obsidian4.TFile)) {
       throw new Error(`Task file not found: ${oldPath}`);
     }
     await this.app.vault.modify(file, content);
@@ -558,24 +966,47 @@ var TaskService = class {
    * Change a task's status.
    */
   async changeStatus(id, newStatus) {
+    if (this._useDaemon) {
+      try {
+        if (newStatus === "completed") {
+          await this.daemonClient.completeTask(id);
+        } else if (newStatus === "next") {
+          await this.daemonClient.startTask(id);
+        } else if (newStatus === "someday") {
+          await this.daemonClient.deferTask(id);
+        } else {
+          throw new DaemonUnavailableError("Status not supported via daemon");
+        }
+        return;
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    await this.changeStatusInFiles(id, newStatus);
+  }
+  /**
+   * Change task status directly in files (fallback mode).
+   */
+  async changeStatusInFiles(id, newStatus) {
     const task = await this.getTask(id);
     if (!task) {
       throw new Error(`Task not found: ${id}`);
     }
     if (newStatus === "completed") {
-      return this.completeTask(id);
+      return this.completeTaskInFiles(id);
     }
-    const oldStatus = task.status;
     task.status = newStatus;
     task.updated = (/* @__PURE__ */ new Date()).toISOString();
     const newFolderPath = this.vaultService.getStatusPath(newStatus);
     await this.vaultService.ensureFolderExists(newFolderPath);
     const oldPath = task.path;
     const filename = oldPath.split("/").pop() || "";
-    task.path = (0, import_obsidian3.normalizePath)(`${newFolderPath}/${filename}`);
+    task.path = (0, import_obsidian4.normalizePath)(`${newFolderPath}/${filename}`);
     const content = this.serializeTask(task);
     const file = this.app.vault.getAbstractFileByPath(oldPath);
-    if (!(file instanceof import_obsidian3.TFile)) {
+    if (!(file instanceof import_obsidian4.TFile)) {
       throw new Error(`Task file not found: ${oldPath}`);
     }
     await this.app.vault.modify(file, content);
@@ -666,12 +1097,42 @@ ${task.content}`;
     }
     return String(value);
   }
+  /**
+   * Get project names for dropdowns.
+   */
+  async getProjectNames() {
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getProjectNames();
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    return this.vaultService.getProjects();
+  }
+  /**
+   * Get people names for dropdowns.
+   */
+  async getPeopleNames() {
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getPeopleNames();
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+      }
+    }
+    return this.vaultService.getPeople();
+  }
 };
 
 // src/views/TaskListView.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 var TASK_LIST_VIEW_TYPE = "aio-task-list";
-var TaskListView = class extends import_obsidian4.ItemView {
+var TaskListView = class extends import_obsidian5.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.currentStatus = "all";
@@ -699,7 +1160,7 @@ var TaskListView = class extends import_obsidian4.ItemView {
       el.createEl("div", { cls: "aio-task-list-header" }, (header) => {
         header.createEl("h4", { text: "Tasks", cls: "aio-task-list-title" });
         const addBtn = header.createEl("button", { cls: "aio-add-btn", attr: { "aria-label": "Add task" } });
-        (0, import_obsidian4.setIcon)(addBtn, "plus");
+        (0, import_obsidian5.setIcon)(addBtn, "plus");
         addBtn.addEventListener("click", () => {
           this.plugin.openQuickAddModal();
         });
@@ -803,7 +1264,7 @@ var TaskListView = class extends import_obsidian4.ItemView {
     const actionsEl = taskEl.createEl("div", { cls: "aio-task-actions" });
     if (task.status !== "next" && task.status !== "completed") {
       const startBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Start" } });
-      (0, import_obsidian4.setIcon)(startBtn, "play");
+      (0, import_obsidian5.setIcon)(startBtn, "play");
       startBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         await this.plugin.taskService.changeStatus(task.id, "next");
@@ -812,7 +1273,7 @@ var TaskListView = class extends import_obsidian4.ItemView {
     }
     if (task.status !== "someday" && task.status !== "completed") {
       const deferBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Defer" } });
-      (0, import_obsidian4.setIcon)(deferBtn, "clock");
+      (0, import_obsidian5.setIcon)(deferBtn, "clock");
       deferBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         await this.plugin.taskService.changeStatus(task.id, "someday");
@@ -820,7 +1281,7 @@ var TaskListView = class extends import_obsidian4.ItemView {
       });
     }
     const editBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Edit" } });
-    (0, import_obsidian4.setIcon)(editBtn, "pencil");
+    (0, import_obsidian5.setIcon)(editBtn, "pencil");
     editBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.plugin.openTaskEditModal(task);
@@ -829,9 +1290,9 @@ var TaskListView = class extends import_obsidian4.ItemView {
 };
 
 // src/views/InboxView.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var INBOX_VIEW_TYPE = "aio-inbox";
-var InboxView = class extends import_obsidian5.ItemView {
+var InboxView = class extends import_obsidian6.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.inboxTasks = [];
@@ -923,27 +1384,27 @@ var InboxView = class extends import_obsidian5.ItemView {
     });
     container.createEl("div", { cls: "aio-inbox-actions" }, (actions) => {
       const startBtn = actions.createEl("button", { cls: "aio-inbox-action mod-cta" });
-      startBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian5.setIcon)(span, "play"));
+      startBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "play"));
       startBtn.createEl("span", { text: "Start" });
       startBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Next" });
       startBtn.addEventListener("click", () => this.handleAction("next"));
       const deferBtn = actions.createEl("button", { cls: "aio-inbox-action" });
-      deferBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian5.setIcon)(span, "clock"));
+      deferBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "clock"));
       deferBtn.createEl("span", { text: "Defer" });
       deferBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Someday" });
       deferBtn.addEventListener("click", () => this.handleAction("someday"));
       const waitBtn = actions.createEl("button", { cls: "aio-inbox-action" });
-      waitBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian5.setIcon)(span, "user"));
+      waitBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "user"));
       waitBtn.createEl("span", { text: "Wait" });
       waitBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Waiting" });
       waitBtn.addEventListener("click", () => this.handleAction("waiting"));
       const scheduleBtn = actions.createEl("button", { cls: "aio-inbox-action" });
-      scheduleBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian5.setIcon)(span, "calendar"));
+      scheduleBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "calendar"));
       scheduleBtn.createEl("span", { text: "Schedule" });
       scheduleBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Scheduled" });
       scheduleBtn.addEventListener("click", () => this.handleAction("scheduled"));
       const completeBtn = actions.createEl("button", { cls: "aio-inbox-action" });
-      completeBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian5.setIcon)(span, "check"));
+      completeBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "check"));
       completeBtn.createEl("span", { text: "Done" });
       completeBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Completed" });
       completeBtn.addEventListener("click", () => this.handleAction("completed"));
@@ -1007,7 +1468,7 @@ var InboxView = class extends import_obsidian5.ItemView {
 };
 
 // src/modals/QuickAddModal.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/utils/dates.ts
 var InvalidDateError = class extends Error {
@@ -1067,7 +1528,10 @@ function parseDate(dateStr) {
     const targetDay = days.indexOf(nextDayMatch[2]);
     const currentDay = today.getDay();
     let daysAhead = targetDay - currentDay;
-    if (daysAhead <= 0 || nextDayMatch[1]) {
+    if (daysAhead <= 0) {
+      daysAhead += 7;
+    }
+    if (nextDayMatch[1]) {
       daysAhead += 7;
     }
     const targetDate = new Date(today);
@@ -1086,7 +1550,10 @@ function parseDate(dateStr) {
   throw new InvalidDateError(`Could not parse date: ${dateStr}`);
 }
 function formatIsoDate(d) {
-  return d.toISOString().split("T")[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 function getEndOfWeek() {
   const today = /* @__PURE__ */ new Date();
@@ -1109,7 +1576,7 @@ function getEndOfYear() {
 }
 
 // src/modals/QuickAddModal.ts
-var QuickAddModal = class extends import_obsidian6.Modal {
+var QuickAddModal = class extends import_obsidian7.Modal {
   constructor(app, plugin, onSubmit) {
     super(app);
     this.title = "";
@@ -1123,7 +1590,7 @@ var QuickAddModal = class extends import_obsidian6.Modal {
     contentEl.empty();
     contentEl.addClass("aio-quick-add-modal");
     contentEl.createEl("h2", { text: "Quick Add Task" });
-    new import_obsidian6.Setting(contentEl).setName("Title").setDesc("Task title (required)").addText((text) => {
+    new import_obsidian7.Setting(contentEl).setName("Title").setDesc("Task title (required)").addText((text) => {
       text.setPlaceholder("What needs to be done?").setValue(this.title).onChange((value) => {
         this.title = value;
       });
@@ -1135,10 +1602,10 @@ var QuickAddModal = class extends import_obsidian6.Modal {
       });
       setTimeout(() => text.inputEl.focus(), 10);
     });
-    new import_obsidian6.Setting(contentEl).setName("Due Date").setDesc("Optional: YYYY-MM-DD or natural language (tomorrow, next friday)").addText((text) => text.setPlaceholder("tomorrow").setValue(this.dueDate).onChange((value) => {
+    new import_obsidian7.Setting(contentEl).setName("Due Date").setDesc("Optional: YYYY-MM-DD or natural language (tomorrow, next friday)").addText((text) => text.setPlaceholder("tomorrow").setValue(this.dueDate).onChange((value) => {
       this.dueDate = value;
     }));
-    new import_obsidian6.Setting(contentEl).setName("Project").setDesc("Optional: Link to a project").addDropdown(async (dropdown) => {
+    new import_obsidian7.Setting(contentEl).setName("Project").setDesc("Optional: Link to a project").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const projects = await this.plugin.vaultService.getProjects();
       for (const project of projects) {
@@ -1175,7 +1642,7 @@ var QuickAddModal = class extends import_obsidian6.Modal {
           options.due = formatIsoDate(parsed);
         } catch (e) {
           if (e instanceof InvalidDateError) {
-            new import_obsidian6.Notice(`Invalid date: ${this.dueDate}`);
+            new import_obsidian7.Notice(`Invalid date: ${this.dueDate}`);
             return;
           }
           throw e;
@@ -1198,8 +1665,8 @@ var QuickAddModal = class extends import_obsidian6.Modal {
 };
 
 // src/modals/TaskEditModal.ts
-var import_obsidian7 = require("obsidian");
-var TaskEditModal = class extends import_obsidian7.Modal {
+var import_obsidian8 = require("obsidian");
+var TaskEditModal = class extends import_obsidian8.Modal {
   constructor(app, plugin, task, onSubmit) {
     var _a, _b;
     super(app);
@@ -1221,16 +1688,16 @@ var TaskEditModal = class extends import_obsidian7.Modal {
     contentEl.addClass("aio-task-edit-modal");
     contentEl.createEl("h2", { text: "Edit Task" });
     contentEl.createEl("div", { cls: "aio-task-id-display", text: `ID: ${this.task.id}` });
-    new import_obsidian7.Setting(contentEl).setName("Title").addText((text) => text.setValue(this.title).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Title").addText((text) => text.setValue(this.title).onChange((value) => {
       this.title = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Status").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("waiting", "Waiting").addOption("scheduled", "Scheduled").addOption("someday", "Someday").addOption("completed", "Completed").setValue(this.status).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Status").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("waiting", "Waiting").addOption("scheduled", "Scheduled").addOption("someday", "Someday").addOption("completed", "Completed").setValue(this.status).onChange((value) => {
       this.status = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Due Date").setDesc("YYYY-MM-DD format").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.dueDate).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Due Date").setDesc("YYYY-MM-DD format").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.dueDate).onChange((value) => {
       this.dueDate = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Project").addDropdown(async (dropdown) => {
+    new import_obsidian8.Setting(contentEl).setName("Project").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const projects = await this.plugin.vaultService.getProjects();
       for (const project of projects) {
@@ -1241,7 +1708,7 @@ var TaskEditModal = class extends import_obsidian7.Modal {
         this.project = value;
       });
     });
-    new import_obsidian7.Setting(contentEl).setName("Assigned To").addDropdown(async (dropdown) => {
+    new import_obsidian8.Setting(contentEl).setName("Assigned To").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const people = await this.plugin.vaultService.getPeople();
       for (const person of people) {
@@ -1252,13 +1719,13 @@ var TaskEditModal = class extends import_obsidian7.Modal {
         this.assignedTo = value;
       });
     });
-    new import_obsidian7.Setting(contentEl).setName("Waiting On").setDesc("Person or thing you are waiting for").addText((text) => text.setValue(this.waitingOn).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Waiting On").setDesc("Person or thing you are waiting for").addText((text) => text.setValue(this.waitingOn).onChange((value) => {
       this.waitingOn = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Time Estimate").setDesc("e.g., 30m, 2h, 1d").addText((text) => text.setPlaceholder("2h").setValue(this.timeEstimate).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Time Estimate").setDesc("e.g., 30m, 2h, 1d").addText((text) => text.setPlaceholder("2h").setValue(this.timeEstimate).onChange((value) => {
       this.timeEstimate = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Tags").setDesc("Comma-separated list").addText((text) => text.setPlaceholder("backend, urgent").setValue(this.tags).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Tags").setDesc("Comma-separated list").addText((text) => text.setPlaceholder("backend, urgent").setValue(this.tags).onChange((value) => {
       this.tags = value;
     }));
     const buttonContainer = contentEl.createEl("div", { cls: "aio-modal-buttons" });
@@ -1314,11 +1781,21 @@ var TaskEditModal = class extends import_obsidian7.Modal {
 };
 
 // src/main.ts
-var AioPlugin = class extends import_obsidian8.Plugin {
+var HEALTH_CHECK_INTERVAL = 3e4;
+var AioPlugin = class extends import_obsidian9.Plugin {
+  constructor() {
+    super(...arguments);
+    this.statusBarItem = null;
+    this.healthCheckInterval = null;
+  }
   async onload() {
     await this.loadSettings();
     this.vaultService = new VaultService(this.app, this.settings);
     this.taskService = new TaskService(this.app, this.settings);
+    this.statusBarItem = this.addStatusBarItem();
+    this.updateStatusBar(false);
+    await this.checkDaemonConnection();
+    this.startHealthChecks();
     await this.vaultService.ensureAioStructure();
     this.registerView(
       TASK_LIST_VIEW_TYPE,
@@ -1432,6 +1909,70 @@ var AioPlugin = class extends import_obsidian8.Plugin {
     this.addSettingTab(new AioSettingTab(this.app, this));
   }
   onunload() {
+    this.stopHealthChecks();
+  }
+  /**
+   * Check daemon connection and update status bar.
+   */
+  async checkDaemonConnection() {
+    if (!this.settings.useDaemon) {
+      this.updateStatusBar(false, "disabled");
+      return;
+    }
+    const connected = await this.taskService.checkDaemonConnection();
+    this.updateStatusBar(connected);
+    if (connected) {
+      const health = this.taskService.daemon.lastHealthCheck;
+      if (health) {
+        console.log(`AIO: Connected to daemon v${health.version}, ${health.cache.task_count} tasks cached`);
+      }
+    }
+  }
+  /**
+   * Start periodic health checks.
+   */
+  startHealthChecks() {
+    if (this.healthCheckInterval) {
+      return;
+    }
+    this.healthCheckInterval = window.setInterval(async () => {
+      await this.checkDaemonConnection();
+    }, HEALTH_CHECK_INTERVAL);
+    this.registerInterval(this.healthCheckInterval);
+  }
+  /**
+   * Stop periodic health checks.
+   */
+  stopHealthChecks() {
+    if (this.healthCheckInterval) {
+      window.clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+  /**
+   * Update the status bar with daemon connection status.
+   */
+  updateStatusBar(connected, mode) {
+    if (!this.statusBarItem) {
+      return;
+    }
+    if (mode === "disabled") {
+      this.statusBarItem.setText("AIO: Local");
+      this.statusBarItem.setAttribute("title", "Daemon mode disabled - using local files");
+      this.statusBarItem.removeClass("aio-connected", "aio-disconnected");
+      return;
+    }
+    if (connected) {
+      this.statusBarItem.setText("AIO: Connected");
+      this.statusBarItem.setAttribute("title", "Connected to AIO daemon");
+      this.statusBarItem.addClass("aio-connected");
+      this.statusBarItem.removeClass("aio-disconnected");
+    } else {
+      this.statusBarItem.setText("AIO: Offline");
+      this.statusBarItem.setAttribute("title", "Daemon not available - read-only mode");
+      this.statusBarItem.addClass("aio-disconnected");
+      this.statusBarItem.removeClass("aio-connected");
+    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -1439,7 +1980,8 @@ var AioPlugin = class extends import_obsidian8.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.vaultService = new VaultService(this.app, this.settings);
-    this.taskService = new TaskService(this.app, this.settings);
+    this.taskService.updateSettings(this.settings);
+    await this.checkDaemonConnection();
   }
   /**
    * Activate a view in the right sidebar.

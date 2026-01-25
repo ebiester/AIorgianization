@@ -9,6 +9,7 @@ from rich.console import Console
 from aio.cli.add import add
 from aio.cli.archive import archive
 from aio.cli.config import config
+from aio.cli.daemon_cmd import daemon
 from aio.cli.dashboard import dashboard
 from aio.cli.done import done
 from aio.cli.file import file
@@ -53,6 +54,7 @@ cli.add_command(dashboard)
 cli.add_command(archive)
 cli.add_command(config)
 cli.add_command(file)
+cli.add_command(daemon)
 
 
 def main() -> None:

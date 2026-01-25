@@ -75,6 +75,10 @@ export interface AioSettings {
   defaultStatus: TaskStatus;
   /** Date display format */
   dateFormat: string;
+  /** Daemon API URL */
+  daemonUrl: string;
+  /** Enable daemon mode (use HTTP API instead of direct file access) */
+  useDaemon: boolean;
 }
 
 /**
@@ -84,6 +88,8 @@ export const DEFAULT_SETTINGS: AioSettings = {
   aioFolderPath: 'AIO',
   defaultStatus: 'inbox',
   dateFormat: 'YYYY-MM-DD',
+  daemonUrl: 'http://localhost:7432',
+  useDaemon: true,
 };
 
 /**
@@ -102,3 +108,80 @@ export const STATUS_FOLDERS: Record<TaskStatus, string> = {
  * Characters used for ID generation (excludes ambiguous: 0, 1, I, O).
  */
 export const ID_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * Daemon API response format for success.
+ */
+export interface DaemonSuccessResponse<T = unknown> {
+  ok: true;
+  data: T;
+}
+
+/**
+ * Daemon API response format for error.
+ */
+export interface DaemonErrorResponse {
+  ok: false;
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+/**
+ * Daemon API response (union type).
+ */
+export type DaemonResponse<T = unknown> = DaemonSuccessResponse<T> | DaemonErrorResponse;
+
+/**
+ * Task data as returned by the daemon API.
+ */
+export interface DaemonTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  created: string;
+  updated: string;
+  is_overdue: boolean;
+  is_due_today: boolean;
+  due?: string;
+  project?: string;
+  waiting_on?: string;
+  assigned_to?: string;
+  tags?: string[];
+  time_estimate?: string;
+  completed?: string;
+}
+
+/**
+ * Health check response from daemon.
+ */
+export interface DaemonHealthResponse {
+  status: string;
+  version: string;
+  uptime: number;
+  cache: {
+    task_count: number;
+    last_refresh: string;
+  };
+}
+
+/**
+ * Project data as returned by the daemon API.
+ */
+export interface DaemonProject {
+  id: string;
+  title: string;
+  status: string;
+  team?: string;
+}
+
+/**
+ * Person data as returned by the daemon API.
+ */
+export interface DaemonPerson {
+  id: string;
+  name: string;
+  team?: string;
+  role?: string;
+}

@@ -1,10 +1,14 @@
 """Add command for AIorgianization CLI."""
 
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
 
+from aio.cli.client import DaemonClient, DaemonError, DaemonUnavailableError
+from aio.daemon.protocol import ErrorCode
 from aio.exceptions import (
     AmbiguousMatchError,
     InvalidDateError,
@@ -65,6 +69,96 @@ def add(
         aio add "New feature" -p "New Project" --create-project
         aio add "Review PR" --assign Sarah
     """
+    # Use direct for --create-project or tags (daemon doesn't support these yet)
+    if create_project or tag:
+        _add_direct(ctx, title, due, project, create_project, status, tag, assign)
+        return
+
+    # Try daemon first
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _add_via_daemon(client, title, due, project, status, assign)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    # Fallback: direct execution
+    _add_direct(ctx, title, due, project, create_project, status, tag, assign)
+
+
+def _add_via_daemon(
+    client: DaemonClient,
+    title: str,
+    due: str | None,
+    project: str | None,
+    status: str,
+    assign: str | None,
+) -> None:
+    """Add task via daemon."""
+    # Extract project name from wikilink if provided
+    project_query = None
+    if project:
+        project_query = project
+        if project.startswith("[[") and project.endswith("]]"):
+            inner = project[2:-2]
+            project_query = inner.split("/")[-1] if "/" in inner else inner
+
+    try:
+        result = client.add_task(
+            title=title,
+            due=due,
+            project=project_query,
+            status=status,
+            assign=assign,
+        )
+        task = result["task"]
+        _display_created_task(task, due)
+    except DaemonError as e:
+        if e.code == ErrorCode.INVALID_DATE:
+            console.print(f"[red]Invalid date:[/red] {due}")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.PROJECT_NOT_FOUND:
+            console.print(f"[red]Project not found:[/red] {project_query}")
+            console.print(
+                f"\nTo create this project, use:\n"
+                f'  aio add "{title}" -p "{project_query}" --create-project'
+            )
+            raise click.Abort() from None
+        elif e.code == ErrorCode.AMBIGUOUS_MATCH:
+            console.print("[red]Multiple matches[/red]")
+            raise click.Abort() from None
+        elif e.code == ErrorCode.PERSON_NOT_FOUND:
+            console.print(f"[red]Person not found:[/red] {assign}")
+            raise click.Abort() from None
+        raise
+
+
+def _display_created_task(task: dict[str, Any], due_str: str | None) -> None:
+    """Display created task info."""
+    console.print(f"[green]Created task:[/green] {task['title']}")
+    console.print(f"  ID: [cyan]{task['id']}[/cyan]")
+    console.print(f"  Status: {task['status']}")
+    if task.get("waiting_on"):
+        console.print(f"  Waiting on: {task['waiting_on']}")
+    if task.get("due"):
+        due_date = date.fromisoformat(task["due"])
+        console.print(f"  Due: {format_relative_date(due_date)}")
+    if task.get("project"):
+        console.print(f"  Project: {task['project']}")
+
+
+def _add_direct(
+    ctx: click.Context,
+    title: str,
+    due: str | None,
+    project: str | None,
+    create_project: bool,
+    status: str,
+    tag: tuple[str, ...],
+    assign: str | None,
+) -> None:
+    """Add task via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
     task_service = TaskService(vault_service)

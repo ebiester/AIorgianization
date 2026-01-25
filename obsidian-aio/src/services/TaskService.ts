@@ -1,18 +1,61 @@
 import { App, TFile, TFolder, normalizePath } from 'obsidian';
 import { Task, TaskStatus, CreateTaskOptions, ID_CHARS, AioSettings } from '../types';
 import { VaultService } from './VaultService';
+import { DaemonClient, DaemonUnavailableError } from './DaemonClient';
 
 /**
  * Service for task CRUD operations.
+ *
+ * Supports two modes:
+ * - Daemon mode: All operations go through the daemon HTTP API (fast, centralized)
+ * - Fallback mode: Direct file operations (read-only when daemon unavailable)
  */
 export class TaskService {
   private vaultService: VaultService;
+  private daemonClient: DaemonClient;
+  private _useDaemon: boolean;
 
   constructor(
     private app: App,
     private settings: AioSettings
   ) {
     this.vaultService = new VaultService(app, settings);
+    this.daemonClient = new DaemonClient(settings);
+    this._useDaemon = settings.useDaemon;
+  }
+
+  /**
+   * Whether daemon mode is enabled and connected.
+   */
+  get isDaemonConnected(): boolean {
+    return this._useDaemon && this.daemonClient.isConnected;
+  }
+
+  /**
+   * Get the daemon client (for status checks).
+   */
+  get daemon(): DaemonClient {
+    return this.daemonClient;
+  }
+
+  /**
+   * Update settings and reconnect if needed.
+   */
+  updateSettings(settings: AioSettings): void {
+    this.settings = settings;
+    this._useDaemon = settings.useDaemon;
+    this.daemonClient.updateSettings(settings);
+    this.vaultService = new VaultService(this.app, settings);
+  }
+
+  /**
+   * Check daemon connection and update status.
+   */
+  async checkDaemonConnection(): Promise<boolean> {
+    if (!this._useDaemon) {
+      return false;
+    }
+    return this.daemonClient.testConnection();
   }
 
   /**
@@ -50,8 +93,27 @@ export class TaskService {
    * List all tasks, optionally filtered by status.
    */
   async listTasks(status?: TaskStatus): Promise<Task[]> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.listTasks(status);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    return this.listTasksFromFiles(status);
+  }
+
+  /**
+   * List tasks from files (fallback mode).
+   */
+  private async listTasksFromFiles(status?: TaskStatus): Promise<Task[]> {
     const tasks: Task[] = [];
-    const tasksPath = this.vaultService.getTasksPath();
 
     const statuses: TaskStatus[] = status
       ? [status]
@@ -256,14 +318,50 @@ export class TaskService {
    * Get a task by ID.
    */
   async getTask(id: string): Promise<Task | null> {
-    const tasks = await this.listTasks();
-    return tasks.find(t => t.id.toUpperCase() === id.toUpperCase()) || null;
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getTask(id);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    const tasks = await this.listTasksFromFiles();
+    return tasks.find((t) => t.id.toUpperCase() === id.toUpperCase()) || null;
   }
 
   /**
    * Create a new task.
    */
   async createTask(title: string, options: CreateTaskOptions = {}): Promise<Task> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.createTask(title, options);
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    return this.createTaskInFiles(title, options);
+  }
+
+  /**
+   * Create a task directly in files (fallback mode).
+   */
+  private async createTaskInFiles(
+    title: string,
+    options: CreateTaskOptions = {}
+  ): Promise<Task> {
     const id = await this.generateUniqueId();
     const now = new Date().toISOString();
     const status = options.status || this.settings.defaultStatus;
@@ -318,6 +416,27 @@ export class TaskService {
    * Mark a task as completed.
    */
   async completeTask(id: string): Promise<void> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        await this.daemonClient.completeTask(id);
+        return;
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    await this.completeTaskInFiles(id);
+  }
+
+  /**
+   * Complete a task directly in files (fallback mode).
+   */
+  private async completeTaskInFiles(id: string): Promise<void> {
     const task = await this.getTask(id);
     if (!task) {
       throw new Error(`Task not found: ${id}`);
@@ -353,16 +472,46 @@ export class TaskService {
    * Change a task's status.
    */
   async changeStatus(id: string, newStatus: TaskStatus): Promise<void> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        if (newStatus === 'completed') {
+          await this.daemonClient.completeTask(id);
+        } else if (newStatus === 'next') {
+          await this.daemonClient.startTask(id);
+        } else if (newStatus === 'someday') {
+          await this.daemonClient.deferTask(id);
+        } else {
+          // For other statuses, fall through to file-based approach
+          // (daemon API doesn't have endpoints for waiting/scheduled directly)
+          throw new DaemonUnavailableError('Status not supported via daemon');
+        }
+        return;
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    await this.changeStatusInFiles(id, newStatus);
+  }
+
+  /**
+   * Change task status directly in files (fallback mode).
+   */
+  private async changeStatusInFiles(id: string, newStatus: TaskStatus): Promise<void> {
     const task = await this.getTask(id);
     if (!task) {
       throw new Error(`Task not found: ${id}`);
     }
 
     if (newStatus === 'completed') {
-      return this.completeTask(id);
+      return this.completeTaskInFiles(id);
     }
 
-    const oldStatus = task.status;
     task.status = newStatus;
     task.updated = new Date().toISOString();
 
@@ -461,12 +610,57 @@ export class TaskService {
     }
     if (typeof value === 'string') {
       // Quote strings that need it
-      if (value.includes(':') || value.includes('#') || value.includes('\n') ||
-          value.startsWith('[[') || value.match(/^\d/)) {
+      if (
+        value.includes(':') ||
+        value.includes('#') ||
+        value.includes('\n') ||
+        value.startsWith('[[') ||
+        value.match(/^\d/)
+      ) {
         return `"${value.replace(/"/g, '\\"')}"`;
       }
       return value;
     }
     return String(value);
+  }
+
+  /**
+   * Get project names for dropdowns.
+   */
+  async getProjectNames(): Promise<string[]> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getProjectNames();
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    return this.vaultService.getProjects();
+  }
+
+  /**
+   * Get people names for dropdowns.
+   */
+  async getPeopleNames(): Promise<string[]> {
+    // Try daemon first if enabled
+    if (this._useDaemon) {
+      try {
+        return await this.daemonClient.getPeopleNames();
+      } catch (e) {
+        if (!(e instanceof DaemonUnavailableError)) {
+          throw e;
+        }
+        // Fall through to file-based approach
+      }
+    }
+
+    // Fallback to file-based approach
+    return this.vaultService.getPeople();
   }
 }

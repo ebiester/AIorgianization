@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { Plugin, WorkspaceLeaf, Notice } from 'obsidian';
 import { AioSettings, DEFAULT_SETTINGS, Task } from './types';
 import { AioSettingTab } from './settings';
 import { VaultService } from './services/VaultService';
@@ -8,10 +8,15 @@ import { InboxView, INBOX_VIEW_TYPE } from './views/InboxView';
 import { QuickAddModal } from './modals/QuickAddModal';
 import { TaskEditModal } from './modals/TaskEditModal';
 
+/** Interval for daemon health checks (30 seconds). */
+const HEALTH_CHECK_INTERVAL = 30000;
+
 export default class AioPlugin extends Plugin {
   settings: AioSettings;
   vaultService: VaultService;
   taskService: TaskService;
+  private statusBarItem: HTMLElement | null = null;
+  private healthCheckInterval: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -20,7 +25,17 @@ export default class AioPlugin extends Plugin {
     this.vaultService = new VaultService(this.app, this.settings);
     this.taskService = new TaskService(this.app, this.settings);
 
-    // Ensure AIO folder structure exists
+    // Add status bar item for daemon status
+    this.statusBarItem = this.addStatusBarItem();
+    this.updateStatusBar(false);
+
+    // Check daemon connection
+    await this.checkDaemonConnection();
+
+    // Start periodic health checks
+    this.startHealthChecks();
+
+    // Ensure AIO folder structure exists (for fallback mode)
     await this.vaultService.ensureAioStructure();
 
     // Register views
@@ -152,7 +167,82 @@ export default class AioPlugin extends Plugin {
   }
 
   onunload(): void {
-    // Cleanup
+    // Stop health checks
+    this.stopHealthChecks();
+  }
+
+  /**
+   * Check daemon connection and update status bar.
+   */
+  private async checkDaemonConnection(): Promise<void> {
+    if (!this.settings.useDaemon) {
+      this.updateStatusBar(false, 'disabled');
+      return;
+    }
+
+    const connected = await this.taskService.checkDaemonConnection();
+    this.updateStatusBar(connected);
+
+    if (connected) {
+      const health = this.taskService.daemon.lastHealthCheck;
+      if (health) {
+        console.log(`AIO: Connected to daemon v${health.version}, ${health.cache.task_count} tasks cached`);
+      }
+    }
+  }
+
+  /**
+   * Start periodic health checks.
+   */
+  private startHealthChecks(): void {
+    if (this.healthCheckInterval) {
+      return;
+    }
+
+    this.healthCheckInterval = window.setInterval(async () => {
+      await this.checkDaemonConnection();
+    }, HEALTH_CHECK_INTERVAL);
+
+    // Register for cleanup
+    this.registerInterval(this.healthCheckInterval);
+  }
+
+  /**
+   * Stop periodic health checks.
+   */
+  private stopHealthChecks(): void {
+    if (this.healthCheckInterval) {
+      window.clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  /**
+   * Update the status bar with daemon connection status.
+   */
+  private updateStatusBar(connected: boolean, mode?: 'disabled'): void {
+    if (!this.statusBarItem) {
+      return;
+    }
+
+    if (mode === 'disabled') {
+      this.statusBarItem.setText('AIO: Local');
+      this.statusBarItem.setAttribute('title', 'Daemon mode disabled - using local files');
+      this.statusBarItem.removeClass('aio-connected', 'aio-disconnected');
+      return;
+    }
+
+    if (connected) {
+      this.statusBarItem.setText('AIO: Connected');
+      this.statusBarItem.setAttribute('title', 'Connected to AIO daemon');
+      this.statusBarItem.addClass('aio-connected');
+      this.statusBarItem.removeClass('aio-disconnected');
+    } else {
+      this.statusBarItem.setText('AIO: Offline');
+      this.statusBarItem.setAttribute('title', 'Daemon not available - read-only mode');
+      this.statusBarItem.addClass('aio-disconnected');
+      this.statusBarItem.removeClass('aio-connected');
+    }
   }
 
   async loadSettings(): Promise<void> {
@@ -163,7 +253,9 @@ export default class AioPlugin extends Plugin {
     await this.saveData(this.settings);
     // Reinitialize services with new settings
     this.vaultService = new VaultService(this.app, this.settings);
-    this.taskService = new TaskService(this.app, this.settings);
+    this.taskService.updateSettings(this.settings);
+    // Re-check daemon connection
+    await this.checkDaemonConnection();
   }
 
   /**
