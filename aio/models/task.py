@@ -76,6 +76,17 @@ class Task(BaseModel):
     tags: list[str] = Field(default_factory=list)
     time_estimate: str | None = Field(default=None, alias="timeEstimate")
 
+    # Archive metadata
+    archived: bool = Field(default=False, description="Whether task is archived")
+    archived_at: datetime | None = Field(
+        default=None, alias="archivedAt", description="When task was archived"
+    )
+    archived_from: str | None = Field(
+        default=None,
+        alias="archivedFrom",
+        description="Original status before archiving (e.g., 'completed', 'next')",
+    )
+
     model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     def frontmatter(self) -> dict[str, Any]:
@@ -119,6 +130,14 @@ class Task(BaseModel):
         data["updated"] = self.updated
         if self.completed:
             data["completed"] = self.completed
+
+        # Archive metadata
+        if self.archived:
+            data["archived"] = self.archived
+            if self.archived_at:
+                data["archivedAt"] = self.archived_at
+            if self.archived_from:
+                data["archivedFrom"] = self.archived_from
 
         return data
 

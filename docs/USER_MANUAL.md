@@ -702,6 +702,11 @@ project: "[[Projects/Q4-Migration]]"
 - Restart your MCP client after configuration changes
 - Check your client's logs for connection errors
 
+**Stale data from MCP server**
+- The MCP server loads vault data once at startup and does not watch for file changes
+- If you edit tasks in Obsidian and the MCP server shows stale data, restart the MCP server
+- This is by design since MCP requests are stateless
+
 ---
 
 ## Reference

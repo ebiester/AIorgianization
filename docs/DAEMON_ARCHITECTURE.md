@@ -195,7 +195,7 @@ Convert plugin from direct file ops to HTTP API calls.
 | `/tasks/{id}/complete` | POST | Mark complete |
 | `/tasks/{id}/start` | POST | Move to Next |
 | `/tasks/{id}/defer` | POST | Move to Someday |
-| `/tasks/{id}/wait` | POST | Move to Waiting |
+| `/tasks/{id}/delegate` | POST | Move to Waiting |
 | `/projects` | GET | List projects |
 | `/people` | GET | List people |
 | `/dashboard` | GET | Get today's dashboard |

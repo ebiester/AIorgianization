@@ -9,6 +9,7 @@ from aio.exceptions import AmbiguousMatchError, TaskNotFoundError
 from aio.models.task import Task, TaskLocation, TaskStatus
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
+from aio.utils import get_slug
 from aio.utils.frontmatter import read_frontmatter, write_frontmatter
 from aio.utils.ids import is_valid_id, normalize_id
 
@@ -72,6 +73,12 @@ class TaskService:
         folder = self.vault.tasks_folder(status.value)
         filename = task.generate_filename()
         filepath = folder / filename
+
+        if filepath.exists():
+            raise FileExistsError(
+                f"Cannot create task: file already exists at {filepath}. "
+                f"Another task may have a conflicting name."
+            )
 
         write_frontmatter(filepath, task.frontmatter(), body)
 
@@ -249,7 +256,7 @@ class TaskService:
         if person:
             # Format as wikilink if not already
             if not person.startswith("[["):
-                person = f"[[People/{person}]]"
+                person = f"[[AIO/People/{get_slug(person)}]]"
             task.waiting_on = person
         return self._update_status(task, TaskStatus.WAITING)
 
@@ -267,6 +274,9 @@ class TaskService:
         if not old_filepath:
             raise TaskNotFoundError(f"Task file not found: {task.id}")
 
+        # Capture original status before archiving
+        original_status = task.status
+
         # Determine archive folder
         archive_folder = self.vault.archive_folder("Tasks", task.status)
         archive_folder.mkdir(parents=True, exist_ok=True)
@@ -275,7 +285,14 @@ class TaskService:
         new_filepath = archive_folder / old_filepath.name
 
         # Update task with archive metadata
-        task.updated = datetime.now()
+        now = datetime.now()
+        task.updated = now
+        task.archived = True
+        task.archived_at = now
+        if isinstance(original_status, TaskStatus):
+            task.archived_from = original_status.value
+        else:
+            task.archived_from = original_status
         write_frontmatter(new_filepath, task.frontmatter(), task.body)
         old_filepath.unlink()
 
@@ -394,6 +411,26 @@ class TaskService:
                     except Exception as e:
                         logger.debug("Failed to read task file %s: %s", filepath, e)
 
+            # Also search completed subfolders (YYYY/MM)
+            if status == TaskStatus.COMPLETED:
+                completed_base = folder
+                if completed_base.exists():
+                    for year_dir in completed_base.iterdir():
+                        if year_dir.is_dir() and year_dir.name.isdigit():
+                            for month_dir in year_dir.iterdir():
+                                if month_dir.is_dir():
+                                    for filepath in month_dir.glob("*.md"):
+                                        try:
+                                            task = self._read_task_file(filepath)
+                                            if query_lower in task.title.lower():
+                                                matches.append(task)
+                                        except Exception as e:
+                                            logger.debug(
+                                                "Failed to read task file %s: %s",
+                                                filepath,
+                                                e,
+                                            )
+
         return matches
 
     def _read_task_file(self, filepath: Path) -> Task:
@@ -427,6 +464,7 @@ class TaskService:
         created = self._parse_datetime(metadata.get("created"), datetime.now())
         updated = self._parse_datetime(metadata.get("updated"), datetime.now())
         completed = self._parse_datetime(metadata.get("completed"), None)
+        archived_at = self._parse_datetime(metadata.get("archivedAt"), None)
 
         return Task(
             id=metadata.get("id", "????"),
@@ -446,6 +484,9 @@ class TaskService:
             created=created,
             updated=updated,
             completed=completed,
+            archived=metadata.get("archived", False),
+            archived_at=archived_at,
+            archived_from=metadata.get("archivedFrom"),
         )
 
     def _extract_title(self, content: str, filepath: Path) -> str:

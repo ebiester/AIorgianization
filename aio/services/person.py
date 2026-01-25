@@ -9,6 +9,7 @@ from aio.exceptions import AmbiguousMatchError, PersonNotFoundError
 from aio.models.person import Person
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
+from aio.utils import get_slug
 from aio.utils.frontmatter import read_frontmatter, write_frontmatter
 from aio.utils.ids import is_valid_id, normalize_id
 
@@ -290,6 +291,7 @@ class PersonService:
 
         # Generate content with Dataview query for delegated tasks
         # Use link() to match wikilinks stored in waitingOn frontmatter
+        slug = get_slug(name)
         body = f"""# {name}
 
 ## Notes
@@ -299,7 +301,7 @@ class PersonService:
 ```dataview
 TABLE due AS "Due", status AS "Status"
 FROM "AIO/Tasks"
-WHERE contains(waitingOn, link("AIO/People/{name}")) AND status != "completed"
+WHERE contains(waitingOn, link("AIO/People/{slug}")) AND status != "completed"
 SORT due ASC
 ```
 
@@ -308,7 +310,7 @@ SORT due ASC
 ```dataview
 TABLE due AS "Due", completed AS "Completed"
 FROM "AIO/Tasks"
-WHERE contains(waitingOn, link("AIO/People/{name}")) AND status = "completed"
+WHERE contains(waitingOn, link("AIO/People/{slug}")) AND status = "completed"
 SORT completed DESC
 ```
 
@@ -320,6 +322,12 @@ SORT completed DESC
         folder = self.vault.people_folder()
         filename = person.generate_filename()
         filepath = folder / filename
+
+        if filepath.exists():
+            raise FileExistsError(
+                f"Cannot create person: file already exists at {filepath}. "
+                f"Another person may have a conflicting name."
+            )
 
         write_frontmatter(filepath, person.frontmatter(), body)
 

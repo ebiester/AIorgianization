@@ -10,6 +10,7 @@ from aio.exceptions import AmbiguousMatchError, ProjectNotFoundError
 from aio.models.project import Project, ProjectStatus
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
+from aio.utils import get_slug
 from aio.utils.frontmatter import read_frontmatter, write_frontmatter
 from aio.utils.ids import is_valid_id, normalize_id
 
@@ -314,6 +315,7 @@ class ProjectService:
         )
 
         # Generate content with Dataview queries for tasks
+        slug = get_slug(name)
         body = f"""# {name}
 
 ## Overview
@@ -325,7 +327,7 @@ class ProjectService:
 ```dataview
 TABLE due AS "Due", status AS "Status"
 FROM "AIO/Tasks"
-WHERE contains(project, link("AIO/Projects/{name}")) AND status != "completed"
+WHERE contains(project, link("AIO/Projects/{slug}")) AND status != "completed"
 SORT due ASC
 ```
 
@@ -334,7 +336,7 @@ SORT due ASC
 ```dataview
 TABLE due AS "Due", completed AS "Completed"
 FROM "AIO/Tasks"
-WHERE contains(project, link("AIO/Projects/{name}")) AND status = "completed"
+WHERE contains(project, link("AIO/Projects/{slug}")) AND status = "completed"
 SORT completed DESC
 ```
 
@@ -348,6 +350,12 @@ SORT completed DESC
         folder = self.vault.projects_folder()
         filename = project.generate_filename()
         filepath = folder / filename
+
+        if filepath.exists():
+            raise FileExistsError(
+                f"Cannot create project: file already exists at {filepath}. "
+                f"Another project may have a conflicting name."
+            )
 
         write_frontmatter(filepath, project.frontmatter(), body)
 

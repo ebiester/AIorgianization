@@ -195,9 +195,50 @@ class TestTaskService:
     def test_wait_task(
         self, vault_service: VaultService, sample_task_file: None
     ) -> None:
-        """wait should change status to waiting."""
+        """wait should change status to waiting with canonical wikilink format."""
         task_service = TaskService(vault_service)
-        task = task_service.wait("AB2C", "Sarah")
+        task = task_service.wait("AB2C", "Sarah Jones")
 
         assert task.status == TaskStatus.WAITING
-        assert "Sarah" in (task.waiting_on or "")
+        # Should use AIO prefix and slugified name
+        assert task.waiting_on == "[[AIO/People/Sarah-Jones]]"
+
+    def test_create_task_duplicate_raises_error(
+        self, vault_service: VaultService
+    ) -> None:
+        """create should raise FileExistsError if file already exists."""
+        task_service = TaskService(vault_service)
+
+        # Create first task
+        task_service.create("Duplicate Task Test")
+
+        # Try to create another task with same title (same filename)
+        with pytest.raises(FileExistsError) as exc_info:
+            task_service.create("Duplicate Task Test")
+
+        assert "file already exists" in str(exc_info.value)
+
+    def test_archive_task_sets_metadata(
+        self, vault_service: VaultService, sample_task_file: None
+    ) -> None:
+        """archive should set archived, archivedAt, and archivedFrom fields."""
+        task_service = TaskService(vault_service)
+
+        # Verify task starts in inbox status
+        original_task = task_service.get("AB2C")
+        assert original_task.status == TaskStatus.INBOX
+        assert not original_task.archived
+
+        # Archive the task
+        archived_task = task_service.archive("AB2C")
+
+        # Verify archive metadata is set
+        assert archived_task.archived is True
+        assert archived_task.archived_at is not None
+        assert archived_task.archived_from == "inbox"
+
+        # Verify frontmatter includes archive fields
+        fm = archived_task.frontmatter()
+        assert fm["archived"] is True
+        assert "archivedAt" in fm
+        assert fm["archivedFrom"] == "inbox"

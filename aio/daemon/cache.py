@@ -276,10 +276,11 @@ class VaultCache:
             task_ids = self._tasks_by_status.get(status, [])
             return [self._tasks[tid] for tid in task_ids if tid in self._tasks]
 
-        # Return all tasks except completed by default
+        # Return all tasks except completed and someday by default
+        # (matches TaskService.list_tasks() behavior)
         result: list[Task] = []
         for s in TaskStatus:
-            if s != TaskStatus.COMPLETED:
+            if s not in (TaskStatus.COMPLETED, TaskStatus.SOMEDAY):
                 task_ids = self._tasks_by_status.get(s, [])
                 result.extend(self._tasks[tid] for tid in task_ids if tid in self._tasks)
         return result

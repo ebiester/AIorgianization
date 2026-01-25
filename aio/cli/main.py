@@ -13,6 +13,7 @@ from aio.cli.daemon_cmd import daemon
 from aio.cli.dashboard import dashboard
 from aio.cli.done import done
 from aio.cli.file import file
+from aio.cli.index import index
 from aio.cli.init import init
 from aio.cli.list import list_tasks
 from aio.cli.plugin import plugin
@@ -57,6 +58,7 @@ cli.add_command(config)
 cli.add_command(file)
 cli.add_command(daemon)
 cli.add_command(plugin)
+cli.add_command(index)
 
 
 def main() -> None:
