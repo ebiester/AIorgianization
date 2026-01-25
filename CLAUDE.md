@@ -153,6 +153,10 @@ aio wait <task> [person]          # Move to Waiting
 aio dashboard                     # Generate/update today's dashboard
 aio dashboard --date 2024-01-15   # Specific date
 
+# Plugin management
+aio plugin upgrade                # Upgrade Obsidian plugin in vault
+aio plugin status                 # Show plugin version and install status
+
 # Archiving
 aio archive task <task>
 aio archive project <project>

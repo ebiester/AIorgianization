@@ -356,6 +356,17 @@ aio archive tasks --before 2026-01-01 --dry-run
 
 Archived items are moved to the parallel `Archive/` folder structure.
 
+### Plugin Management
+
+```bash
+aio plugin upgrade         # Upgrade the Obsidian plugin in your vault
+aio plugin status          # Show plugin installation status and version
+```
+
+After running `aio plugin upgrade`, reload Obsidian:
+- Toggle the plugin off and on in Settings → Community plugins, OR
+- Press Cmd+R (Mac) / Ctrl+R (Windows) to reload Obsidian
+
 ### Other Commands
 
 ```bash

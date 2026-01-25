@@ -485,6 +485,49 @@ Before running any tests:
 
 ---
 
+### UAT-027a: Plugin Status
+
+**Objective:** Verify plugin status command shows installation info.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Run `aio plugin status` | Shows plugin path, version, last updated timestamp |
+| 2 | Check output format | Path, version, and date displayed clearly |
+
+**Pass Criteria:** Status displays plugin installation details.
+
+---
+
+### UAT-027b: Plugin Upgrade
+
+**Objective:** Verify plugin upgrade command updates the Obsidian plugin.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Run `aio plugin status` | Note current "Last updated" timestamp |
+| 2 | Run `aio plugin upgrade` | Success message with plugin path |
+| 3 | Run `aio plugin status` | "Last updated" timestamp is now current |
+| 4 | Check `.obsidian/plugins/aio/main.js` | File exists and is recent |
+| 5 | Reload Obsidian (Cmd+R) | Plugin loads without errors |
+| 6 | Open command palette | AIO commands appear |
+
+**Pass Criteria:** Plugin files updated, Obsidian can reload and use the plugin.
+
+---
+
+### UAT-027c: Plugin Upgrade - No Vault
+
+**Objective:** Verify plugin upgrade fails gracefully without a configured vault.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Temporarily unset vault path | No vault configured |
+| 2 | Run `aio plugin upgrade` | Error: "No vault found. Run 'aio init' first." |
+
+**Pass Criteria:** Clear error message with remediation.
+
+---
+
 ## Phase 3: MCP Server Integration
 
 ### UAT-028: MCP Server Startup
@@ -1011,6 +1054,9 @@ Before running any tests:
 - [ ] UAT-025: Error Handling - Invalid Date
 - [x] ~~UAT-026: Error Handling - Invalid Priority~~ [DELETED]
 - [ ] UAT-027: Error Handling - Vault Not Initialized
+- [ ] UAT-027a: Plugin Status
+- [ ] UAT-027b: Plugin Upgrade
+- [ ] UAT-027c: Plugin Upgrade - No Vault
 
 ### Phase 3: Jira Integration
 - [ ] UAT-028: Jira Configuration
