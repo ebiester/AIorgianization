@@ -295,6 +295,13 @@ def main() -> None:
     """Entry point for aio-daemon command."""
     import argparse
 
+    # Set process title for Activity Monitor (optional)
+    try:
+        import setproctitle
+        setproctitle.setproctitle("AIorganization daemon")
+    except ImportError:
+        pass  # Not critical - just makes it easier to find in Activity Monitor
+
     parser = argparse.ArgumentParser(description="AIO Daemon Server")
     parser.add_argument(
         "--vault", "-v",
