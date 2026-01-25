@@ -15,6 +15,7 @@ from aio.cli.done import done
 from aio.cli.file import file
 from aio.cli.init import init
 from aio.cli.list import list_tasks
+from aio.cli.plugin import plugin
 from aio.cli.status import defer, start, wait
 from aio.exceptions import AioError
 
@@ -55,6 +56,7 @@ cli.add_command(archive)
 cli.add_command(config)
 cli.add_command(file)
 cli.add_command(daemon)
+cli.add_command(plugin)
 
 
 def main() -> None:
