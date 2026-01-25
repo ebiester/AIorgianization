@@ -74,6 +74,12 @@ cd "$PROJECT_ROOT" || die "Failed to change to project root: $PROJECT_ROOT"
 # Ensure dependencies are installed
 uv sync --all-extras --quiet || die "Failed to sync dependencies with uv"
 
+# Work around macOS hidden flag issue on .pth files
+# macOS adds com.apple.provenance extended attribute which sets UF_HIDDEN flag
+# Python's site module skips hidden .pth files, breaking editable installs
+# Solution: Add project root to PYTHONPATH to ensure aio module is found
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PROJECT_ROOT"
+
 # Initialize AIO structure using uv run
 # Note: stdout must be suppressed since this script returns the vault path via stdout
 # On failure, we capture and display the output

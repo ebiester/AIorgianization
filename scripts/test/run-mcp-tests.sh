@@ -23,6 +23,12 @@ set -euo pipefail
 export UV_NATIVE_TLS=1
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/claude/uv-cache}"
 
+# Work around macOS hidden flag issue on .pth files
+# Add project root to PYTHONPATH to ensure aio module is found
+SCRIPT_DIR_TEMP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT_TEMP="$(cd "$SCRIPT_DIR_TEMP/../.." && pwd)"
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PROJECT_ROOT_TEMP"
+
 # Error handling helper
 die() {
     echo "ERROR: $1" >&2
