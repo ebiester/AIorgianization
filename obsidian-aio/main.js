@@ -1910,6 +1910,8 @@ var AioPlugin = class extends import_obsidian9.Plugin {
   }
   onunload() {
     this.stopHealthChecks();
+    this.app.workspace.detachLeavesOfType(TASK_LIST_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(INBOX_VIEW_TYPE);
   }
   /**
    * Check daemon connection and update status bar.

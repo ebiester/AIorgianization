@@ -169,6 +169,10 @@ export default class AioPlugin extends Plugin {
   onunload(): void {
     // Stop health checks
     this.stopHealthChecks();
+
+    // Detach all AIO views to prevent "plugin no longer active" errors on restart
+    this.app.workspace.detachLeavesOfType(TASK_LIST_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(INBOX_VIEW_TYPE);
   }
 
   /**
