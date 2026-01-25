@@ -531,7 +531,13 @@ var VaultService = class {
     const normalizedPath = (0, import_obsidian3.normalizePath)(path);
     const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
     if (!folder) {
-      await this.app.vault.createFolder(normalizedPath);
+      try {
+        await this.app.vault.createFolder(normalizedPath);
+      } catch (e) {
+        if (e instanceof Error && !e.message.includes("Folder already exists")) {
+          throw e;
+        }
+      }
     } else if (!(folder instanceof import_obsidian3.TFolder)) {
       throw new Error(`Path exists but is not a folder: ${normalizedPath}`);
     }

@@ -76,7 +76,14 @@ export class VaultService {
     const folder = this.app.vault.getAbstractFileByPath(normalizedPath);
 
     if (!folder) {
-      await this.app.vault.createFolder(normalizedPath);
+      try {
+        await this.app.vault.createFolder(normalizedPath);
+      } catch (e) {
+        // Ignore "Folder already exists" errors (race condition)
+        if (e instanceof Error && !e.message.includes('Folder already exists')) {
+          throw e;
+        }
+      }
     } else if (!(folder instanceof TFolder)) {
       throw new Error(`Path exists but is not a folder: ${normalizedPath}`);
     }
