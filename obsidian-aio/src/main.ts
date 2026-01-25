@@ -303,6 +303,7 @@ export default class AioPlugin extends Plugin {
 
   /**
    * Get the current task from the active file.
+   * Uses Obsidian's metadata cache for synchronous access.
    */
   private getCurrentTask(): Task | null {
     const file = this.app.workspace.getActiveFile();
@@ -313,9 +314,48 @@ export default class AioPlugin extends Plugin {
       return null;
     }
 
-    // Parse the file as a task
-    // Note: This is sync but we could cache tasks for better performance
-    return null; // TODO: Implement async task lookup
+    // Use Obsidian's metadata cache for synchronous frontmatter access
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (!cache?.frontmatter) {
+      return null;
+    }
+
+    const fm = cache.frontmatter;
+
+    // Verify this is a task file
+    if (fm.type !== 'task') {
+      return null;
+    }
+
+    // Extract title from first heading in cache or filename
+    let title = fm.title || '';
+    if (!title && cache.headings && cache.headings.length > 0) {
+      title = cache.headings[0].heading;
+    }
+    if (!title) {
+      title = file.basename;
+    }
+
+    return {
+      id: fm.id || '',
+      type: 'task',
+      status: fm.status || 'inbox',
+      title,
+      due: fm.due,
+      project: fm.project,
+      assignedTo: fm.assignedTo,
+      waitingOn: fm.waitingOn,
+      blockedBy: fm.blockedBy || [],
+      blocks: fm.blocks || [],
+      location: fm.location,
+      tags: fm.tags || [],
+      timeEstimate: fm.timeEstimate,
+      created: fm.created || new Date().toISOString(),
+      updated: fm.updated || new Date().toISOString(),
+      completed: fm.completed,
+      content: '', // Not needed for command palette checks
+      path: file.path,
+    };
   }
 
   /**

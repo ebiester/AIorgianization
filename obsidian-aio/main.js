@@ -2020,6 +2020,7 @@ var AioPlugin = class extends import_obsidian9.Plugin {
   }
   /**
    * Get the current task from the active file.
+   * Uses Obsidian's metadata cache for synchronous access.
    */
   getCurrentTask() {
     const file = this.app.workspace.getActiveFile();
@@ -2028,7 +2029,42 @@ var AioPlugin = class extends import_obsidian9.Plugin {
     if (!file.path.includes(`${this.settings.aioFolderPath}/Tasks`)) {
       return null;
     }
-    return null;
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (!(cache == null ? void 0 : cache.frontmatter)) {
+      return null;
+    }
+    const fm = cache.frontmatter;
+    if (fm.type !== "task") {
+      return null;
+    }
+    let title = fm.title || "";
+    if (!title && cache.headings && cache.headings.length > 0) {
+      title = cache.headings[0].heading;
+    }
+    if (!title) {
+      title = file.basename;
+    }
+    return {
+      id: fm.id || "",
+      type: "task",
+      status: fm.status || "inbox",
+      title,
+      due: fm.due,
+      project: fm.project,
+      assignedTo: fm.assignedTo,
+      waitingOn: fm.waitingOn,
+      blockedBy: fm.blockedBy || [],
+      blocks: fm.blocks || [],
+      location: fm.location,
+      tags: fm.tags || [],
+      timeEstimate: fm.timeEstimate,
+      created: fm.created || (/* @__PURE__ */ new Date()).toISOString(),
+      updated: fm.updated || (/* @__PURE__ */ new Date()).toISOString(),
+      completed: fm.completed,
+      content: "",
+      // Not needed for command palette checks
+      path: file.path
+    };
   }
   /**
    * Refresh all open AIO views.
