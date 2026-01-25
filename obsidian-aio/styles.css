@@ -414,3 +414,66 @@
   background: var(--color-red);
   opacity: 0.9;
 }
+
+/* Read-Only Mode */
+.aio-readonly-banner {
+  background: var(--color-orange);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aio-readonly-banner::before {
+  content: '⚠';
+}
+
+/* Disabled state for buttons */
+.aio-disabled,
+button.aio-disabled,
+.aio-add-btn.aio-disabled,
+.aio-action-btn.aio-disabled,
+.aio-inbox-action.aio-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.aio-task-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Status Bar Styles */
+.aio-connected {
+  color: var(--color-green);
+}
+
+.aio-disconnected.aio-readonly {
+  color: var(--color-orange);
+}
+
+/* Review Complete */
+.aio-inbox-review-complete {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.aio-inbox-review-complete h3 {
+  margin: 0 0 8px 0;
+}
+
+.aio-inbox-review-complete p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.aio-review-complete-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}

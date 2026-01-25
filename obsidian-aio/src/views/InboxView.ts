@@ -1,6 +1,7 @@
-import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import type AioPlugin from '../main';
 import { Task } from '../types';
+import { DaemonOfflineError } from '../services/DaemonClient';
 
 export const INBOX_VIEW_TYPE = 'aio-inbox';
 
@@ -40,7 +41,17 @@ export class InboxView extends ItemView {
     container.empty();
     this.skippedCount = 0;
 
+    const isReadOnly = this.plugin.isReadOnly;
+
     container.createEl('div', { cls: 'aio-inbox-container' }, async (el) => {
+      // Show read-only banner if daemon is offline
+      if (isReadOnly) {
+        el.createEl('div', {
+          cls: 'aio-readonly-banner',
+          text: 'Read-only: daemon offline. Run "aio daemon start" to process inbox.',
+        });
+      }
+
       // Header
       el.createEl('div', { cls: 'aio-inbox-header' }, (header) => {
         header.createEl('h4', { text: 'Process Inbox', cls: 'aio-inbox-title' });
@@ -53,7 +64,7 @@ export class InboxView extends ItemView {
         if (this.inboxTasks.length === 0) {
           this.renderInboxZero(el);
         } else {
-          this.renderCurrentTask(el);
+          this.renderCurrentTask(el, isReadOnly);
         }
       } catch (e) {
         el.createEl('div', { cls: 'aio-error', text: `Error loading inbox: ${e}` });
@@ -74,7 +85,7 @@ export class InboxView extends ItemView {
     });
   }
 
-  private renderCurrentTask(container: HTMLElement): void {
+  private renderCurrentTask(container: HTMLElement, isReadOnly: boolean = false): void {
     const task = this.inboxTasks[this.currentIndex];
 
     // Progress indicator
@@ -124,42 +135,67 @@ export class InboxView extends ItemView {
       }
     });
 
-    // Action buttons
+    // Action buttons - disabled when read-only
     container.createEl('div', { cls: 'aio-inbox-actions' }, (actions) => {
       // Start (move to Next)
       const startBtn = actions.createEl('button', { cls: 'aio-inbox-action mod-cta' });
       startBtn.createEl('span', { cls: 'aio-action-icon' }, (span) => setIcon(span, 'play'));
       startBtn.createEl('span', { text: 'Start' });
       startBtn.createEl('span', { cls: 'aio-action-hint', text: '→ Next' });
-      startBtn.addEventListener('click', () => this.handleAction('next'));
+      if (isReadOnly) {
+        startBtn.addClass('aio-disabled');
+        startBtn.setAttribute('title', 'Daemon offline - cannot process tasks');
+      } else {
+        startBtn.addEventListener('click', () => this.handleAction('next'));
+      }
 
       // Defer (move to Someday)
       const deferBtn = actions.createEl('button', { cls: 'aio-inbox-action' });
       deferBtn.createEl('span', { cls: 'aio-action-icon' }, (span) => setIcon(span, 'clock'));
       deferBtn.createEl('span', { text: 'Defer' });
       deferBtn.createEl('span', { cls: 'aio-action-hint', text: '→ Someday' });
-      deferBtn.addEventListener('click', () => this.handleAction('someday'));
+      if (isReadOnly) {
+        deferBtn.addClass('aio-disabled');
+        deferBtn.setAttribute('title', 'Daemon offline - cannot process tasks');
+      } else {
+        deferBtn.addEventListener('click', () => this.handleAction('someday'));
+      }
 
       // Wait (move to Waiting)
       const waitBtn = actions.createEl('button', { cls: 'aio-inbox-action' });
       waitBtn.createEl('span', { cls: 'aio-action-icon' }, (span) => setIcon(span, 'user'));
       waitBtn.createEl('span', { text: 'Wait' });
       waitBtn.createEl('span', { cls: 'aio-action-hint', text: '→ Waiting' });
-      waitBtn.addEventListener('click', () => this.handleAction('waiting'));
+      if (isReadOnly) {
+        waitBtn.addClass('aio-disabled');
+        waitBtn.setAttribute('title', 'Daemon offline - cannot process tasks');
+      } else {
+        waitBtn.addEventListener('click', () => this.handleAction('waiting'));
+      }
 
       // Schedule
       const scheduleBtn = actions.createEl('button', { cls: 'aio-inbox-action' });
       scheduleBtn.createEl('span', { cls: 'aio-action-icon' }, (span) => setIcon(span, 'calendar'));
       scheduleBtn.createEl('span', { text: 'Schedule' });
       scheduleBtn.createEl('span', { cls: 'aio-action-hint', text: '→ Scheduled' });
-      scheduleBtn.addEventListener('click', () => this.handleAction('scheduled'));
+      if (isReadOnly) {
+        scheduleBtn.addClass('aio-disabled');
+        scheduleBtn.setAttribute('title', 'Daemon offline - cannot process tasks');
+      } else {
+        scheduleBtn.addEventListener('click', () => this.handleAction('scheduled'));
+      }
 
       // Complete
       const completeBtn = actions.createEl('button', { cls: 'aio-inbox-action' });
       completeBtn.createEl('span', { cls: 'aio-action-icon' }, (span) => setIcon(span, 'check'));
       completeBtn.createEl('span', { text: 'Done' });
       completeBtn.createEl('span', { cls: 'aio-action-hint', text: '→ Completed' });
-      completeBtn.addEventListener('click', () => this.handleAction('completed'));
+      if (isReadOnly) {
+        completeBtn.addClass('aio-disabled');
+        completeBtn.setAttribute('title', 'Daemon offline - cannot process tasks');
+      } else {
+        completeBtn.addEventListener('click', () => this.handleAction('completed'));
+      }
     });
 
     // Skip button
@@ -230,7 +266,12 @@ export class InboxView extends ItemView {
 
       await this.refresh();
     } catch (e) {
-      console.error('Error processing task:', e);
+      if (e instanceof DaemonOfflineError) {
+        new Notice('Cannot process task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error('Error processing task:', e);
+        new Notice(`Error processing task: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
   }
 }

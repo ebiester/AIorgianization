@@ -1,6 +1,7 @@
-import { App, Modal, Setting } from 'obsidian';
+import { App, Modal, Notice, Setting } from 'obsidian';
 import type AioPlugin from '../main';
 import { Task, TaskStatus } from '../types';
+import { DaemonOfflineError } from '../services/DaemonClient';
 
 export class TaskEditModal extends Modal {
   private plugin: AioPlugin;
@@ -40,6 +41,15 @@ export class TaskEditModal extends Modal {
     contentEl.addClass('aio-task-edit-modal');
 
     contentEl.createEl('h2', { text: 'Edit Task' });
+
+    // Show read-only warning if daemon is offline
+    const isReadOnly = this.plugin.isReadOnly;
+    if (isReadOnly) {
+      contentEl.createEl('div', {
+        cls: 'aio-readonly-banner',
+        text: 'Daemon offline - cannot edit tasks. Run "aio daemon start" to enable writes.',
+      });
+    }
 
     // Task ID (read-only)
     contentEl.createEl('div', { cls: 'aio-task-id-display', text: `ID: ${this.task.id}` });
@@ -154,22 +164,32 @@ export class TaskEditModal extends Modal {
     });
 
     const saveBtn = buttonContainer.createEl('button', { cls: 'mod-cta', text: 'Save' });
-    saveBtn.addEventListener('click', () => {
-      this.save();
-    });
+    if (isReadOnly) {
+      saveBtn.disabled = true;
+      saveBtn.addClass('aio-disabled');
+    } else {
+      saveBtn.addEventListener('click', () => {
+        this.save();
+      });
+    }
 
-    // Delete button (with confirmation)
+    // Delete button (with confirmation) - disabled in read-only mode
     const deleteBtn = buttonContainer.createEl('button', { cls: 'mod-warning', text: 'Delete' });
-    deleteBtn.addEventListener('click', async () => {
-      if (confirm(`Are you sure you want to delete "${this.task.title}"?`)) {
-        const file = this.app.vault.getAbstractFileByPath(this.task.path);
-        if (file) {
-          await this.app.vault.delete(file);
-          this.onSubmit();
-          this.close();
+    if (isReadOnly) {
+      deleteBtn.disabled = true;
+      deleteBtn.addClass('aio-disabled');
+    } else {
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm(`Are you sure you want to delete "${this.task.title}"?`)) {
+          const file = this.app.vault.getAbstractFileByPath(this.task.path);
+          if (file) {
+            await this.app.vault.delete(file);
+            this.onSubmit();
+            this.close();
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   private async save(): Promise<void> {
@@ -205,7 +225,12 @@ export class TaskEditModal extends Modal {
       this.onSubmit();
       this.close();
     } catch (e) {
-      console.error('Error saving task:', e);
+      if (e instanceof DaemonOfflineError) {
+        new Notice('Cannot save task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error('Error saving task:', e);
+        new Notice(`Error saving task: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
   }
 

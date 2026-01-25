@@ -53,6 +53,12 @@ var DaemonUnavailableError = class extends Error {
     this.name = "DaemonUnavailableError";
   }
 };
+var DaemonOfflineError = class extends Error {
+  constructor(operation = "operation") {
+    super(`Cannot ${operation}: daemon is offline. Start the daemon with 'aio daemon start' or disable daemon mode in settings.`);
+    this.name = "DaemonOfflineError";
+  }
+};
 var DaemonApiError = class extends Error {
   constructor(code, message) {
     super(message);
@@ -615,6 +621,13 @@ var TaskService = class {
     return this._useDaemon && this.daemonClient.isConnected;
   }
   /**
+   * Whether the plugin is in read-only mode.
+   * Read-only when daemon mode is enabled but daemon is not connected.
+   */
+  get isReadOnly() {
+    return this._useDaemon && !this.daemonClient.isConnected;
+  }
+  /**
    * Get the daemon client (for status checks).
    */
   get daemon() {
@@ -866,15 +879,17 @@ var TaskService = class {
   }
   /**
    * Create a new task.
+   * Requires daemon connection when daemon mode is enabled.
    */
   async createTask(title, options = {}) {
     if (this._useDaemon) {
       try {
         return await this.daemonClient.createTask(title, options);
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          throw new DaemonOfflineError("create task");
         }
+        throw e;
       }
     }
     return this.createTaskInFiles(title, options);
@@ -915,8 +930,12 @@ var TaskService = class {
   }
   /**
    * Update an existing task.
+   * Requires daemon to be available when daemon mode is enabled.
    */
   async updateTask(task) {
+    if (this._useDaemon && !this.daemonClient.isConnected) {
+      throw new DaemonOfflineError("update task");
+    }
     task.updated = (/* @__PURE__ */ new Date()).toISOString();
     const content = this.serializeTask(task);
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -927,6 +946,7 @@ var TaskService = class {
   }
   /**
    * Mark a task as completed.
+   * Requires daemon connection when daemon mode is enabled.
    */
   async completeTask(id) {
     if (this._useDaemon) {
@@ -934,9 +954,10 @@ var TaskService = class {
         await this.daemonClient.completeTask(id);
         return;
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          throw new DaemonOfflineError("complete task");
         }
+        throw e;
       }
     }
     await this.completeTaskInFiles(id);
@@ -970,9 +991,13 @@ var TaskService = class {
   }
   /**
    * Change a task's status.
+   * Requires daemon connection when daemon mode is enabled (except for statuses not supported by daemon API).
    */
   async changeStatus(id, newStatus) {
     if (this._useDaemon) {
+      if (!this.daemonClient.isConnected) {
+        throw new DaemonOfflineError("change task status");
+      }
       try {
         if (newStatus === "completed") {
           await this.daemonClient.completeTask(id);
@@ -981,13 +1006,14 @@ var TaskService = class {
         } else if (newStatus === "someday") {
           await this.daemonClient.deferTask(id);
         } else {
-          throw new DaemonUnavailableError("Status not supported via daemon");
+          throw new DaemonOfflineError(`change status to ${newStatus}`);
         }
         return;
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          throw new DaemonOfflineError("change task status");
         }
+        throw e;
       }
     }
     await this.changeStatusInFiles(id, newStatus);
@@ -1162,14 +1188,26 @@ var TaskListView = class extends import_obsidian5.ItemView {
   async refresh() {
     const container = this.containerEl.children[1];
     container.empty();
+    const isReadOnly = this.plugin.isReadOnly;
     container.createEl("div", { cls: "aio-task-list-container" }, (el) => {
+      if (isReadOnly) {
+        el.createEl("div", {
+          cls: "aio-readonly-banner",
+          text: 'Read-only: daemon offline. Run "aio daemon start" to enable writes.'
+        });
+      }
       el.createEl("div", { cls: "aio-task-list-header" }, (header) => {
         header.createEl("h4", { text: "Tasks", cls: "aio-task-list-title" });
         const addBtn = header.createEl("button", { cls: "aio-add-btn", attr: { "aria-label": "Add task" } });
         (0, import_obsidian5.setIcon)(addBtn, "plus");
-        addBtn.addEventListener("click", () => {
-          this.plugin.openQuickAddModal();
-        });
+        if (isReadOnly) {
+          addBtn.addClass("aio-disabled");
+          addBtn.setAttribute("title", "Daemon offline - cannot add tasks");
+        } else {
+          addBtn.addEventListener("click", () => {
+            this.plugin.openQuickAddModal();
+          });
+        }
       });
       el.createEl("div", { cls: "aio-status-tabs" }, (tabs) => {
         this.createTab(tabs, "all", "All");
@@ -1224,17 +1262,32 @@ var TaskListView = class extends import_obsidian5.ItemView {
   }
   renderTask(container, task) {
     const taskEl = container.createEl("div", { cls: "aio-task-item" });
+    const isReadOnly = this.plugin.isReadOnly;
     const checkbox = taskEl.createEl("input", {
       cls: "aio-task-checkbox",
       attr: { type: "checkbox" }
     });
     checkbox.checked = task.status === "completed";
-    checkbox.addEventListener("change", async () => {
-      if (checkbox.checked) {
-        await this.plugin.taskService.completeTask(task.id);
-        await this.refresh();
-      }
-    });
+    if (isReadOnly) {
+      checkbox.disabled = true;
+      checkbox.setAttribute("title", "Daemon offline - cannot complete tasks");
+    } else {
+      checkbox.addEventListener("change", async () => {
+        if (checkbox.checked) {
+          try {
+            await this.plugin.taskService.completeTask(task.id);
+            await this.refresh();
+          } catch (e) {
+            checkbox.checked = false;
+            if (e instanceof DaemonOfflineError) {
+              new import_obsidian5.Notice("Cannot complete task: daemon is offline.");
+            } else {
+              new import_obsidian5.Notice(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+            }
+          }
+        }
+      });
+    }
     const contentEl = taskEl.createEl("div", { cls: "aio-task-content" });
     const titleEl = contentEl.createEl("div", { cls: "aio-task-title", text: task.title });
     titleEl.addEventListener("click", () => {
@@ -1271,20 +1324,46 @@ var TaskListView = class extends import_obsidian5.ItemView {
     if (task.status !== "next" && task.status !== "completed") {
       const startBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Start" } });
       (0, import_obsidian5.setIcon)(startBtn, "play");
-      startBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await this.plugin.taskService.changeStatus(task.id, "next");
-        await this.refresh();
-      });
+      if (isReadOnly) {
+        startBtn.addClass("aio-disabled");
+        startBtn.setAttribute("title", "Daemon offline - cannot change status");
+      } else {
+        startBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.taskService.changeStatus(task.id, "next");
+            await this.refresh();
+          } catch (err) {
+            if (err instanceof DaemonOfflineError) {
+              new import_obsidian5.Notice("Cannot start task: daemon is offline.");
+            } else {
+              new import_obsidian5.Notice(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+            }
+          }
+        });
+      }
     }
     if (task.status !== "someday" && task.status !== "completed") {
       const deferBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Defer" } });
       (0, import_obsidian5.setIcon)(deferBtn, "clock");
-      deferBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await this.plugin.taskService.changeStatus(task.id, "someday");
-        await this.refresh();
-      });
+      if (isReadOnly) {
+        deferBtn.addClass("aio-disabled");
+        deferBtn.setAttribute("title", "Daemon offline - cannot change status");
+      } else {
+        deferBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.taskService.changeStatus(task.id, "someday");
+            await this.refresh();
+          } catch (err) {
+            if (err instanceof DaemonOfflineError) {
+              new import_obsidian5.Notice("Cannot defer task: daemon is offline.");
+            } else {
+              new import_obsidian5.Notice(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+            }
+          }
+        });
+      }
     }
     const editBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Edit" } });
     (0, import_obsidian5.setIcon)(editBtn, "pencil");
@@ -1324,7 +1403,14 @@ var InboxView = class extends import_obsidian6.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     this.skippedCount = 0;
+    const isReadOnly = this.plugin.isReadOnly;
     container.createEl("div", { cls: "aio-inbox-container" }, async (el) => {
+      if (isReadOnly) {
+        el.createEl("div", {
+          cls: "aio-readonly-banner",
+          text: 'Read-only: daemon offline. Run "aio daemon start" to process inbox.'
+        });
+      }
       el.createEl("div", { cls: "aio-inbox-header" }, (header) => {
         header.createEl("h4", { text: "Process Inbox", cls: "aio-inbox-title" });
       });
@@ -1333,7 +1419,7 @@ var InboxView = class extends import_obsidian6.ItemView {
         if (this.inboxTasks.length === 0) {
           this.renderInboxZero(el);
         } else {
-          this.renderCurrentTask(el);
+          this.renderCurrentTask(el, isReadOnly);
         }
       } catch (e) {
         el.createEl("div", { cls: "aio-error", text: `Error loading inbox: ${e}` });
@@ -1351,7 +1437,7 @@ var InboxView = class extends import_obsidian6.ItemView {
       });
     });
   }
-  renderCurrentTask(container) {
+  renderCurrentTask(container, isReadOnly = false) {
     const task = this.inboxTasks[this.currentIndex];
     container.createEl("div", { cls: "aio-inbox-progress" }, (progress) => {
       progress.createEl("span", {
@@ -1393,27 +1479,52 @@ var InboxView = class extends import_obsidian6.ItemView {
       startBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "play"));
       startBtn.createEl("span", { text: "Start" });
       startBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Next" });
-      startBtn.addEventListener("click", () => this.handleAction("next"));
+      if (isReadOnly) {
+        startBtn.addClass("aio-disabled");
+        startBtn.setAttribute("title", "Daemon offline - cannot process tasks");
+      } else {
+        startBtn.addEventListener("click", () => this.handleAction("next"));
+      }
       const deferBtn = actions.createEl("button", { cls: "aio-inbox-action" });
       deferBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "clock"));
       deferBtn.createEl("span", { text: "Defer" });
       deferBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Someday" });
-      deferBtn.addEventListener("click", () => this.handleAction("someday"));
+      if (isReadOnly) {
+        deferBtn.addClass("aio-disabled");
+        deferBtn.setAttribute("title", "Daemon offline - cannot process tasks");
+      } else {
+        deferBtn.addEventListener("click", () => this.handleAction("someday"));
+      }
       const waitBtn = actions.createEl("button", { cls: "aio-inbox-action" });
       waitBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "user"));
       waitBtn.createEl("span", { text: "Wait" });
       waitBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Waiting" });
-      waitBtn.addEventListener("click", () => this.handleAction("waiting"));
+      if (isReadOnly) {
+        waitBtn.addClass("aio-disabled");
+        waitBtn.setAttribute("title", "Daemon offline - cannot process tasks");
+      } else {
+        waitBtn.addEventListener("click", () => this.handleAction("waiting"));
+      }
       const scheduleBtn = actions.createEl("button", { cls: "aio-inbox-action" });
       scheduleBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "calendar"));
       scheduleBtn.createEl("span", { text: "Schedule" });
       scheduleBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Scheduled" });
-      scheduleBtn.addEventListener("click", () => this.handleAction("scheduled"));
+      if (isReadOnly) {
+        scheduleBtn.addClass("aio-disabled");
+        scheduleBtn.setAttribute("title", "Daemon offline - cannot process tasks");
+      } else {
+        scheduleBtn.addEventListener("click", () => this.handleAction("scheduled"));
+      }
       const completeBtn = actions.createEl("button", { cls: "aio-inbox-action" });
       completeBtn.createEl("span", { cls: "aio-action-icon" }, (span) => (0, import_obsidian6.setIcon)(span, "check"));
       completeBtn.createEl("span", { text: "Done" });
       completeBtn.createEl("span", { cls: "aio-action-hint", text: "\u2192 Completed" });
-      completeBtn.addEventListener("click", () => this.handleAction("completed"));
+      if (isReadOnly) {
+        completeBtn.addClass("aio-disabled");
+        completeBtn.setAttribute("title", "Daemon offline - cannot process tasks");
+      } else {
+        completeBtn.addEventListener("click", () => this.handleAction("completed"));
+      }
     });
     container.createEl("div", { cls: "aio-inbox-skip" }, (el) => {
       const skipBtn = el.createEl("button", { cls: "aio-skip-btn", text: "Skip for now" });
@@ -1468,7 +1579,12 @@ var InboxView = class extends import_obsidian6.ItemView {
       }
       await this.refresh();
     } catch (e) {
-      console.error("Error processing task:", e);
+      if (e instanceof DaemonOfflineError) {
+        new import_obsidian6.Notice('Cannot process task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error("Error processing task:", e);
+        new import_obsidian6.Notice(`Error processing task: ${e instanceof Error ? e.message : "Unknown error"}`);
+      }
     }
   }
 };
@@ -1596,6 +1712,13 @@ var QuickAddModal = class extends import_obsidian7.Modal {
     contentEl.empty();
     contentEl.addClass("aio-quick-add-modal");
     contentEl.createEl("h2", { text: "Quick Add Task" });
+    const isReadOnly = this.plugin.isReadOnly;
+    if (isReadOnly) {
+      contentEl.createEl("div", {
+        cls: "aio-readonly-banner",
+        text: 'Daemon offline - cannot create tasks. Run "aio daemon start" to enable writes.'
+      });
+    }
     new import_obsidian7.Setting(contentEl).setName("Title").setDesc("Task title (required)").addText((text) => {
       text.setPlaceholder("What needs to be done?").setValue(this.title).onChange((value) => {
         this.title = value;
@@ -1628,9 +1751,14 @@ var QuickAddModal = class extends import_obsidian7.Modal {
       this.close();
     });
     const submitBtn = buttonContainer.createEl("button", { cls: "mod-cta", text: "Add Task" });
-    submitBtn.addEventListener("click", () => {
-      this.submit();
-    });
+    if (isReadOnly) {
+      submitBtn.disabled = true;
+      submitBtn.addClass("aio-disabled");
+    } else {
+      submitBtn.addEventListener("click", () => {
+        this.submit();
+      });
+    }
     contentEl.createEl("div", {
       cls: "aio-modal-hint",
       text: "Press Enter to save, Esc to cancel"
@@ -1661,7 +1789,12 @@ var QuickAddModal = class extends import_obsidian7.Modal {
       this.onSubmit();
       this.close();
     } catch (e) {
-      console.error("Error creating task:", e);
+      if (e instanceof DaemonOfflineError) {
+        new import_obsidian7.Notice('Cannot create task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error("Error creating task:", e);
+        new import_obsidian7.Notice(`Error creating task: ${e instanceof Error ? e.message : "Unknown error"}`);
+      }
     }
   }
   onClose() {
@@ -1693,6 +1826,13 @@ var TaskEditModal = class extends import_obsidian8.Modal {
     contentEl.empty();
     contentEl.addClass("aio-task-edit-modal");
     contentEl.createEl("h2", { text: "Edit Task" });
+    const isReadOnly = this.plugin.isReadOnly;
+    if (isReadOnly) {
+      contentEl.createEl("div", {
+        cls: "aio-readonly-banner",
+        text: 'Daemon offline - cannot edit tasks. Run "aio daemon start" to enable writes.'
+      });
+    }
     contentEl.createEl("div", { cls: "aio-task-id-display", text: `ID: ${this.task.id}` });
     new import_obsidian8.Setting(contentEl).setName("Title").addText((text) => text.setValue(this.title).onChange((value) => {
       this.title = value;
@@ -1740,20 +1880,30 @@ var TaskEditModal = class extends import_obsidian8.Modal {
       this.close();
     });
     const saveBtn = buttonContainer.createEl("button", { cls: "mod-cta", text: "Save" });
-    saveBtn.addEventListener("click", () => {
-      this.save();
-    });
+    if (isReadOnly) {
+      saveBtn.disabled = true;
+      saveBtn.addClass("aio-disabled");
+    } else {
+      saveBtn.addEventListener("click", () => {
+        this.save();
+      });
+    }
     const deleteBtn = buttonContainer.createEl("button", { cls: "mod-warning", text: "Delete" });
-    deleteBtn.addEventListener("click", async () => {
-      if (confirm(`Are you sure you want to delete "${this.task.title}"?`)) {
-        const file = this.app.vault.getAbstractFileByPath(this.task.path);
-        if (file) {
-          await this.app.vault.delete(file);
-          this.onSubmit();
-          this.close();
+    if (isReadOnly) {
+      deleteBtn.disabled = true;
+      deleteBtn.addClass("aio-disabled");
+    } else {
+      deleteBtn.addEventListener("click", async () => {
+        if (confirm(`Are you sure you want to delete "${this.task.title}"?`)) {
+          const file = this.app.vault.getAbstractFileByPath(this.task.path);
+          if (file) {
+            await this.app.vault.delete(file);
+            this.onSubmit();
+            this.close();
+          }
         }
-      }
-    });
+      });
+    }
   }
   async save() {
     if (!this.title.trim()) {
@@ -1777,7 +1927,12 @@ var TaskEditModal = class extends import_obsidian8.Modal {
       this.onSubmit();
       this.close();
     } catch (e) {
-      console.error("Error saving task:", e);
+      if (e instanceof DaemonOfflineError) {
+        new import_obsidian8.Notice('Cannot save task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error("Error saving task:", e);
+        new import_obsidian8.Notice(`Error saving task: ${e instanceof Error ? e.message : "Unknown error"}`);
+      }
     }
   }
   onClose() {
@@ -1793,6 +1948,14 @@ var AioPlugin = class extends import_obsidian9.Plugin {
     super(...arguments);
     this.statusBarItem = null;
     this.healthCheckInterval = null;
+  }
+  /**
+   * Whether the plugin is in read-only mode.
+   * Read-only when daemon mode is enabled but daemon is not connected.
+   */
+  get isReadOnly() {
+    var _a, _b;
+    return (_b = (_a = this.taskService) == null ? void 0 : _a.isReadOnly) != null ? _b : false;
   }
   async onload() {
     await this.loadSettings();
@@ -1841,6 +2004,12 @@ var AioPlugin = class extends import_obsidian9.Plugin {
           if (!checking) {
             this.taskService.completeTask(task.id).then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new import_obsidian9.Notice('Cannot complete task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new import_obsidian9.Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -1857,6 +2026,12 @@ var AioPlugin = class extends import_obsidian9.Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, "next").then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new import_obsidian9.Notice('Cannot start task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new import_obsidian9.Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -1873,6 +2048,12 @@ var AioPlugin = class extends import_obsidian9.Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, "someday").then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new import_obsidian9.Notice('Cannot defer task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new import_obsidian9.Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -1889,6 +2070,12 @@ var AioPlugin = class extends import_obsidian9.Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, "waiting").then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new import_obsidian9.Notice('Cannot set task to waiting: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new import_obsidian9.Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -1905,6 +2092,12 @@ var AioPlugin = class extends import_obsidian9.Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, "scheduled").then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new import_obsidian9.Notice('Cannot schedule task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new import_obsidian9.Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -1974,11 +2167,11 @@ var AioPlugin = class extends import_obsidian9.Plugin {
       this.statusBarItem.setText("AIO: Connected");
       this.statusBarItem.setAttribute("title", "Connected to AIO daemon");
       this.statusBarItem.addClass("aio-connected");
-      this.statusBarItem.removeClass("aio-disconnected");
+      this.statusBarItem.removeClass("aio-disconnected", "aio-readonly");
     } else {
-      this.statusBarItem.setText("AIO: Offline");
-      this.statusBarItem.setAttribute("title", "Daemon not available - read-only mode");
-      this.statusBarItem.addClass("aio-disconnected");
+      this.statusBarItem.setText("AIO: Read-only");
+      this.statusBarItem.setAttribute("title", 'Daemon offline - read-only mode. Run "aio daemon start" to enable writes.');
+      this.statusBarItem.addClass("aio-disconnected", "aio-readonly");
       this.statusBarItem.removeClass("aio-connected");
     }
   }

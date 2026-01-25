@@ -22,6 +22,17 @@ export class DaemonUnavailableError extends Error {
 }
 
 /**
+ * Error thrown when a write operation is attempted while daemon is offline.
+ * Used to enforce read-only mode when daemon is unavailable.
+ */
+export class DaemonOfflineError extends Error {
+  constructor(operation: string = 'operation') {
+    super(`Cannot ${operation}: daemon is offline. Start the daemon with 'aio daemon start' or disable daemon mode in settings.`);
+    this.name = 'DaemonOfflineError';
+  }
+}
+
+/**
  * Error thrown when daemon returns an error response.
  */
 export class DaemonApiError extends Error {

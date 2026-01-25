@@ -13,7 +13,7 @@
 | 7 | MCP cache never refreshes | **CONFIRMED (by design)** | Low |
 | 8 | Archive metadata not written | **FIXED** | Medium |
 | 9 | Daemon endpoint mismatch in docs | **FIXED** | Low |
-| 10 | Plugin writes files in fallback mode | **CONFIRMED** | Medium |
+| 10 | Plugin writes files in fallback mode | **FIXED** | Medium |
 
 ### Finding Details
 
@@ -85,12 +85,22 @@
 - **Solution:** Updated documentation to match implementation.
 - **Files fixed:** `docs/DAEMON_ARCHITECTURE.md` (line 198) - `/wait` → `/delegate`
 
-#### #10 - Plugin Writes in Fallback Mode
+#### #10 - Plugin Writes in Fallback Mode (FIXED)
 - **Problem:** Obsidian plugin has full file write and ID generation capability when daemon is offline.
 - **Impact:** Two sources of truth; potential ID collisions if plugin and daemon both generate IDs.
-- **Files involved:**
-  - `obsidian-aio/src/services/TaskService.ts` (lines 341-398, 64-90)
-- **Fix:** See "Obsidian Plugin: Read-Only Fallback" section below.
+- **Solution:** Implemented read-only mode when daemon is offline:
+  - Write operations now throw `DaemonOfflineError` instead of falling back to file writes
+  - UI shows read-only banner and disables action buttons when offline
+  - Status bar shows "AIO: Read-only" to indicate the mode
+- **Files fixed:**
+  - `obsidian-aio/src/services/TaskService.ts` - write operations throw errors when offline
+  - `obsidian-aio/src/services/DaemonClient.ts` - added `DaemonOfflineError` class
+  - `obsidian-aio/src/main.ts` - `isReadOnly` property, updated status bar
+  - `obsidian-aio/src/modals/QuickAddModal.ts` - read-only banner, disabled button
+  - `obsidian-aio/src/modals/TaskEditModal.ts` - read-only banner, disabled buttons
+  - `obsidian-aio/src/views/TaskListView.ts` - read-only banner, disabled actions
+  - `obsidian-aio/src/views/InboxView.ts` - read-only banner, disabled actions
+  - `obsidian-aio/styles.css` - styling for read-only state
 
 ---
 
@@ -150,20 +160,39 @@ Added existence checks to TaskService.create(), ProjectService.create(), PersonS
 - Added `_read_task_file()` support for reading archive metadata
 - Added test: `test_archive_task_sets_metadata`
 
-### Phase 3: Plugin Read-Only Fallback (Finding #10)
+### Phase 3: Plugin Read-Only Fallback (Finding #10) - **DONE**
 
 **Goal:** Keep daemon as the only write path.
 
-**If daemon is unavailable:**
-- Read-only mode with explicit banner (e.g., "Daemon offline - tasks are read-only")
-- Provide a one-click action or instructions to restart (`aio daemon start`)
-- Show connection status in the UI (e.g., status pill + last error)
+**Implementation completed:**
 
-**Changes needed in `obsidian-aio/src/`:**
-- Remove/disable file writes in `TaskService.ts` fallback paths
-- Remove ID generation in fallback mode
-- Add UI banner component for offline status
-- Update status bar to show "Read-only" instead of "Offline"
+**TaskService changes (`obsidian-aio/src/services/TaskService.ts`):**
+- Added `isReadOnly` property to detect when daemon mode is enabled but offline
+- `createTask()` now throws `DaemonOfflineError` instead of falling back to file writes
+- `updateTask()` checks daemon connection and throws `DaemonOfflineError` if offline
+- `completeTask()` now throws `DaemonOfflineError` instead of falling back
+- `changeStatus()` now throws `DaemonOfflineError` instead of falling back
+
+**DaemonClient changes (`obsidian-aio/src/services/DaemonClient.ts`):**
+- Added `DaemonOfflineError` class for clear error messaging
+
+**Main plugin changes (`obsidian-aio/src/main.ts`):**
+- Added `isReadOnly` property exposed to UI components
+- Updated status bar to show "AIO: Read-only" instead of "AIO: Offline"
+- All command handlers now catch `DaemonOfflineError` and show user-friendly notices
+
+**Modal changes:**
+- `QuickAddModal.ts`: Shows read-only banner, disables submit button when offline
+- `TaskEditModal.ts`: Shows read-only banner, disables save/delete buttons when offline
+
+**View changes:**
+- `TaskListView.ts`: Shows read-only banner, disables add/action buttons, handles errors
+- `InboxView.ts`: Shows read-only banner, disables all action buttons when offline
+
+**Styles (`obsidian-aio/styles.css`):**
+- Added `.aio-readonly-banner` for warning banner styling
+- Added `.aio-disabled` for disabled button states
+- Added status bar color classes for connected/read-only states
 
 ### Phase 4: Documentation
 
@@ -188,4 +217,8 @@ Added existence checks to TaskService.create(), ProjectService.create(), PersonS
 - Canonical wikilink format tests
 - Title search with completed subfolders tests
 - Archive metadata tests
-- Plugin read-only mode tests (TypeScript/Vitest)
+- Plugin read-only mode tests (TypeScript/Vitest):
+  - `TaskService.isReadOnly` returns true when daemon enabled but offline
+  - Write operations throw `DaemonOfflineError` when offline
+  - UI components disable action buttons in read-only mode
+  - Status bar shows "Read-only" when daemon offline

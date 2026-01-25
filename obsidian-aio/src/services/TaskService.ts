@@ -1,7 +1,7 @@
 import { App, TFile, TFolder, normalizePath } from 'obsidian';
 import { Task, TaskStatus, CreateTaskOptions, ID_CHARS, AioSettings } from '../types';
 import { VaultService } from './VaultService';
-import { DaemonClient, DaemonUnavailableError } from './DaemonClient';
+import { DaemonClient, DaemonUnavailableError, DaemonOfflineError } from './DaemonClient';
 
 /**
  * Service for task CRUD operations.
@@ -29,6 +29,14 @@ export class TaskService {
    */
   get isDaemonConnected(): boolean {
     return this._useDaemon && this.daemonClient.isConnected;
+  }
+
+  /**
+   * Whether the plugin is in read-only mode.
+   * Read-only when daemon mode is enabled but daemon is not connected.
+   */
+  get isReadOnly(): boolean {
+    return this._useDaemon && !this.daemonClient.isConnected;
   }
 
   /**
@@ -337,21 +345,23 @@ export class TaskService {
 
   /**
    * Create a new task.
+   * Requires daemon connection when daemon mode is enabled.
    */
   async createTask(title: string, options: CreateTaskOptions = {}): Promise<Task> {
-    // Try daemon first if enabled
+    // If daemon mode is enabled, require daemon connection
     if (this._useDaemon) {
       try {
         return await this.daemonClient.createTask(title, options);
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          // Don't fall back - throw read-only error
+          throw new DaemonOfflineError('create task');
         }
-        // Fall through to file-based approach
+        throw e;
       }
     }
 
-    // Fallback to file-based approach
+    // Only allow file-based approach when daemon mode is disabled
     return this.createTaskInFiles(title, options);
   }
 
@@ -399,8 +409,14 @@ export class TaskService {
 
   /**
    * Update an existing task.
+   * Requires daemon to be available when daemon mode is enabled.
    */
   async updateTask(task: Task): Promise<void> {
+    // If daemon mode is enabled but not connected, throw read-only error
+    if (this._useDaemon && !this.daemonClient.isConnected) {
+      throw new DaemonOfflineError('update task');
+    }
+
     task.updated = new Date().toISOString();
     const content = this.serializeTask(task);
 
@@ -414,22 +430,24 @@ export class TaskService {
 
   /**
    * Mark a task as completed.
+   * Requires daemon connection when daemon mode is enabled.
    */
   async completeTask(id: string): Promise<void> {
-    // Try daemon first if enabled
+    // If daemon mode is enabled, require daemon connection
     if (this._useDaemon) {
       try {
         await this.daemonClient.completeTask(id);
         return;
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          // Don't fall back - throw read-only error
+          throw new DaemonOfflineError('complete task');
         }
-        // Fall through to file-based approach
+        throw e;
       }
     }
 
-    // Fallback to file-based approach
+    // Only allow file-based approach when daemon mode is disabled
     await this.completeTaskInFiles(id);
   }
 
@@ -470,10 +488,16 @@ export class TaskService {
 
   /**
    * Change a task's status.
+   * Requires daemon connection when daemon mode is enabled (except for statuses not supported by daemon API).
    */
   async changeStatus(id: string, newStatus: TaskStatus): Promise<void> {
-    // Try daemon first if enabled
+    // If daemon mode is enabled, require daemon connection
     if (this._useDaemon) {
+      // Check if daemon is connected before attempting
+      if (!this.daemonClient.isConnected) {
+        throw new DaemonOfflineError('change task status');
+      }
+
       try {
         if (newStatus === 'completed') {
           await this.daemonClient.completeTask(id);
@@ -482,20 +506,21 @@ export class TaskService {
         } else if (newStatus === 'someday') {
           await this.daemonClient.deferTask(id);
         } else {
-          // For other statuses, fall through to file-based approach
-          // (daemon API doesn't have endpoints for waiting/scheduled directly)
-          throw new DaemonUnavailableError('Status not supported via daemon');
+          // For waiting/scheduled, daemon doesn't have direct endpoints
+          // Still require daemon to be connected - throw read-only error
+          throw new DaemonOfflineError(`change status to ${newStatus}`);
         }
         return;
       } catch (e) {
-        if (!(e instanceof DaemonUnavailableError)) {
-          throw e;
+        if (e instanceof DaemonUnavailableError) {
+          // Don't fall back - throw read-only error
+          throw new DaemonOfflineError('change task status');
         }
-        // Fall through to file-based approach
+        throw e;
       }
     }
 
-    // Fallback to file-based approach
+    // Only allow file-based approach when daemon mode is disabled
     await this.changeStatusInFiles(id, newStatus);
   }
 

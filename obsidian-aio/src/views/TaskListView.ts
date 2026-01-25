@@ -1,6 +1,7 @@
-import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import type AioPlugin from '../main';
 import { Task, TaskStatus, STATUS_FOLDERS } from '../types';
+import { DaemonOfflineError } from '../services/DaemonClient';
 
 export const TASK_LIST_VIEW_TYPE = 'aio-task-list';
 
@@ -38,15 +39,30 @@ export class TaskListView extends ItemView {
     const container = this.containerEl.children[1];
     container.empty();
 
+    const isReadOnly = this.plugin.isReadOnly;
+
     container.createEl('div', { cls: 'aio-task-list-container' }, (el) => {
+      // Show read-only banner if daemon is offline
+      if (isReadOnly) {
+        el.createEl('div', {
+          cls: 'aio-readonly-banner',
+          text: 'Read-only: daemon offline. Run "aio daemon start" to enable writes.',
+        });
+      }
+
       // Header with title and add button
       el.createEl('div', { cls: 'aio-task-list-header' }, (header) => {
         header.createEl('h4', { text: 'Tasks', cls: 'aio-task-list-title' });
         const addBtn = header.createEl('button', { cls: 'aio-add-btn', attr: { 'aria-label': 'Add task' } });
         setIcon(addBtn, 'plus');
-        addBtn.addEventListener('click', () => {
-          this.plugin.openQuickAddModal();
-        });
+        if (isReadOnly) {
+          addBtn.addClass('aio-disabled');
+          addBtn.setAttribute('title', 'Daemon offline - cannot add tasks');
+        } else {
+          addBtn.addEventListener('click', () => {
+            this.plugin.openQuickAddModal();
+          });
+        }
       });
 
       // Status filter tabs
@@ -111,6 +127,7 @@ export class TaskListView extends ItemView {
 
   private renderTask(container: HTMLElement, task: Task): void {
     const taskEl = container.createEl('div', { cls: 'aio-task-item' });
+    const isReadOnly = this.plugin.isReadOnly;
 
     // Checkbox
     const checkbox = taskEl.createEl('input', {
@@ -118,12 +135,26 @@ export class TaskListView extends ItemView {
       attr: { type: 'checkbox' },
     });
     checkbox.checked = task.status === 'completed';
-    checkbox.addEventListener('change', async () => {
-      if (checkbox.checked) {
-        await this.plugin.taskService.completeTask(task.id);
-        await this.refresh();
-      }
-    });
+    if (isReadOnly) {
+      checkbox.disabled = true;
+      checkbox.setAttribute('title', 'Daemon offline - cannot complete tasks');
+    } else {
+      checkbox.addEventListener('change', async () => {
+        if (checkbox.checked) {
+          try {
+            await this.plugin.taskService.completeTask(task.id);
+            await this.refresh();
+          } catch (e) {
+            checkbox.checked = false;
+            if (e instanceof DaemonOfflineError) {
+              new Notice('Cannot complete task: daemon is offline.');
+            } else {
+              new Notice(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            }
+          }
+        }
+      });
+    }
 
     // Task content
     const contentEl = taskEl.createEl('div', { cls: 'aio-task-content' });
@@ -178,24 +209,50 @@ export class TaskListView extends ItemView {
     if (task.status !== 'next' && task.status !== 'completed') {
       const startBtn = actionsEl.createEl('button', { cls: 'aio-action-btn', attr: { 'aria-label': 'Start' } });
       setIcon(startBtn, 'play');
-      startBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await this.plugin.taskService.changeStatus(task.id, 'next');
-        await this.refresh();
-      });
+      if (isReadOnly) {
+        startBtn.addClass('aio-disabled');
+        startBtn.setAttribute('title', 'Daemon offline - cannot change status');
+      } else {
+        startBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.taskService.changeStatus(task.id, 'next');
+            await this.refresh();
+          } catch (err) {
+            if (err instanceof DaemonOfflineError) {
+              new Notice('Cannot start task: daemon is offline.');
+            } else {
+              new Notice(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            }
+          }
+        });
+      }
     }
 
     if (task.status !== 'someday' && task.status !== 'completed') {
       const deferBtn = actionsEl.createEl('button', { cls: 'aio-action-btn', attr: { 'aria-label': 'Defer' } });
       setIcon(deferBtn, 'clock');
-      deferBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await this.plugin.taskService.changeStatus(task.id, 'someday');
-        await this.refresh();
-      });
+      if (isReadOnly) {
+        deferBtn.addClass('aio-disabled');
+        deferBtn.setAttribute('title', 'Daemon offline - cannot change status');
+      } else {
+        deferBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.taskService.changeStatus(task.id, 'someday');
+            await this.refresh();
+          } catch (err) {
+            if (err instanceof DaemonOfflineError) {
+              new Notice('Cannot defer task: daemon is offline.');
+            } else {
+              new Notice(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            }
+          }
+        });
+      }
     }
 
-    // Edit button
+    // Edit button - always enabled to allow viewing, but modal will show read-only state
     const editBtn = actionsEl.createEl('button', { cls: 'aio-action-btn', attr: { 'aria-label': 'Edit' } });
     setIcon(editBtn, 'pencil');
     editBtn.addEventListener('click', (e) => {

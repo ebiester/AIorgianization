@@ -1,6 +1,7 @@
 import { App, Modal, Notice, Setting } from 'obsidian';
 import type AioPlugin from '../main';
 import { parseDate, formatIsoDate, InvalidDateError } from '../utils/dates';
+import { DaemonOfflineError } from '../services/DaemonClient';
 
 export class QuickAddModal extends Modal {
   private plugin: AioPlugin;
@@ -21,6 +22,15 @@ export class QuickAddModal extends Modal {
     contentEl.addClass('aio-quick-add-modal');
 
     contentEl.createEl('h2', { text: 'Quick Add Task' });
+
+    // Show read-only warning if daemon is offline
+    const isReadOnly = this.plugin.isReadOnly;
+    if (isReadOnly) {
+      contentEl.createEl('div', {
+        cls: 'aio-readonly-banner',
+        text: 'Daemon offline - cannot create tasks. Run "aio daemon start" to enable writes.',
+      });
+    }
 
     // Title input (autofocus)
     new Setting(contentEl)
@@ -81,9 +91,14 @@ export class QuickAddModal extends Modal {
     });
 
     const submitBtn = buttonContainer.createEl('button', { cls: 'mod-cta', text: 'Add Task' });
-    submitBtn.addEventListener('click', () => {
-      this.submit();
-    });
+    if (isReadOnly) {
+      submitBtn.disabled = true;
+      submitBtn.addClass('aio-disabled');
+    } else {
+      submitBtn.addEventListener('click', () => {
+        this.submit();
+      });
+    }
 
     // Keyboard shortcut hint
     contentEl.createEl('div', {
@@ -121,7 +136,12 @@ export class QuickAddModal extends Modal {
       this.onSubmit();
       this.close();
     } catch (e) {
-      console.error('Error creating task:', e);
+      if (e instanceof DaemonOfflineError) {
+        new Notice('Cannot create task: daemon is offline. Run "aio daemon start" to enable writes.');
+      } else {
+        console.error('Error creating task:', e);
+        new Notice(`Error creating task: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
   }
 

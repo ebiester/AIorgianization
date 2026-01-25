@@ -7,6 +7,7 @@ import { TaskListView, TASK_LIST_VIEW_TYPE } from './views/TaskListView';
 import { InboxView, INBOX_VIEW_TYPE } from './views/InboxView';
 import { QuickAddModal } from './modals/QuickAddModal';
 import { TaskEditModal } from './modals/TaskEditModal';
+import { DaemonOfflineError } from './services/DaemonClient';
 
 /** Interval for daemon health checks (30 seconds). */
 const HEALTH_CHECK_INTERVAL = 30000;
@@ -17,6 +18,14 @@ export default class AioPlugin extends Plugin {
   taskService: TaskService;
   private statusBarItem: HTMLElement | null = null;
   private healthCheckInterval: number | null = null;
+
+  /**
+   * Whether the plugin is in read-only mode.
+   * Read-only when daemon mode is enabled but daemon is not connected.
+   */
+  get isReadOnly(): boolean {
+    return this.taskService?.isReadOnly ?? false;
+  }
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -86,6 +95,12 @@ export default class AioPlugin extends Plugin {
           if (!checking) {
             this.taskService.completeTask(task.id).then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new Notice('Cannot complete task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -103,6 +118,12 @@ export default class AioPlugin extends Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, 'next').then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new Notice('Cannot start task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -120,6 +141,12 @@ export default class AioPlugin extends Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, 'someday').then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new Notice('Cannot defer task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -137,6 +164,12 @@ export default class AioPlugin extends Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, 'waiting').then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new Notice('Cannot set task to waiting: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -154,6 +187,12 @@ export default class AioPlugin extends Plugin {
           if (!checking) {
             this.taskService.changeStatus(task.id, 'scheduled').then(() => {
               this.refreshViews();
+            }).catch((e) => {
+              if (e instanceof DaemonOfflineError) {
+                new Notice('Cannot schedule task: daemon is offline. Run "aio daemon start" to enable writes.');
+              } else {
+                new Notice(`Error: ${e.message}`);
+              }
             });
           }
           return true;
@@ -240,11 +279,11 @@ export default class AioPlugin extends Plugin {
       this.statusBarItem.setText('AIO: Connected');
       this.statusBarItem.setAttribute('title', 'Connected to AIO daemon');
       this.statusBarItem.addClass('aio-connected');
-      this.statusBarItem.removeClass('aio-disconnected');
+      this.statusBarItem.removeClass('aio-disconnected', 'aio-readonly');
     } else {
-      this.statusBarItem.setText('AIO: Offline');
-      this.statusBarItem.setAttribute('title', 'Daemon not available - read-only mode');
-      this.statusBarItem.addClass('aio-disconnected');
+      this.statusBarItem.setText('AIO: Read-only');
+      this.statusBarItem.setAttribute('title', 'Daemon offline - read-only mode. Run "aio daemon start" to enable writes.');
+      this.statusBarItem.addClass('aio-disconnected', 'aio-readonly');
       this.statusBarItem.removeClass('aio-connected');
     }
   }
