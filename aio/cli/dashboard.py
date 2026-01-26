@@ -19,14 +19,24 @@ console = Console()
 @click.command()
 @click.option("--date", "date_str", help="Generate for specific date (default: today)")
 @click.option("--stdout", is_flag=True, help="Print to stdout instead of saving file")
+@click.option(
+    "--standalone",
+    is_flag=True,
+    help="Save as standalone file instead of embedding in daily note",
+)
 @click.pass_context
-def dashboard(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
+def dashboard(
+    ctx: click.Context, date_str: str | None, stdout: bool, standalone: bool
+) -> None:
     """Generate the daily dashboard.
 
-    Creates or updates the dashboard file in AIO/Dashboard/.
+    By default, embeds the dashboard in your daily note (if it exists).
+    Falls back to creating a standalone file in AIO/Dashboard/ if the
+    daily note is not found.
 
     Examples:
-        aio dashboard                    # Today's dashboard
+        aio dashboard                    # Embed in daily note (or standalone fallback)
+        aio dashboard --standalone       # Force standalone file
         aio dashboard --date 2024-01-15  # Specific date
         aio dashboard --stdout           # Print without saving
     """
@@ -41,7 +51,7 @@ def dashboard(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
             pass
 
     # Fallback or save mode: use direct
-    _dashboard_direct(ctx, date_str, stdout)
+    _dashboard_direct(ctx, date_str, stdout, standalone)
 
 
 def _dashboard_via_daemon(client: DaemonClient, date_str: str | None) -> None:
@@ -51,7 +61,9 @@ def _dashboard_via_daemon(client: DaemonClient, date_str: str | None) -> None:
     console.print(content)
 
 
-def _dashboard_direct(ctx: click.Context, date_str: str | None, stdout: bool) -> None:
+def _dashboard_direct(
+    ctx: click.Context, date_str: str | None, stdout: bool, standalone: bool
+) -> None:
     """Generate dashboard via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
     vault_service = VaultService(vault_path)
@@ -68,8 +80,21 @@ def _dashboard_direct(ctx: click.Context, date_str: str | None, stdout: bool) ->
             raise click.Abort() from None
 
     if stdout:
-        content = dashboard_service.generate(for_date)
+        # Print callout format (for embedding) by default
+        content = dashboard_service.generate_callout(for_date)
         console.print(content)
-    else:
+    elif standalone:
+        # Explicit standalone mode
         filepath = dashboard_service.save(for_date)
         console.print(f"[green]Dashboard saved:[/green] {filepath}")
+    else:
+        # Default: try to embed in daily note, fallback to standalone
+        filepath = dashboard_service.embed_in_daily_note(for_date)
+        if filepath:
+            console.print(f"[green]Dashboard embedded in:[/green] {filepath}")
+        else:
+            # Daily note doesn't exist - fallback to standalone
+            filepath = dashboard_service.save(for_date)
+            console.print(
+                f"[yellow]Daily note not found, saving standalone:[/yellow] {filepath}"
+            )

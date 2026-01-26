@@ -121,7 +121,8 @@ aio init <vault-path>             # Initialize AIO structure
 aio add "Task" -d tomorrow        # Quick add
 aio list inbox                    # List inbox tasks
 aio done <id>                     # Complete task
-aio dashboard                     # Generate dashboard
+aio dashboard                     # Embed in daily note (or standalone fallback)
+aio dashboard --standalone        # Force standalone file
 
 # Comprehensive test runner (Python + TypeScript + MCP)
 ./scripts/test/run-tests.sh                    # Run all tests
@@ -149,9 +150,11 @@ aio wait <task> [person]          # Move to Waiting
 # The -a/--assign flag creates task and delegates immediately:
 # aio add "Review API" --assign Sarah  # Creates in Waiting status
 
-# Dashboard
-aio dashboard                     # Generate/update today's dashboard
+# Dashboard (embeds in daily note by default, falls back to standalone)
+aio dashboard                     # Embed in daily note (or standalone fallback)
+aio dashboard --standalone        # Force standalone file in AIO/Dashboard/
 aio dashboard --date 2024-01-15   # Specific date
+aio dashboard --stdout            # Print to stdout without saving
 
 # Plugin management
 aio plugin upgrade                # Upgrade Obsidian plugin in vault

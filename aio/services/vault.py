@@ -3,16 +3,27 @@
 The vault is an Obsidian vault with the AIO directory structure initialized.
 """
 
+from __future__ import annotations
+
 import importlib.resources
 import json
 import os
 import shutil
+from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    pass  # Future type imports if needed
 
 import yaml
 
 from aio.exceptions import VaultNotFoundError, VaultNotInitializedError
+
+# Default daily note settings
+DEFAULT_DAILY_NOTE_FOLDER = "Daily"
+DEFAULT_DAILY_NOTE_FORMAT = "YYYY-MM-DD"
+DEFAULT_DASHBOARD_CALLOUT = "aio-dashboard"
 
 # Default vault structure
 AIO_FOLDERS = [
@@ -363,3 +374,69 @@ class VaultService:
         # Write back
         with open(community_plugins_file, "w", encoding="utf-8") as f:
             json.dump(enabled_plugins, f, indent=2)
+
+    def get_daily_note_settings(self) -> dict[str, Any]:
+        """Get daily note settings from Obsidian or AIO config.
+
+        Reads from Obsidian's daily-notes.json if available, otherwise
+        falls back to AIO config or defaults.
+
+        Returns:
+            Dictionary with 'folder', 'format', and 'callout' keys.
+        """
+        # Check AIO config first (allows user override)
+        aio_config = self.get_config()
+        dashboard_config = aio_config.get("dashboard", {})
+
+        # Then check Obsidian's daily-notes.json
+        obsidian_settings: dict[str, Any] = {}
+        daily_notes_file = self.vault_path / ".obsidian" / "daily-notes.json"
+        if daily_notes_file.exists():
+            try:
+                with open(daily_notes_file, encoding="utf-8") as f:
+                    obsidian_settings = json.load(f)
+            except Exception:
+                pass
+
+        # Merge settings with priority: AIO config > Obsidian > defaults
+        return {
+            "folder": dashboard_config.get(
+                "daily_note_folder",
+                obsidian_settings.get("folder", DEFAULT_DAILY_NOTE_FOLDER),
+            ),
+            "format": dashboard_config.get(
+                "daily_note_format",
+                obsidian_settings.get("format", DEFAULT_DAILY_NOTE_FORMAT),
+            ),
+            "callout": dashboard_config.get(
+                "callout_type", DEFAULT_DASHBOARD_CALLOUT
+            ),
+        }
+
+    def get_daily_note_path(self, for_date: date) -> Path:
+        """Get the path to a daily note for a specific date.
+
+        Args:
+            for_date: The date for the daily note.
+
+        Returns:
+            Full path to the daily note file.
+        """
+        settings = self.get_daily_note_settings()
+        folder = settings["folder"]
+        date_format = settings["format"]
+
+        # Convert Obsidian date format to Python strftime format
+        # Obsidian uses: YYYY, MM, DD, etc.
+        # Python uses: %Y, %m, %d, etc.
+        strftime_format = (
+            date_format.replace("YYYY", "%Y")
+            .replace("YY", "%y")
+            .replace("MM", "%m")
+            .replace("DD", "%d")
+            .replace("dddd", "%A")  # Full weekday name
+            .replace("ddd", "%a")  # Abbreviated weekday
+        )
+
+        filename = for_date.strftime(strftime_format) + ".md"
+        return self.vault_path / folder / filename

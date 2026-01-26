@@ -12,11 +12,12 @@ A personal task and deadline management system for engineering managers, built o
 4. [Daily Workflow](#daily-workflow)
 5. [CLI Reference](#cli-reference)
 6. [Integrations](#integrations)
-7. [File Formats](#file-formats)
-8. [Tips](#tips)
-9. [Development](#development)
-10. [Troubleshooting](#troubleshooting)
-11. [Reference](#reference)
+7. [Daily Note Integration](#daily-note-integration)
+8. [File Formats](#file-formats)
+9. [Tips](#tips)
+10. [Development](#development)
+11. [Troubleshooting](#troubleshooting)
+12. [Reference](#reference)
 
 ---
 
@@ -367,11 +368,26 @@ After running `aio plugin upgrade`, reload Obsidian:
 - Toggle the plugin off and on in Settings → Community plugins, OR
 - Press Cmd+R (Mac) / Ctrl+R (Windows) to reload Obsidian
 
+### Dashboard
+
+```bash
+# Default: embed in daily note (falls back to standalone if daily note doesn't exist)
+aio dashboard                    # Embed in daily note or create standalone
+aio dashboard --date 2026-01-15  # Specific date
+
+# Force standalone file (skip daily note embedding)
+aio dashboard --standalone       # Creates AIO/Dashboard/YYYY-MM-DD.md
+
+# Print without saving
+aio dashboard --stdout           # Print callout format to stdout
+```
+
+See [Daily Note Integration](#daily-note-integration) for setup with Templater.
+
 ### Other Commands
 
 ```bash
 aio init <vault-path>      # Initialize AIO structure
-aio dashboard              # Generate today's dashboard
 aio delegated              # Show all delegated tasks by person
 aio delegated Sarah        # Show tasks delegated to Sarah
 aio project list           # List all projects
@@ -434,6 +450,114 @@ Once configured, you can ask your AI assistant:
 - "Add a task for Sarah to update the docs" → Uses `aio_add_task` with `assign`
 - "Show my inbox" → Uses `aio_list_tasks`
 - "Mark the auth bug task as done" → Uses `aio_complete_task`
+
+---
+
+## Daily Note Integration
+
+If you use Obsidian's Daily Notes or Templater plugin, AIO automatically embeds your dashboard directly into your daily note. If the daily note doesn't exist, it falls back to creating a standalone file.
+
+### How It Works
+
+1. Your Templater template includes a callout placeholder
+2. Running `aio dashboard` finds your daily note and replaces the callout content
+3. The rest of your daily note (morning routine, personal notes, etc.) is preserved
+4. If no daily note exists, a standalone file is created in `AIO/Dashboard/`
+
+### Setup
+
+#### 1. Add the Callout to Your Template
+
+In your Templater daily note template, add a placeholder callout where you want the dashboard:
+
+```markdown
+# <% tp.date.now("YYYY-MM-DD") %>
+
+## Morning Routine
+- [ ] Review calendar
+- [ ] Check email
+
+## Tasks
+> [!aio-dashboard]
+> Run `aio dashboard --embed` to populate
+
+## Notes
+
+## End of Day
+```
+
+The `> [!aio-dashboard]` callout is the marker that AIO looks for. Everything inside the callout will be replaced when you run the dashboard command.
+
+#### 2. Configure AIO (Optional)
+
+AIO automatically reads your Obsidian daily notes settings from `.obsidian/daily-notes.json`. If you need to override these, add to your `.aio/config.yaml`:
+
+```yaml
+dashboard:
+  daily_note_folder: "Daily"           # Default: reads from Obsidian
+  daily_note_format: "YYYY-MM-DD"      # Default: reads from Obsidian
+  callout_type: "aio-dashboard"        # Default: aio-dashboard
+```
+
+Supported date format tokens:
+- `YYYY` - 4-digit year (2026)
+- `YY` - 2-digit year (26)
+- `MM` - 2-digit month (01-12)
+- `DD` - 2-digit day (01-31)
+- `dddd` - Full weekday name (Monday)
+- `ddd` - Abbreviated weekday (Mon)
+
+#### 3. Generate Your Dashboard
+
+```bash
+# Embed in today's daily note (default behavior)
+aio dashboard
+
+# For a specific date
+aio dashboard --date 2026-01-15
+
+# Force standalone file (skip daily note embedding)
+aio dashboard --standalone
+```
+
+### Example Output
+
+After running `aio dashboard --embed`, your daily note will look like:
+
+```markdown
+# 2026-01-26
+
+## Morning Routine
+- [ ] Review calendar
+- [ ] Check email
+
+## Tasks
+> [!aio-dashboard] AIO Dashboard
+> **Overdue**
+>
+> | Task | Due | ID |
+> |------|-----|------|
+> | Fix auth bug | 2 days ago | AB2C |
+>
+> **Due Today**
+>
+> | Task | Project | ID |
+> |------|---------|------|
+> | Review Sarah's PR | Q4 Migration | X7KP |
+>
+> **Quick Links:** [[AIO/Tasks/Inbox/|Inbox]] · [[AIO/Tasks/Next/|Next]] · [[AIO/Projects/|Projects]]
+
+## Notes
+
+## End of Day
+```
+
+### Tips
+
+- **Automate with cron:** Run `aio dashboard` each morning via cron or launchd
+- **Multiple runs:** Running the command again replaces the existing dashboard content
+- **Automatic fallback:** If the daily note doesn't exist, AIO automatically creates a standalone file in `AIO/Dashboard/`
+- **Custom callout type:** Change `callout_type` in config to use a different callout style (e.g., `info`, `note`, `warning`)
 
 ---
 
