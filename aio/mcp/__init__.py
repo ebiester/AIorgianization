@@ -1,4 +1,4 @@
-"""MCP server for Claude/Cursor integration."""
+"""MCP server for MCP-capable AI assistant integration."""
 
 from aio.mcp.server import (
     ServiceRegistry,

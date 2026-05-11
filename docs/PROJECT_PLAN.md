@@ -9,7 +9,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 - **Storage:** Markdown files in Obsidian vault (no database)
 - **UI:** Obsidian plugin for viewing/editing tasks
 - **CLI:** Python (Click) for quick capture when not in Obsidian
-- **MCP:** Python MCP server for Cursor CLI integration
+- **MCP:** Python MCP server for any MCP-capable client
 - **Testing:** pytest (unit, integration, e2e)
 
 ---
@@ -20,7 +20,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 |-------|------|--------|-------|
 | 1 | Foundation | Done | Vault structure, CLI basics |
 | 2 | Obsidian Plugin Core | Done | Task views, commands |
-| 3 | AI Integration | Done | MCP server for Cursor CLI |
+| 3 | AI Integration | Done | MCP server for MCP-capable clients |
 | 4 | Polish | Not Started | Weekly review, refinements |
 
 ---
@@ -117,7 +117,7 @@ aio archive tasks --before 2024-01-01
 
 ## Phase 3: AI Integration
 
-**Objective:** MCP server exposing vault to Cursor CLI for AI assistance.
+**Objective:** MCP server exposing vault to MCP-capable clients for AI assistance.
 
 ### Deliverables
 
@@ -135,16 +135,16 @@ aio archive tasks --before 2024-01-01
 | Context pack tools | Create, list, append context packs | Done |
 | Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
 | Task resources | Expose task lists as resources | Done |
-| Cursor skill file | .cursor/skills/aio.md instructions | Not Started |
+| Client instruction file | Reusable AIO instructions for MCP-capable assistants, such as `.cursor/skills/aio.md` | Not Started |
 | MCP integration tests | Test tool invocations | Done |
 | MCP startup message | Display initialization message when server starts | Done |
 | MCP graceful shutdown | Handle Ctrl+C gracefully with clean exit message | Done |
 
 ### Verification
 
-- Configure MCP server in Cursor (`~/.cursor/mcp.json`)
+- Configure MCP server in an MCP-capable client
 - "Add a task to review the roadmap by Friday"
-- Cursor calls aio_add_task
+- Client calls aio_add_task
 - Task file created in vault
 
 ---
@@ -183,11 +183,11 @@ aio archive tasks --before 2024-01-01
 | 2 | All plugin features (TypeScript) |
 | 4 | Weekly review, polish |
 
-### Cursor Integration
+### MCP Client Integration
 
 | Phase | Work |
 |-------|------|
-| 3 | MCP config, skill file (.cursor/skills/aio.md) |
+| 3 | MCP config, reusable client instructions such as `.cursor/skills/aio.md` |
 
 ---
 

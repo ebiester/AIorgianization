@@ -547,7 +547,7 @@ Before running any tests:
 
 **Objective:** Verify MCP add task tool.
 
-**Note:** This requires MCP client (Cursor or test harness).
+**Note:** This requires an MCP-capable client or test harness.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -1121,4 +1121,4 @@ Before running any tests:
 
 4. **Known Limitations:** Some features marked as "Not Started" in PROJECT_PLAN (dependency visualization, location navigation, subtask progress) are not included in this UAT.
 
-5. **MCP Testing:** MCP tests (UAT-032 to UAT-040) require an MCP client. For manual testing, use Cursor or a test harness.
+5. **MCP Testing:** MCP tests (UAT-032 to UAT-040) require an MCP-capable client. For manual testing, use any MCP client or a test harness.

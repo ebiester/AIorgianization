@@ -1,6 +1,6 @@
 """MCP server for AIorgianization.
 
-Exposes vault operations to Claude/Cursor via the Model Context Protocol.
+Exposes vault operations to MCP-capable clients via the Model Context Protocol.
 Uses shared handlers from the daemon for consistent business logic.
 """
 

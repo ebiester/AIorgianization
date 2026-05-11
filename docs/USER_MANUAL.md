@@ -86,7 +86,7 @@ The plugin is installed automatically when you run `aio init`. To install manual
 
 ### Install the MCP Server (Optional)
 
-The MCP server allows AI assistants (Claude Code, Cursor, Claude Desktop) to interact with your vault.
+The MCP server allows any MCP-capable AI assistant or client to interact with your vault.
 
 #### For Claude Code
 

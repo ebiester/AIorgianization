@@ -4,11 +4,11 @@ This file provides guidance to AI assistants (Cursor, Claude Code, etc.) when wo
 
 ## Project Overview
 
-AIorgianization is an Obsidian-native task and context management system for Eric, an engineering manager. Tasks are stored as markdown files in the Obsidian vault, with a CLI for quick capture and an MCP server for Cursor/Claude integration.
+AIorgianization is an Obsidian-native task and context management system for Eric, an engineering manager. Tasks are stored as markdown files in the Obsidian vault, with a CLI for quick capture and an MCP server for MCP-capable AI assistants.
 
 **Key principle:** The Obsidian vault is the single source of truth. No separate database.
 
-**Target integration:** Cursor CLI with MCP tools and skills.
+**Target integration:** Any AI assistant or client that can interact with MCP tools and resources.
 
 ## Architecture
 
@@ -452,13 +452,13 @@ def write_task(path: Path, task: Task) -> None:
 - Store dates as ISO 8601 in frontmatter
 - Display dates relative ("tomorrow", "in 3 days", "overdue")
 
-## MCP Server (Cursor Integration)
+## MCP Server
 
-The MCP server exposes vault operations to Cursor CLI and other MCP-compatible tools:
+The MCP server exposes vault operations to any MCP-capable assistant or client:
 
 ### Configuration
 
-Add to your Cursor MCP config (`~/.cursor/mcp.json` or project-level):
+Add this server to your MCP client configuration. For example, Cursor uses `~/.cursor/mcp.json` or a project-level MCP config:
 
 ```json
 {
@@ -503,9 +503,9 @@ aio://projects         # Active projects list
 aio://dashboard        # Today's dashboard
 ```
 
-### Cursor Skills
+### Assistant Instructions
 
-Create `.cursor/skills/aio.md` for natural language task management:
+For clients that support reusable instructions or skills, create an AIO task-management instruction file such as `.cursor/skills/aio.md`:
 
 ```markdown
 # AIO Task Management Skill

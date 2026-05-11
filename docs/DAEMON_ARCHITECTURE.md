@@ -3,7 +3,7 @@
 ## Goal
 Create a persistent daemon that serves as the **single source of truth** for all clients:
 - **CLI** (thin client, <20ms response)
-- **Cursor/MCP** (AI tool integration)
+- **MCP-capable AI clients** (AI tool integration)
 - **Obsidian plugin** (UI in the vault)
 
 Eliminate duplicate business logic across Python CLI and TypeScript plugin.
@@ -24,14 +24,14 @@ Eliminate duplicate business logic across Python CLI and TypeScript plugin.
 │           │                 │                 │                      │
 │  ┌────────┴────────┐ ┌──────┴──────┐ ┌────────┴────────┐            │
 │  │ Unix Socket     │ │ HTTP API    │ │ stdio (MCP)     │            │
-│  │ ~/.aio/daemon   │ │ localhost   │ │ for Cursor      │            │
+│  │ ~/.aio/daemon   │ │ localhost   │ │ for MCP clients │            │
 │  │ .sock           │ │ :7432       │ │                 │            │
 │  └────────┬────────┘ └──────┬──────┘ └────────┬────────┘            │
 └───────────┼─────────────────┼─────────────────┼─────────────────────┘
             │                 │                 │
      ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐
-     │  CLI (thin) │   │  Obsidian   │   │   Cursor    │
-     │  aio add... │   │  Plugin     │   │   (MCP)     │
+     │  CLI (thin) │   │  Obsidian   │   │ MCP Client  │
+     │  aio add... │   │  Plugin     │   │             │
      └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
@@ -40,7 +40,7 @@ Eliminate duplicate business logic across Python CLI and TypeScript plugin.
 1. **Three transports, one handler layer:**
    - Unix socket (JSON-RPC) for CLI - fastest, ~5ms
    - HTTP API for Obsidian plugin - works in browser context
-   - stdio (MCP protocol) for Cursor - AI tool spec
+   - stdio (MCP protocol) for MCP-capable AI clients
 
 2. **Single source of business logic** - Python daemon owns:
    - ID generation (no collisions across clients)
@@ -250,7 +250,7 @@ After each phase:
 1. **Phase 1:** `uv run aio-daemon` starts, logs "ready" on all transports
 2. **Phase 2:** `aio daemon install` works on macOS (launchd) and Linux (systemd)
 3. **Phase 3:** `aio list` returns in <20ms when daemon running
-4. **Phase 4:** MCP tools still work via Cursor
+4. **Phase 4:** MCP tools still work via an MCP-capable client
 5. **Phase 5:** Obsidian plugin creates tasks via HTTP API
 
 **Performance benchmark:**
@@ -276,12 +276,12 @@ uv run mypy aio
 
 ## Migration Path
 
-1. **Phase 1-4:** CLI and Cursor work with daemon, plugin unchanged
+1. **Phase 1-4:** CLI and MCP clients work with daemon, plugin unchanged
 2. **Phase 5:** Plugin migrated, old file operations removed
 3. **Cleanup:** Remove duplicate TypeScript logic from plugin
 
 This creates a clean architecture where:
 - All business logic lives in Python
-- All clients are thin (CLI, Cursor, Obsidian)
+- All clients are thin (CLI, MCP clients, Obsidian)
 - Single point for schema changes
 - No ID collisions across clients

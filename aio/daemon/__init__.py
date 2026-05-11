@@ -1,7 +1,7 @@
 """AIO Daemon - Persistent server for all AIO clients.
 
 The daemon serves as the single source of truth for all AIO clients
-(CLI, MCP/Cursor, Obsidian plugin), eliminating duplicate business logic
+(CLI, MCP clients, Obsidian plugin), eliminating duplicate business logic
 and enabling fast response times through in-memory caching.
 """
 

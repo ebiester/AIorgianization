@@ -307,7 +307,7 @@ var AioSettingTab = class extends import_obsidian2.PluginSettingTab {
     }));
     containerEl.createEl("h3", { text: "Daemon Connection" });
     containerEl.createEl("p", {
-      text: "The AIO daemon provides fast task operations and synchronization across CLI, Cursor, and Obsidian. When connected, all changes go through the daemon for consistency.",
+      text: "The AIO daemon provides fast task operations and synchronization across CLI, MCP clients, and Obsidian. When connected, all changes go through the daemon for consistency.",
       cls: "setting-item-description"
     });
     new import_obsidian2.Setting(containerEl).setName("Enable Daemon Mode").setDesc("Use the AIO daemon for task operations. When disabled or daemon unavailable, falls back to direct file access (read-only for mutations).").addToggle((toggle) => toggle.setValue(this.plugin.settings.useDaemon).onChange(async (value) => {
