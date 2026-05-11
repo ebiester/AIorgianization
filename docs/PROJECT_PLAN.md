@@ -209,14 +209,12 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 1. [ ] Implement weekly review wizard in Obsidian plugin
 2. [ ] Add review tracking (record completion timestamps)
 3. [ ] Implement Waiting-for view grouped by person
-4. [ ] Add right-click context menu in plugin
 5. [ ] Implement dependency visualization in task views
 6. [ ] Add Blocked view for tasks waiting on dependencies
 7. [ ] Implement location navigation (click to open file/URL)
 8. [ ] Add subtask progress display
-9. [ ] Create Cursor skill file (.cursor/skills/aio.md)
 10. [x] Write MCP integration tests
-11. [ ] Add `delegate` as CLI alias for `wait` with required person argument
+11. [x] Add `delegate` as CLI alias for `wait` with required person argument
 13. [x] Add `aio_delegate_task` MCP tool (alias for wait with person)
 14. [x] Add MCP server startup message showing initialization status
 15. [x] Add graceful MCP server shutdown (handle Ctrl+C with clean exit message)
