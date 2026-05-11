@@ -12,6 +12,7 @@ from typing import Any
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Resource, TextContent, Tool
+from pydantic import AnyUrl
 
 from aio.daemon.cache import VaultCache
 from aio.daemon.handlers import (
@@ -277,7 +278,7 @@ def get_handler_context() -> HandlerContext:
 server = Server("aio")
 
 
-@server.list_tools()
+@server.list_tools()  # type: ignore[no-untyped-call,untyped-decorator]
 async def list_tools() -> list[Tool]:
     """List available MCP tools."""
     return [
@@ -611,7 +612,7 @@ async def list_tools() -> list[Tool]:
     ]
 
 
-@server.call_tool()
+@server.call_tool()  # type: ignore[untyped-decorator]
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool invocations."""
     try:
@@ -885,42 +886,42 @@ async def handle_file_set(args: dict[str, Any]) -> list[TextContent]:
     return [TextContent(type="text", text=text)]
 
 
-@server.list_resources()
+@server.list_resources()  # type: ignore[no-untyped-call,untyped-decorator]
 async def list_resources() -> list[Resource]:
     """List available MCP resources."""
     return [
         Resource(
-            uri="aio://tasks/inbox",
+            uri=AnyUrl("aio://tasks/inbox"),
             name="Inbox Tasks",
             description="Unprocessed tasks in the inbox",
             mimeType="text/plain",
         ),
         Resource(
-            uri="aio://tasks/next",
+            uri=AnyUrl("aio://tasks/next"),
             name="Next Actions",
             description="Tasks ready to work on",
             mimeType="text/plain",
         ),
         Resource(
-            uri="aio://tasks/waiting",
+            uri=AnyUrl("aio://tasks/waiting"),
             name="Waiting For",
             description="Delegated tasks",
             mimeType="text/plain",
         ),
         Resource(
-            uri="aio://tasks/today",
+            uri=AnyUrl("aio://tasks/today"),
             name="Today's Tasks",
             description="Tasks due today and overdue",
             mimeType="text/plain",
         ),
         Resource(
-            uri="aio://projects",
+            uri=AnyUrl("aio://projects"),
             name="Active Projects",
             description="List of active projects",
             mimeType="text/plain",
         ),
         Resource(
-            uri="aio://dashboard",
+            uri=AnyUrl("aio://dashboard"),
             name="Daily Dashboard",
             description="Today's dashboard",
             mimeType="text/markdown",
@@ -928,7 +929,7 @@ async def list_resources() -> list[Resource]:
     ]
 
 
-@server.read_resource()
+@server.read_resource()  # type: ignore[no-untyped-call,untyped-decorator]
 async def read_resource(uri: str) -> str:
     """Read a resource."""
     task_service = get_task_service()

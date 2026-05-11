@@ -275,3 +275,34 @@ def _wait_direct(
         for match_id in e.matches:
             console.print(f"  - {match_id}")
         raise click.Abort() from None
+
+
+@click.command()
+@click.argument("query")
+@click.argument("person", required=True)
+@click.option(
+    "--create-person",
+    is_flag=True,
+    help="Create the person if they don't exist",
+)
+@click.pass_context
+def delegate(
+    ctx: click.Context, query: str, person: str, create_person: bool
+) -> None:
+    """Delegate a task to a person.
+
+    This is an alias for `aio wait <task> <person>` with PERSON required.
+    """
+    if create_person:
+        _wait_direct(ctx, query, person, create_person)
+        return
+
+    client = DaemonClient()
+    try:
+        if client.is_running():
+            _wait_via_daemon(client, query, person)
+            return
+    except DaemonUnavailableError:
+        pass
+
+    _wait_direct(ctx, query, person, create_person)

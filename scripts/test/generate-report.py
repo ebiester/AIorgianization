@@ -66,7 +66,8 @@ def extract_uat_markers(python_results: dict, project_root: Path = None) -> dict
         outcome = test.get("outcome", "")
         passed = outcome == "passed"
 
-        # Extract function name from node_id (e.g., "tests/integration/test_cli.py::TestAddCommand::test_add_task")
+        # Extract function name from node_id, e.g.:
+        # tests/integration/test_cli.py::TestAddCommand::test_add_task
         func_name = node_id.split("::")[-1] if "::" in node_id else ""
 
         # Check if this test has UAT markers from source
@@ -356,7 +357,11 @@ def generate_manual_checklist() -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate combined test report")
-    parser.add_argument("--results-dir", default="test-results", help="Directory containing test results")
+    parser.add_argument(
+        "--results-dir",
+        default="test-results",
+        help="Directory containing test results",
+    )
     parser.add_argument("--output-dir", default="test-results", help="Output directory for reports")
     args = parser.parse_args()
 
@@ -387,9 +392,9 @@ def main():
     (output_dir / "manual-test-checklist.md").write_text(checklist)
 
     print(f"Reports generated in {output_dir}:")
-    print(f"  - combined-report.md")
-    print(f"  - uat-coverage.json")
-    print(f"  - manual-test-checklist.md")
+    print("  - combined-report.md")
+    print("  - uat-coverage.json")
+    print("  - manual-test-checklist.md")
 
 
 if __name__ == "__main__":

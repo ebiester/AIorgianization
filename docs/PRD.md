@@ -63,7 +63,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Projects | Group tasks under projects with links, timeline, health | Done |
+| Projects | Group tasks under projects with links, timeline, health, and CLI views | Done |
 | Teams | Define teams and members | Done (via Person model) |
 | People | Track who you delegate to | Done |
 | Delegated view | See all tasks you've given to others | Done (`aio list waiting`) |
@@ -77,15 +77,15 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Task list view | Custom pane showing tasks by status | Done |
 | Quick add modal | Fast task entry via command palette | Done |
 | Inbox processing | GTD clarify/organize workflow | Done |
-| Waiting-for view | Delegated items grouped by person | Not Started |
-| Weekly review | Guided review wizard | Not Started |
+| Waiting-for view | Delegated items grouped by person | Done |
+| Weekly review | Guided review wizard | Done |
 | Task editing | Modal to edit all task fields | Done |
 | Status commands | Complete, start, defer via commands | Done |
-| Task dependencies | Link tasks as blockers/blocked-by | Done (model only) |
-| Dependency visualization | See blocked tasks and blockers in views | Not Started |
-| Location linking | Connect task to file path, line, or URL in project | Done (model only) |
-| Location navigation | Click to open file/URL from task view | Not Started |
-| Subtask progress | Track and display completion of subtasks within tasks | Not Started |
+| Task dependencies | Link tasks as blockers/blocked-by | Done |
+| Dependency visualization | See blocked tasks and blockers in views | Done |
+| Location linking | Connect task to file path, line, or URL in project | Done |
+| Location navigation | Click to open file/URL from task view | Done |
+| Subtask progress | Track and display completion of subtasks within tasks | Done |
 | Template system | Customizable templates for tasks, projects, people from template directory | Not Started |
 
 #### Obsidian Plugin Detailed Requirements

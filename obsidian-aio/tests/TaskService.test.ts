@@ -211,6 +211,36 @@ tags: []
       expect(task!.status).toBe('waiting');
       expect(task!.waitingOn).toBe('[[AIO/People/Sarah]]');
     });
+
+    it('parses nested location frontmatter', async () => {
+      const content = `---
+id: LC1N
+type: task
+status: next
+location:
+  file: src/api/payments.ts
+  line: 142
+  url: https://example.com/spec
+created: 2024-01-15T10:00:00
+updated: 2024-01-15T10:00:00
+blockedBy: []
+blocks: []
+tags: []
+---
+
+# Location Task`;
+
+      app.vault.setFileContent('AIO/Tasks/Next/location.md', content);
+      const file = app.vault.getAbstractFileByPath('AIO/Tasks/Next/location.md') as MockTFile;
+
+      const task = await taskService.parseTaskFile(file as any);
+
+      expect(task!.location).toEqual({
+        file: 'src/api/payments.ts',
+        line: 142,
+        url: 'https://example.com/spec',
+      });
+    });
   });
 
   describe('YAML parsing edge cases', () => {
@@ -335,6 +365,104 @@ updated: 2024-01-15T10:00:00
       expect(task!.id).toBe('SR1G');
       expect(task!.type).toBe('task');
       expect(task!.status).toBe('inbox');
+    });
+  });
+
+  describe('task view helpers', () => {
+    it('counts markdown subtask progress', () => {
+      const progress = taskService.getSubtaskProgress({
+        content: `# Parent
+
+## Subtasks
+- [x] Draft agenda
+- [ ] Schedule meeting
+* [X] Send pre-read
+`,
+      });
+
+      expect(progress).toEqual({ completed: 2, total: 3 });
+    });
+
+    it('groups waiting tasks by person label', async () => {
+      app.vault.setFileContent('AIO/Tasks/Waiting/sarah-one.md', `---
+id: W1AA
+type: task
+status: waiting
+waitingOn: "[[AIO/People/Sarah]]"
+created: 2024-01-15T10:00:00
+updated: 2024-01-15T10:00:00
+blockedBy: []
+blocks: []
+tags: []
+---
+
+# Sarah Task`);
+      app.vault.setFileContent('AIO/Tasks/Waiting/john-one.md', `---
+id: W2BB
+type: task
+status: waiting
+waitingOn: "[[AIO/People/John]]"
+created: 2024-01-16T10:00:00
+updated: 2024-01-16T10:00:00
+blockedBy: []
+blocks: []
+tags: []
+---
+
+# John Task`);
+      app.vault.setFileContent('AIO/Tasks/Waiting/sarah-two.md', `---
+id: W3CC
+type: task
+status: waiting
+waitingOn: "[[AIO/People/Sarah]]"
+created: 2024-01-17T10:00:00
+updated: 2024-01-17T10:00:00
+blockedBy: []
+blocks: []
+tags: []
+---
+
+# Another Sarah Task`);
+
+      const groups = await taskService.listWaitingGroups();
+
+      expect(groups.map((group) => group.person)).toEqual(['John', 'Sarah']);
+      expect(groups.find((group) => group.person === 'Sarah')!.tasks).toHaveLength(2);
+    });
+
+    it('lists blocked tasks and resolves blockers', async () => {
+      app.vault.setFileContent('AIO/Tasks/Next/blocker.md', `---
+id: BLK1
+type: task
+status: next
+created: 2024-01-15T10:00:00
+updated: 2024-01-15T10:00:00
+blockedBy: []
+blocks:
+  - WAIT
+tags: []
+---
+
+# Finish API`);
+      app.vault.setFileContent('AIO/Tasks/Next/blocked.md', `---
+id: WAIT
+type: task
+status: next
+created: 2024-01-16T10:00:00
+updated: 2024-01-16T10:00:00
+blockedBy:
+  - BLK1
+blocks: []
+tags: []
+---
+
+# Ship client`);
+
+      const blocked = await taskService.listBlockedTasks();
+      const blockers = await taskService.getBlockingTasks(blocked[0]);
+
+      expect(blocked.map((task) => task.id)).toEqual(['WAIT']);
+      expect(blockers.map((task) => task.id)).toEqual(['BLK1']);
     });
   });
 });

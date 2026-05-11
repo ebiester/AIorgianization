@@ -7,7 +7,7 @@ export const TASK_LIST_VIEW_TYPE = 'aio-task-list';
 
 export class TaskListView extends ItemView {
   private plugin: AioPlugin;
-  private currentStatus: TaskStatus | 'all' = 'all';
+  private currentStatus: TaskStatus | 'all' | 'blocked' = 'all';
   private tasks: Task[] = [];
 
   constructor(leaf: WorkspaceLeaf, plugin: AioPlugin) {
@@ -71,6 +71,7 @@ export class TaskListView extends ItemView {
         this.createTab(tabs, 'inbox', 'Inbox');
         this.createTab(tabs, 'next', 'Next');
         this.createTab(tabs, 'waiting', 'Waiting');
+        this.createTab(tabs, 'blocked', 'Blocked');
         this.createTab(tabs, 'scheduled', 'Scheduled');
         this.createTab(tabs, 'someday', 'Someday');
       });
@@ -82,7 +83,7 @@ export class TaskListView extends ItemView {
     });
   }
 
-  private createTab(container: HTMLElement, status: TaskStatus | 'all', label: string): void {
+  private createTab(container: HTMLElement, status: TaskStatus | 'all' | 'blocked', label: string): void {
     const tab = container.createEl('button', {
       cls: `aio-status-tab ${this.currentStatus === status ? 'is-active' : ''}`,
       text: label,
@@ -98,6 +99,8 @@ export class TaskListView extends ItemView {
     try {
       if (this.currentStatus === 'all') {
         this.tasks = await this.plugin.taskService.listTasks();
+      } else if (this.currentStatus === 'blocked') {
+        this.tasks = await this.plugin.taskService.listBlockedTasks();
       } else {
         this.tasks = await this.plugin.taskService.listTasks(this.currentStatus);
       }
@@ -117,17 +120,45 @@ export class TaskListView extends ItemView {
         return;
       }
 
+      if (this.currentStatus === 'waiting') {
+        await this.renderWaitingGroups(container);
+        return;
+      }
+
+      const allTasks = await this.plugin.taskService.listTasks();
       for (const task of this.tasks) {
-        this.renderTask(container, task);
+        this.renderTask(container, task, allTasks);
       }
     } catch (e) {
       container.createEl('div', { cls: 'aio-error', text: `Error loading tasks: ${e}` });
     }
   }
 
-  private renderTask(container: HTMLElement, task: Task): void {
+  private async renderWaitingGroups(container: HTMLElement): Promise<void> {
+    const groups = await this.plugin.taskService.listWaitingGroups();
+    const allTasks = await this.plugin.taskService.listTasks();
+
+    for (const group of groups) {
+      container.createEl('section', { cls: 'aio-waiting-group' }, (section) => {
+        section.createEl('div', { cls: 'aio-waiting-group-header' }, (header) => {
+          header.createEl('h5', { text: group.person });
+          header.createEl('span', {
+            cls: 'aio-waiting-count',
+            text: `${group.tasks.length} task${group.tasks.length === 1 ? '' : 's'}`,
+          });
+        });
+
+        for (const task of group.tasks) {
+          this.renderTask(section, task, allTasks);
+        }
+      });
+    }
+  }
+
+  private renderTask(container: HTMLElement, task: Task, allTasks: Task[]): void {
     const taskEl = container.createEl('div', { cls: 'aio-task-item' });
     const isReadOnly = this.plugin.isReadOnly;
+    const tasksById = new Map(allTasks.map((candidate) => [candidate.id.toUpperCase(), candidate]));
 
     // Checkbox
     const checkbox = taskEl.createEl('input', {
@@ -167,6 +198,10 @@ export class TaskListView extends ItemView {
         this.app.workspace.getLeaf(false).openFile(file as any);
       }
     });
+    titleEl.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      this.showContextMenu(event, task);
+    });
 
     // Metadata row
     const metaEl = contentEl.createEl('div', { cls: 'aio-task-meta' });
@@ -196,6 +231,41 @@ export class TaskListView extends ItemView {
       metaEl.createEl('span', { cls: 'aio-project', text: projectName });
     }
 
+    if (task.waitingOn) {
+      const waitingOn = task.waitingOn.replace(/^\[\[/, '').replace(/\]\]$/, '').split('/').pop() || task.waitingOn;
+      const days = this.plugin.taskService.getDaysSinceCreated(task);
+      metaEl.createEl('span', {
+        cls: 'aio-waiting-on',
+        text: `${waitingOn} (${days}d)`,
+      });
+    }
+
+    const progress = this.plugin.taskService.getSubtaskProgress(task);
+    if (progress.total > 0) {
+      metaEl.createEl('span', {
+        cls: 'aio-subtask-progress',
+        text: `${progress.completed}/${progress.total} subtasks`,
+      });
+    }
+
+    if (task.blockedBy.length > 0) {
+      const blockerNames = task.blockedBy.map((id) => {
+        const blocker = tasksById.get(id.toUpperCase());
+        return blocker ? `${blocker.title} (${blocker.id})` : id;
+      });
+      metaEl.createEl('span', {
+        cls: 'aio-blocked-by',
+        text: `Blocked by ${blockerNames.join(', ')}`,
+      });
+    }
+
+    if (task.blocks.length > 0) {
+      metaEl.createEl('span', {
+        cls: 'aio-blocks',
+        text: `Blocks ${task.blocks.join(', ')}`,
+      });
+    }
+
     // Tags
     if (task.tags.length > 0) {
       for (const tag of task.tags.slice(0, 3)) {
@@ -205,6 +275,15 @@ export class TaskListView extends ItemView {
 
     // Action buttons
     const actionsEl = taskEl.createEl('div', { cls: 'aio-task-actions' });
+
+    if (task.location?.url || task.location?.file) {
+      const locationBtn = actionsEl.createEl('button', { cls: 'aio-action-btn', attr: { 'aria-label': 'Open location' } });
+      setIcon(locationBtn, 'external-link');
+      locationBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openTaskLocation(task);
+      });
+    }
 
     if (task.status !== 'next' && task.status !== 'completed') {
       const startBtn = actionsEl.createEl('button', { cls: 'aio-action-btn', attr: { 'aria-label': 'Start' } });
@@ -259,5 +338,86 @@ export class TaskListView extends ItemView {
       e.stopPropagation();
       this.plugin.openTaskEditModal(task);
     });
+  }
+
+  private showContextMenu(event: MouseEvent, task: Task): void {
+    document.querySelectorAll('.aio-context-menu').forEach((menu) => menu.remove());
+
+    const menu = document.body.createEl('div', {
+      cls: 'aio-context-menu',
+      attr: {
+        style: `left: ${event.pageX}px; top: ${event.pageY}px;`,
+      },
+    });
+
+    const addAction = (label: string, handler: () => void, disabled = false): void => {
+      const item = menu.createEl('button', { cls: 'aio-context-menu-item', text: label });
+      if (disabled) {
+        item.addClass('aio-disabled');
+      } else {
+        item.addEventListener('click', () => {
+          menu.remove();
+          handler();
+        });
+      }
+    };
+
+    addAction('Complete', () => this.applyStatus(task, 'completed'), this.plugin.isReadOnly || task.status === 'completed');
+    addAction('Start working', () => this.applyStatus(task, 'next'), this.plugin.isReadOnly || task.status === 'next' || task.status === 'completed');
+    addAction('Defer to someday', () => this.applyStatus(task, 'someday'), this.plugin.isReadOnly || task.status === 'someday' || task.status === 'completed');
+    addAction('Move to waiting', () => this.applyStatus(task, 'waiting'), this.plugin.isReadOnly || task.status === 'waiting' || task.status === 'completed');
+    addAction('Edit details...', () => this.plugin.openTaskEditModal(task));
+    addAction('Open in editor', () => this.openTaskFile(task));
+    if (task.location?.url || task.location?.file) {
+      addAction('Open location', () => this.openTaskLocation(task));
+    }
+
+    const close = (closeEvent: MouseEvent): void => {
+      if (!menu.contains(closeEvent.target as Node)) {
+        menu.remove();
+        document.removeEventListener('click', close);
+      }
+    };
+    window.setTimeout(() => document.addEventListener('click', close), 0);
+  }
+
+  private async applyStatus(task: Task, status: TaskStatus): Promise<void> {
+    try {
+      if (status === 'completed') {
+        await this.plugin.taskService.completeTask(task.id);
+      } else {
+        await this.plugin.taskService.changeStatus(task.id, status);
+      }
+      await this.refresh();
+    } catch (e) {
+      if (e instanceof DaemonOfflineError) {
+        new Notice('Cannot update task: daemon is offline.');
+      } else {
+        new Notice(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
+    }
+  }
+
+  private openTaskFile(task: Task): void {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file) {
+      this.app.workspace.getLeaf(false).openFile(file as any);
+    }
+  }
+
+  private openTaskLocation(task: Task): void {
+    if (task.location?.url) {
+      window.open(task.location.url);
+      return;
+    }
+
+    if (task.location?.file) {
+      const file = this.app.vault.getAbstractFileByPath(task.location.file);
+      if (file) {
+        this.app.workspace.getLeaf(false).openFile(file as any);
+      } else {
+        new Notice(`Location file not found: ${task.location.file}`);
+      }
+    }
   }
 }

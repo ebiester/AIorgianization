@@ -3,6 +3,16 @@ import { Task, TaskStatus, CreateTaskOptions, ID_CHARS, AioSettings } from '../t
 import { VaultService } from './VaultService';
 import { DaemonClient, DaemonUnavailableError, DaemonOfflineError } from './DaemonClient';
 
+export interface SubtaskProgress {
+  completed: number;
+  total: number;
+}
+
+export interface WaitingGroup {
+  person: string;
+  tasks: Task[];
+}
+
 /**
  * Service for task CRUD operations.
  *
@@ -115,6 +125,87 @@ export class TaskService {
 
     // Fallback to file-based approach
     return this.listTasksFromFiles(status);
+  }
+
+  /**
+   * List waiting tasks grouped by person.
+   */
+  async listWaitingGroups(): Promise<WaitingGroup[]> {
+    const tasks = await this.listTasks('waiting');
+    const groups = new Map<string, Task[]>();
+
+    for (const task of tasks) {
+      const person = this.getPersonLabel(task.waitingOn || task.assignedTo);
+      const group = groups.get(person) || [];
+      group.push(task);
+      groups.set(person, group);
+    }
+
+    return Array.from(groups.entries())
+      .map(([person, personTasks]) => ({
+        person,
+        tasks: personTasks.sort((a, b) => a.created.localeCompare(b.created)),
+      }))
+      .sort((a, b) => a.person.localeCompare(b.person));
+  }
+
+  /**
+   * List tasks that are currently blocked by one or more dependencies.
+   */
+  async listBlockedTasks(): Promise<Task[]> {
+    const tasks = await this.listTasks();
+    return tasks.filter((task) => task.blockedBy.length > 0 && task.status !== 'completed');
+  }
+
+  /**
+   * Resolve a task's blocker IDs to task records.
+   */
+  async getBlockingTasks(task: Task): Promise<Task[]> {
+    if (task.blockedBy.length === 0) {
+      return [];
+    }
+
+    const tasks = await this.listTasks();
+    const byId = new Map(tasks.map((candidate) => [candidate.id.toUpperCase(), candidate]));
+    return task.blockedBy
+      .map((id) => byId.get(id.toUpperCase()))
+      .filter((candidate): candidate is Task => Boolean(candidate));
+  }
+
+  /**
+   * Count markdown checkbox subtasks in a task body.
+   */
+  getSubtaskProgress(task: Pick<Task, 'content'>): SubtaskProgress {
+    const matches = task.content.match(/^\s*[-*]\s+\[[ xX]\]\s+/gm) || [];
+    const completed = matches.filter((line) => /\[[xX]\]/.test(line)).length;
+    return { completed, total: matches.length };
+  }
+
+  /**
+   * Calculate whole days since task creation for waiting-for summaries.
+   */
+  getDaysSinceCreated(task: Pick<Task, 'created'>): number {
+    const created = new Date(task.created);
+    if (Number.isNaN(created.getTime())) {
+      return 0;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    created.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((today.getTime() - created.getTime()) / 86400000));
+  }
+
+  private getPersonLabel(personLink?: string): string {
+    if (!personLink) {
+      return 'Unassigned';
+    }
+
+    return personLink
+      .replace(/^\[\[/, '')
+      .replace(/\]\]$/, '')
+      .split('/')
+      .pop() || personLink;
   }
 
   /**
@@ -252,38 +343,57 @@ export class TaskService {
     const result: Record<string, any> = {};
     const lines = yamlStr.split('\n');
     let currentKey = '';
-    let inArray = false;
+    let currentMode: 'array' | 'object' | null = null;
     let arrayValue: string[] = [];
+    let objectValue: Record<string, any> = {};
+
+    const flushPending = (): void => {
+      if (!currentKey || !currentMode) {
+        return;
+      }
+      result[currentKey] = currentMode === 'array' ? arrayValue : objectValue;
+      currentKey = '';
+      currentMode = null;
+      arrayValue = [];
+      objectValue = {};
+    };
 
     for (const line of lines) {
+      if (line.trim() === '') {
+        continue;
+      }
+
       // Array item
       if (line.match(/^\s+-\s+/)) {
+        if (currentMode === 'object' && Object.keys(objectValue).length === 0) {
+          currentMode = 'array';
+        }
         const value = line.replace(/^\s+-\s+/, '').trim();
         arrayValue.push(this.parseValue(value));
         continue;
       }
 
-      // If we were in an array, save it
-      if (inArray && currentKey) {
-        result[currentKey] = arrayValue;
-        inArray = false;
-        arrayValue = [];
+      const nestedMatch = line.match(/^\s+(\w+):\s*(.*)$/);
+      if (currentMode === 'object' && nestedMatch) {
+        objectValue[nestedMatch[1]] = this.parseValue(nestedMatch[2].trim());
+        continue;
       }
 
       // Key-value pair
       const kvMatch = line.match(/^(\w+):\s*(.*)$/);
       if (kvMatch) {
+        flushPending();
+
         const key = kvMatch[1];
         const value = kvMatch[2].trim();
 
         if (value === '' || value === '[]') {
-          // Empty value or empty array, check if next line is array
-          currentKey = key;
-          inArray = true;
-          arrayValue = [];
           if (value === '[]') {
             result[key] = [];
-            inArray = false;
+          } else {
+            currentKey = key;
+            currentMode = 'object';
+            objectValue = {};
           }
         } else {
           result[key] = this.parseValue(value);
@@ -291,10 +401,7 @@ export class TaskService {
       }
     }
 
-    // Handle trailing array
-    if (inArray && currentKey) {
-      result[currentKey] = arrayValue;
-    }
+    flushPending();
 
     return result;
   }

@@ -284,6 +284,16 @@ aio defer "refactor"      # Move to Someday
 3. **Review waiting-for:** Follow up on stale items (>7 days)
 4. **Review someday:** Anything ready to activate?
 
+### Obsidian Plugin Views
+
+Open the task pane with the ribbon check-square icon or `Cmd+P` → "AIO: Open tasks".
+
+The task list includes tabs for All, Inbox, Next, Waiting, Blocked, Scheduled, and Someday. The Waiting tab groups delegated tasks by person and shows days since creation. The Blocked tab shows tasks with `blockedBy` dependencies and displays the blocking task names when those tasks are present in the vault.
+
+Task rows show due dates, project links, waiting person, dependency metadata, and markdown subtask progress such as `3/5 subtasks`. Right-click a task title for context actions: complete, start, defer, move to waiting, edit details, open in editor, or open a linked location. If a task has `location.url`, the location action opens the URL; if it has `location.file`, it opens that vault file.
+
+Start the weekly review with the rotate icon in the ribbon or `Cmd+P` → "AIO: Start weekly review". The review walks through Inbox, Projects, Waiting For, Someday, and Complete. Marking the review complete appends a timestamp to `AIO/Dashboard/weekly-review-log.md`.
+
 ---
 
 ## CLI Reference
@@ -325,14 +335,23 @@ aio list today        # Due today + overdue
 aio list overdue      # Past due date
 ```
 
+### Project Views
+
+```bash
+aio project list                  # Project summary with task counts
+aio project show "Q4 Migration"   # Project details and related tasks
+```
+
 ### Changing Status
 
 ```bash
-aio activate <task>   # Inbox → Next
+aio activate <task>   # Alias for start
+aio next <task>       # Alias for start
 aio start <task>      # → Next
 aio done <task>       # → Completed
 aio defer <task>      # → Someday
 aio wait <task> Sarah # → Waiting (for Sarah)
+aio delegate <task> Sarah # Alias for wait with person required
 ```
 
 ### Archiving

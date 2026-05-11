@@ -22,7 +22,7 @@ __export(main_exports, {
   default: () => AioPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -313,7 +313,7 @@ var AioSettingTab = class extends import_obsidian2.PluginSettingTab {
     }));
     containerEl.createEl("h3", { text: "Daemon Connection" });
     containerEl.createEl("p", {
-      text: "The AIO daemon provides fast task operations and synchronization across CLI, Cursor, and Obsidian. When connected, all changes go through the daemon for consistency.",
+      text: "The AIO daemon provides fast task operations and synchronization across CLI, MCP clients, and Obsidian. When connected, all changes go through the daemon for consistency.",
       cls: "setting-item-description"
     });
     new import_obsidian2.Setting(containerEl).setName("Enable Daemon Mode").setDesc("Use the AIO daemon for task operations. When disabled or daemon unavailable, falls back to direct file access (read-only for mutations).").addToggle((toggle) => toggle.setValue(this.plugin.settings.useDaemon).onChange(async (value) => {
@@ -695,6 +695,68 @@ var TaskService = class {
     return this.listTasksFromFiles(status);
   }
   /**
+   * List waiting tasks grouped by person.
+   */
+  async listWaitingGroups() {
+    const tasks = await this.listTasks("waiting");
+    const groups = /* @__PURE__ */ new Map();
+    for (const task of tasks) {
+      const person = this.getPersonLabel(task.waitingOn || task.assignedTo);
+      const group = groups.get(person) || [];
+      group.push(task);
+      groups.set(person, group);
+    }
+    return Array.from(groups.entries()).map(([person, personTasks]) => ({
+      person,
+      tasks: personTasks.sort((a, b) => a.created.localeCompare(b.created))
+    })).sort((a, b) => a.person.localeCompare(b.person));
+  }
+  /**
+   * List tasks that are currently blocked by one or more dependencies.
+   */
+  async listBlockedTasks() {
+    const tasks = await this.listTasks();
+    return tasks.filter((task) => task.blockedBy.length > 0 && task.status !== "completed");
+  }
+  /**
+   * Resolve a task's blocker IDs to task records.
+   */
+  async getBlockingTasks(task) {
+    if (task.blockedBy.length === 0) {
+      return [];
+    }
+    const tasks = await this.listTasks();
+    const byId = new Map(tasks.map((candidate) => [candidate.id.toUpperCase(), candidate]));
+    return task.blockedBy.map((id) => byId.get(id.toUpperCase())).filter((candidate) => Boolean(candidate));
+  }
+  /**
+   * Count markdown checkbox subtasks in a task body.
+   */
+  getSubtaskProgress(task) {
+    const matches = task.content.match(/^\s*[-*]\s+\[[ xX]\]\s+/gm) || [];
+    const completed = matches.filter((line) => /\[[xX]\]/.test(line)).length;
+    return { completed, total: matches.length };
+  }
+  /**
+   * Calculate whole days since task creation for waiting-for summaries.
+   */
+  getDaysSinceCreated(task) {
+    const created = new Date(task.created);
+    if (Number.isNaN(created.getTime())) {
+      return 0;
+    }
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    created.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((today.getTime() - created.getTime()) / 864e5));
+  }
+  getPersonLabel(personLink) {
+    if (!personLink) {
+      return "Unassigned";
+    }
+    return personLink.replace(/^\[\[/, "").replace(/\]\]$/, "").split("/").pop() || personLink;
+  }
+  /**
    * List tasks from files (fallback mode).
    */
   async listTasksFromFiles(status) {
@@ -806,39 +868,55 @@ var TaskService = class {
     const result = {};
     const lines = yamlStr.split("\n");
     let currentKey = "";
-    let inArray = false;
+    let currentMode = null;
     let arrayValue = [];
+    let objectValue = {};
+    const flushPending = () => {
+      if (!currentKey || !currentMode) {
+        return;
+      }
+      result[currentKey] = currentMode === "array" ? arrayValue : objectValue;
+      currentKey = "";
+      currentMode = null;
+      arrayValue = [];
+      objectValue = {};
+    };
     for (const line of lines) {
+      if (line.trim() === "") {
+        continue;
+      }
       if (line.match(/^\s+-\s+/)) {
+        if (currentMode === "object" && Object.keys(objectValue).length === 0) {
+          currentMode = "array";
+        }
         const value = line.replace(/^\s+-\s+/, "").trim();
         arrayValue.push(this.parseValue(value));
         continue;
       }
-      if (inArray && currentKey) {
-        result[currentKey] = arrayValue;
-        inArray = false;
-        arrayValue = [];
+      const nestedMatch = line.match(/^\s+(\w+):\s*(.*)$/);
+      if (currentMode === "object" && nestedMatch) {
+        objectValue[nestedMatch[1]] = this.parseValue(nestedMatch[2].trim());
+        continue;
       }
       const kvMatch = line.match(/^(\w+):\s*(.*)$/);
       if (kvMatch) {
+        flushPending();
         const key = kvMatch[1];
         const value = kvMatch[2].trim();
         if (value === "" || value === "[]") {
-          currentKey = key;
-          inArray = true;
-          arrayValue = [];
           if (value === "[]") {
             result[key] = [];
-            inArray = false;
+          } else {
+            currentKey = key;
+            currentMode = "object";
+            objectValue = {};
           }
         } else {
           result[key] = this.parseValue(value);
         }
       }
     }
-    if (inArray && currentKey) {
-      result[currentKey] = arrayValue;
-    }
+    flushPending();
     return result;
   }
   /**
@@ -1214,6 +1292,7 @@ var TaskListView = class extends import_obsidian5.ItemView {
         this.createTab(tabs, "inbox", "Inbox");
         this.createTab(tabs, "next", "Next");
         this.createTab(tabs, "waiting", "Waiting");
+        this.createTab(tabs, "blocked", "Blocked");
         this.createTab(tabs, "scheduled", "Scheduled");
         this.createTab(tabs, "someday", "Someday");
       });
@@ -1236,6 +1315,8 @@ var TaskListView = class extends import_obsidian5.ItemView {
     try {
       if (this.currentStatus === "all") {
         this.tasks = await this.plugin.taskService.listTasks();
+      } else if (this.currentStatus === "blocked") {
+        this.tasks = await this.plugin.taskService.listBlockedTasks();
       } else {
         this.tasks = await this.plugin.taskService.listTasks(this.currentStatus);
       }
@@ -1253,16 +1334,41 @@ var TaskListView = class extends import_obsidian5.ItemView {
         container.createEl("div", { cls: "aio-empty-state", text: "No tasks found" });
         return;
       }
+      if (this.currentStatus === "waiting") {
+        await this.renderWaitingGroups(container);
+        return;
+      }
+      const allTasks = await this.plugin.taskService.listTasks();
       for (const task of this.tasks) {
-        this.renderTask(container, task);
+        this.renderTask(container, task, allTasks);
       }
     } catch (e) {
       container.createEl("div", { cls: "aio-error", text: `Error loading tasks: ${e}` });
     }
   }
-  renderTask(container, task) {
+  async renderWaitingGroups(container) {
+    const groups = await this.plugin.taskService.listWaitingGroups();
+    const allTasks = await this.plugin.taskService.listTasks();
+    for (const group of groups) {
+      container.createEl("section", { cls: "aio-waiting-group" }, (section) => {
+        section.createEl("div", { cls: "aio-waiting-group-header" }, (header) => {
+          header.createEl("h5", { text: group.person });
+          header.createEl("span", {
+            cls: "aio-waiting-count",
+            text: `${group.tasks.length} task${group.tasks.length === 1 ? "" : "s"}`
+          });
+        });
+        for (const task of group.tasks) {
+          this.renderTask(section, task, allTasks);
+        }
+      });
+    }
+  }
+  renderTask(container, task, allTasks) {
+    var _a, _b;
     const taskEl = container.createEl("div", { cls: "aio-task-item" });
     const isReadOnly = this.plugin.isReadOnly;
+    const tasksById = new Map(allTasks.map((candidate) => [candidate.id.toUpperCase(), candidate]));
     const checkbox = taskEl.createEl("input", {
       cls: "aio-task-checkbox",
       attr: { type: "checkbox" }
@@ -1296,6 +1402,10 @@ var TaskListView = class extends import_obsidian5.ItemView {
         this.app.workspace.getLeaf(false).openFile(file);
       }
     });
+    titleEl.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      this.showContextMenu(event, task);
+    });
     const metaEl = contentEl.createEl("div", { cls: "aio-task-meta" });
     metaEl.createEl("span", {
       cls: `aio-status-badge aio-status-${task.status}`,
@@ -1315,12 +1425,51 @@ var TaskListView = class extends import_obsidian5.ItemView {
       const projectName = task.project.replace(/^\[\[/, "").replace(/\]\]$/, "");
       metaEl.createEl("span", { cls: "aio-project", text: projectName });
     }
+    if (task.waitingOn) {
+      const waitingOn = task.waitingOn.replace(/^\[\[/, "").replace(/\]\]$/, "").split("/").pop() || task.waitingOn;
+      const days = this.plugin.taskService.getDaysSinceCreated(task);
+      metaEl.createEl("span", {
+        cls: "aio-waiting-on",
+        text: `${waitingOn} (${days}d)`
+      });
+    }
+    const progress = this.plugin.taskService.getSubtaskProgress(task);
+    if (progress.total > 0) {
+      metaEl.createEl("span", {
+        cls: "aio-subtask-progress",
+        text: `${progress.completed}/${progress.total} subtasks`
+      });
+    }
+    if (task.blockedBy.length > 0) {
+      const blockerNames = task.blockedBy.map((id) => {
+        const blocker = tasksById.get(id.toUpperCase());
+        return blocker ? `${blocker.title} (${blocker.id})` : id;
+      });
+      metaEl.createEl("span", {
+        cls: "aio-blocked-by",
+        text: `Blocked by ${blockerNames.join(", ")}`
+      });
+    }
+    if (task.blocks.length > 0) {
+      metaEl.createEl("span", {
+        cls: "aio-blocks",
+        text: `Blocks ${task.blocks.join(", ")}`
+      });
+    }
     if (task.tags.length > 0) {
       for (const tag of task.tags.slice(0, 3)) {
         metaEl.createEl("span", { cls: "aio-tag", text: `#${tag}` });
       }
     }
     const actionsEl = taskEl.createEl("div", { cls: "aio-task-actions" });
+    if (((_a = task.location) == null ? void 0 : _a.url) || ((_b = task.location) == null ? void 0 : _b.file)) {
+      const locationBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Open location" } });
+      (0, import_obsidian5.setIcon)(locationBtn, "external-link");
+      locationBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.openTaskLocation(task);
+      });
+    }
     if (task.status !== "next" && task.status !== "completed") {
       const startBtn = actionsEl.createEl("button", { cls: "aio-action-btn", attr: { "aria-label": "Start" } });
       (0, import_obsidian5.setIcon)(startBtn, "play");
@@ -1371,6 +1520,80 @@ var TaskListView = class extends import_obsidian5.ItemView {
       e.stopPropagation();
       this.plugin.openTaskEditModal(task);
     });
+  }
+  showContextMenu(event, task) {
+    var _a, _b;
+    document.querySelectorAll(".aio-context-menu").forEach((menu2) => menu2.remove());
+    const menu = document.body.createEl("div", {
+      cls: "aio-context-menu",
+      attr: {
+        style: `left: ${event.pageX}px; top: ${event.pageY}px;`
+      }
+    });
+    const addAction = (label, handler, disabled = false) => {
+      const item = menu.createEl("button", { cls: "aio-context-menu-item", text: label });
+      if (disabled) {
+        item.addClass("aio-disabled");
+      } else {
+        item.addEventListener("click", () => {
+          menu.remove();
+          handler();
+        });
+      }
+    };
+    addAction("Complete", () => this.applyStatus(task, "completed"), this.plugin.isReadOnly || task.status === "completed");
+    addAction("Start working", () => this.applyStatus(task, "next"), this.plugin.isReadOnly || task.status === "next" || task.status === "completed");
+    addAction("Defer to someday", () => this.applyStatus(task, "someday"), this.plugin.isReadOnly || task.status === "someday" || task.status === "completed");
+    addAction("Move to waiting", () => this.applyStatus(task, "waiting"), this.plugin.isReadOnly || task.status === "waiting" || task.status === "completed");
+    addAction("Edit details...", () => this.plugin.openTaskEditModal(task));
+    addAction("Open in editor", () => this.openTaskFile(task));
+    if (((_a = task.location) == null ? void 0 : _a.url) || ((_b = task.location) == null ? void 0 : _b.file)) {
+      addAction("Open location", () => this.openTaskLocation(task));
+    }
+    const close = (closeEvent) => {
+      if (!menu.contains(closeEvent.target)) {
+        menu.remove();
+        document.removeEventListener("click", close);
+      }
+    };
+    window.setTimeout(() => document.addEventListener("click", close), 0);
+  }
+  async applyStatus(task, status) {
+    try {
+      if (status === "completed") {
+        await this.plugin.taskService.completeTask(task.id);
+      } else {
+        await this.plugin.taskService.changeStatus(task.id, status);
+      }
+      await this.refresh();
+    } catch (e) {
+      if (e instanceof DaemonOfflineError) {
+        new import_obsidian5.Notice("Cannot update task: daemon is offline.");
+      } else {
+        new import_obsidian5.Notice(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+      }
+    }
+  }
+  openTaskFile(task) {
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    if (file) {
+      this.app.workspace.getLeaf(false).openFile(file);
+    }
+  }
+  openTaskLocation(task) {
+    var _a, _b;
+    if ((_a = task.location) == null ? void 0 : _a.url) {
+      window.open(task.location.url);
+      return;
+    }
+    if ((_b = task.location) == null ? void 0 : _b.file) {
+      const file = this.app.vault.getAbstractFileByPath(task.location.file);
+      if (file) {
+        this.app.workspace.getLeaf(false).openFile(file);
+      } else {
+        new import_obsidian5.Notice(`Location file not found: ${task.location.file}`);
+      }
+    }
   }
 };
 
@@ -1589,8 +1812,255 @@ var InboxView = class extends import_obsidian6.ItemView {
   }
 };
 
-// src/modals/QuickAddModal.ts
+// src/views/WeeklyReviewView.ts
 var import_obsidian7 = require("obsidian");
+var WEEKLY_REVIEW_VIEW_TYPE = "aio-weekly-review";
+var REVIEW_STEPS = [
+  { id: "inbox", title: "Inbox" },
+  { id: "projects", title: "Projects" },
+  { id: "waiting", title: "Waiting For" },
+  { id: "someday", title: "Someday" },
+  { id: "complete", title: "Complete" }
+];
+var WeeklyReviewView = class extends import_obsidian7.ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.currentStepIndex = 0;
+    this.plugin = plugin;
+  }
+  getViewType() {
+    return WEEKLY_REVIEW_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "AIO Weekly Review";
+  }
+  getIcon() {
+    return "rotate-ccw";
+  }
+  async onOpen() {
+    await this.refresh();
+  }
+  async onClose() {
+  }
+  async refresh() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.createEl("div", { cls: "aio-weekly-review-container" }, async (el) => {
+      el.createEl("div", { cls: "aio-weekly-review-header" }, (header) => {
+        header.createEl("h4", { text: "Weekly Review" });
+        header.createEl("span", {
+          cls: "aio-weekly-review-step-count",
+          text: `${this.currentStepIndex + 1} of ${REVIEW_STEPS.length}`
+        });
+      });
+      this.renderStepTabs(el);
+      const step = REVIEW_STEPS[this.currentStepIndex];
+      if (step.id === "inbox") {
+        await this.renderInboxStep(el);
+      } else if (step.id === "projects") {
+        await this.renderProjectsStep(el);
+      } else if (step.id === "waiting") {
+        await this.renderWaitingStep(el);
+      } else if (step.id === "someday") {
+        await this.renderTaskStep(el, "someday");
+      } else {
+        await this.renderCompleteStep(el);
+      }
+      this.renderNavigation(el);
+    });
+  }
+  renderStepTabs(container) {
+    container.createEl("div", { cls: "aio-review-steps" }, (tabs) => {
+      REVIEW_STEPS.forEach((step, index) => {
+        const tab = tabs.createEl("button", {
+          cls: `aio-review-step ${index === this.currentStepIndex ? "is-active" : ""}`,
+          text: step.title
+        });
+        tab.addEventListener("click", async () => {
+          this.currentStepIndex = index;
+          await this.refresh();
+        });
+      });
+    });
+  }
+  async renderInboxStep(container) {
+    const tasks = await this.plugin.taskService.listTasks("inbox");
+    container.createEl("div", { cls: "aio-review-panel" }, (panel) => {
+      panel.createEl("h5", { text: "Process Inbox" });
+      if (tasks.length === 0) {
+        panel.createEl("p", { cls: "aio-review-empty", text: "Inbox is empty." });
+        return;
+      }
+      for (const task of tasks) {
+        this.renderReviewTask(panel, task, true);
+      }
+    });
+  }
+  async renderProjectsStep(container) {
+    const projects = await this.plugin.taskService.getProjectNames();
+    const nextTasks = await this.plugin.taskService.listTasks("next");
+    container.createEl("div", { cls: "aio-review-panel" }, (panel) => {
+      panel.createEl("h5", { text: "Review Projects" });
+      if (projects.length === 0) {
+        panel.createEl("p", { cls: "aio-review-empty", text: "No projects found." });
+        return;
+      }
+      for (const project of projects) {
+        const projectTasks = nextTasks.filter((task) => {
+          var _a;
+          return (_a = task.project) == null ? void 0 : _a.includes(project);
+        });
+        panel.createEl("div", { cls: "aio-review-project" }, (row) => {
+          row.createEl("span", { cls: "aio-review-project-name", text: project });
+          row.createEl("span", {
+            cls: projectTasks.length > 0 ? "aio-review-ok" : "aio-review-warning",
+            text: projectTasks.length > 0 ? `${projectTasks.length} next action${projectTasks.length === 1 ? "" : "s"}` : "No next action"
+          });
+        });
+      }
+    });
+  }
+  async renderWaitingStep(container) {
+    const groups = await this.plugin.taskService.listWaitingGroups();
+    container.createEl("div", { cls: "aio-review-panel" }, (panel) => {
+      panel.createEl("h5", { text: "Review Waiting For" });
+      if (groups.length === 0) {
+        panel.createEl("p", { cls: "aio-review-empty", text: "No waiting tasks." });
+        return;
+      }
+      for (const group of groups) {
+        panel.createEl("div", { cls: "aio-review-person-group" }, (section) => {
+          section.createEl("h6", { text: group.person });
+          for (const task of group.tasks) {
+            this.renderReviewTask(section, task, false);
+          }
+        });
+      }
+    });
+  }
+  async renderTaskStep(container, status) {
+    const tasks = await this.plugin.taskService.listTasks(status);
+    container.createEl("div", { cls: "aio-review-panel" }, (panel) => {
+      panel.createEl("h5", { text: "Review Someday" });
+      if (tasks.length === 0) {
+        panel.createEl("p", { cls: "aio-review-empty", text: "No someday tasks." });
+        return;
+      }
+      for (const task of tasks) {
+        this.renderReviewTask(panel, task, false);
+      }
+    });
+  }
+  async renderCompleteStep(container) {
+    const lastReview = await this.getLastReviewLine();
+    container.createEl("div", { cls: "aio-review-panel aio-review-complete-panel" }, (panel) => {
+      panel.createEl("h5", { text: "Finish Review" });
+      if (lastReview) {
+        panel.createEl("p", { cls: "aio-review-last", text: `Last review: ${lastReview}` });
+      }
+      const completeBtn = panel.createEl("button", { cls: "mod-cta aio-review-complete-btn" });
+      (0, import_obsidian7.setIcon)(completeBtn, "check");
+      completeBtn.createSpan({ text: "Mark review complete" });
+      completeBtn.addEventListener("click", async () => {
+        await this.recordReviewCompletion();
+        new import_obsidian7.Notice("Weekly review recorded.");
+        await this.refresh();
+      });
+    });
+  }
+  renderReviewTask(container, task, includeActions) {
+    container.createEl("div", { cls: "aio-review-task" }, (row) => {
+      row.createEl("div", { cls: "aio-review-task-main" }, (main) => {
+        main.createEl("span", { cls: "aio-review-task-title", text: task.title });
+        const meta = [task.id, task.due ? `due ${task.due}` : "", task.project || ""].filter(Boolean).join(" \xB7 ");
+        main.createEl("span", { cls: "aio-review-task-meta", text: meta });
+      });
+      if (!includeActions) {
+        return;
+      }
+      const actions = row.createEl("div", { cls: "aio-review-task-actions" });
+      this.addStatusAction(actions, task, "next", "Start");
+      this.addStatusAction(actions, task, "someday", "Defer");
+      this.addStatusAction(actions, task, "completed", "Done");
+    });
+  }
+  addStatusAction(container, task, status, label) {
+    const button = container.createEl("button", { text: label });
+    if (this.plugin.isReadOnly) {
+      button.addClass("aio-disabled");
+      return;
+    }
+    button.addEventListener("click", async () => {
+      try {
+        if (status === "completed") {
+          await this.plugin.taskService.completeTask(task.id);
+        } else {
+          await this.plugin.taskService.changeStatus(task.id, status);
+        }
+        await this.refresh();
+      } catch (e) {
+        if (e instanceof DaemonOfflineError) {
+          new import_obsidian7.Notice("Cannot update task: daemon is offline.");
+        } else {
+          new import_obsidian7.Notice(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+        }
+      }
+    });
+  }
+  renderNavigation(container) {
+    container.createEl("div", { cls: "aio-review-navigation" }, (nav) => {
+      const prev = nav.createEl("button", { text: "Back" });
+      prev.disabled = this.currentStepIndex === 0;
+      prev.addEventListener("click", async () => {
+        this.currentStepIndex = Math.max(0, this.currentStepIndex - 1);
+        await this.refresh();
+      });
+      const next = nav.createEl("button", {
+        cls: "mod-cta",
+        text: this.currentStepIndex === REVIEW_STEPS.length - 1 ? "Done" : "Next"
+      });
+      next.addEventListener("click", async () => {
+        if (this.currentStepIndex === REVIEW_STEPS.length - 1) {
+          this.leaf.detach();
+          return;
+        }
+        this.currentStepIndex = Math.min(REVIEW_STEPS.length - 1, this.currentStepIndex + 1);
+        await this.refresh();
+      });
+    });
+  }
+  async recordReviewCompletion() {
+    const dashboardPath = this.plugin.vaultService.getDashboardPath();
+    await this.plugin.vaultService.ensureFolderExists(dashboardPath);
+    const logPath = (0, import_obsidian7.normalizePath)(`${dashboardPath}/weekly-review-log.md`);
+    const file = this.app.vault.getAbstractFileByPath(logPath);
+    const line = `- ${(/* @__PURE__ */ new Date()).toISOString()} weekly review completed`;
+    if (file instanceof import_obsidian7.TFile) {
+      const existing = await this.app.vault.read(file);
+      await this.app.vault.modify(file, `${existing.trimEnd()}
+${line}
+`);
+      return;
+    }
+    await this.app.vault.create(logPath, `# Weekly Review Log
+
+${line}
+`);
+  }
+  async getLastReviewLine() {
+    const logPath = (0, import_obsidian7.normalizePath)(`${this.plugin.vaultService.getDashboardPath()}/weekly-review-log.md`);
+    const file = this.app.vault.getAbstractFileByPath(logPath);
+    if (!(file instanceof import_obsidian7.TFile)) {
+      return null;
+    }
+    const content = await this.app.vault.read(file);
+    const entries = content.split("\n").filter((line) => line.startsWith("- "));
+    return entries.length > 0 ? entries[entries.length - 1].replace(/^- /, "") : null;
+  }
+};
+
+// src/modals/QuickAddModal.ts
+var import_obsidian8 = require("obsidian");
 
 // src/utils/dates.ts
 var InvalidDateError = class extends Error {
@@ -1698,7 +2168,7 @@ function getEndOfYear() {
 }
 
 // src/modals/QuickAddModal.ts
-var QuickAddModal = class extends import_obsidian7.Modal {
+var QuickAddModal = class extends import_obsidian8.Modal {
   constructor(app, plugin, onSubmit) {
     super(app);
     this.title = "";
@@ -1719,7 +2189,7 @@ var QuickAddModal = class extends import_obsidian7.Modal {
         text: 'Daemon offline - cannot create tasks. Run "aio daemon start" to enable writes.'
       });
     }
-    new import_obsidian7.Setting(contentEl).setName("Title").setDesc("Task title (required)").addText((text) => {
+    new import_obsidian8.Setting(contentEl).setName("Title").setDesc("Task title (required)").addText((text) => {
       text.setPlaceholder("What needs to be done?").setValue(this.title).onChange((value) => {
         this.title = value;
       });
@@ -1731,10 +2201,10 @@ var QuickAddModal = class extends import_obsidian7.Modal {
       });
       setTimeout(() => text.inputEl.focus(), 10);
     });
-    new import_obsidian7.Setting(contentEl).setName("Due Date").setDesc("Optional: YYYY-MM-DD or natural language (tomorrow, next friday)").addText((text) => text.setPlaceholder("tomorrow").setValue(this.dueDate).onChange((value) => {
+    new import_obsidian8.Setting(contentEl).setName("Due Date").setDesc("Optional: YYYY-MM-DD or natural language (tomorrow, next friday)").addText((text) => text.setPlaceholder("tomorrow").setValue(this.dueDate).onChange((value) => {
       this.dueDate = value;
     }));
-    new import_obsidian7.Setting(contentEl).setName("Project").setDesc("Optional: Link to a project").addDropdown(async (dropdown) => {
+    new import_obsidian8.Setting(contentEl).setName("Project").setDesc("Optional: Link to a project").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const projects = await this.plugin.vaultService.getProjects();
       for (const project of projects) {
@@ -1776,7 +2246,7 @@ var QuickAddModal = class extends import_obsidian7.Modal {
           options.due = formatIsoDate(parsed);
         } catch (e) {
           if (e instanceof InvalidDateError) {
-            new import_obsidian7.Notice(`Invalid date: ${this.dueDate}`);
+            new import_obsidian8.Notice(`Invalid date: ${this.dueDate}`);
             return;
           }
           throw e;
@@ -1790,10 +2260,10 @@ var QuickAddModal = class extends import_obsidian7.Modal {
       this.close();
     } catch (e) {
       if (e instanceof DaemonOfflineError) {
-        new import_obsidian7.Notice('Cannot create task: daemon is offline. Run "aio daemon start" to enable writes.');
+        new import_obsidian8.Notice('Cannot create task: daemon is offline. Run "aio daemon start" to enable writes.');
       } else {
         console.error("Error creating task:", e);
-        new import_obsidian7.Notice(`Error creating task: ${e instanceof Error ? e.message : "Unknown error"}`);
+        new import_obsidian8.Notice(`Error creating task: ${e instanceof Error ? e.message : "Unknown error"}`);
       }
     }
   }
@@ -1804,8 +2274,8 @@ var QuickAddModal = class extends import_obsidian7.Modal {
 };
 
 // src/modals/TaskEditModal.ts
-var import_obsidian8 = require("obsidian");
-var TaskEditModal = class extends import_obsidian8.Modal {
+var import_obsidian9 = require("obsidian");
+var TaskEditModal = class extends import_obsidian9.Modal {
   constructor(app, plugin, task, onSubmit) {
     var _a, _b;
     super(app);
@@ -1834,16 +2304,16 @@ var TaskEditModal = class extends import_obsidian8.Modal {
       });
     }
     contentEl.createEl("div", { cls: "aio-task-id-display", text: `ID: ${this.task.id}` });
-    new import_obsidian8.Setting(contentEl).setName("Title").addText((text) => text.setValue(this.title).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Title").addText((text) => text.setValue(this.title).onChange((value) => {
       this.title = value;
     }));
-    new import_obsidian8.Setting(contentEl).setName("Status").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("waiting", "Waiting").addOption("scheduled", "Scheduled").addOption("someday", "Someday").addOption("completed", "Completed").setValue(this.status).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Status").addDropdown((dropdown) => dropdown.addOption("inbox", "Inbox").addOption("next", "Next").addOption("waiting", "Waiting").addOption("scheduled", "Scheduled").addOption("someday", "Someday").addOption("completed", "Completed").setValue(this.status).onChange((value) => {
       this.status = value;
     }));
-    new import_obsidian8.Setting(contentEl).setName("Due Date").setDesc("YYYY-MM-DD format").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.dueDate).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Due Date").setDesc("YYYY-MM-DD format").addText((text) => text.setPlaceholder("YYYY-MM-DD").setValue(this.dueDate).onChange((value) => {
       this.dueDate = value;
     }));
-    new import_obsidian8.Setting(contentEl).setName("Project").addDropdown(async (dropdown) => {
+    new import_obsidian9.Setting(contentEl).setName("Project").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const projects = await this.plugin.vaultService.getProjects();
       for (const project of projects) {
@@ -1854,7 +2324,7 @@ var TaskEditModal = class extends import_obsidian8.Modal {
         this.project = value;
       });
     });
-    new import_obsidian8.Setting(contentEl).setName("Assigned To").addDropdown(async (dropdown) => {
+    new import_obsidian9.Setting(contentEl).setName("Assigned To").addDropdown(async (dropdown) => {
       dropdown.addOption("", "(None)");
       const people = await this.plugin.vaultService.getPeople();
       for (const person of people) {
@@ -1865,13 +2335,13 @@ var TaskEditModal = class extends import_obsidian8.Modal {
         this.assignedTo = value;
       });
     });
-    new import_obsidian8.Setting(contentEl).setName("Waiting On").setDesc("Person or thing you are waiting for").addText((text) => text.setValue(this.waitingOn).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Waiting On").setDesc("Person or thing you are waiting for").addText((text) => text.setValue(this.waitingOn).onChange((value) => {
       this.waitingOn = value;
     }));
-    new import_obsidian8.Setting(contentEl).setName("Time Estimate").setDesc("e.g., 30m, 2h, 1d").addText((text) => text.setPlaceholder("2h").setValue(this.timeEstimate).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Time Estimate").setDesc("e.g., 30m, 2h, 1d").addText((text) => text.setPlaceholder("2h").setValue(this.timeEstimate).onChange((value) => {
       this.timeEstimate = value;
     }));
-    new import_obsidian8.Setting(contentEl).setName("Tags").setDesc("Comma-separated list").addText((text) => text.setPlaceholder("backend, urgent").setValue(this.tags).onChange((value) => {
+    new import_obsidian9.Setting(contentEl).setName("Tags").setDesc("Comma-separated list").addText((text) => text.setPlaceholder("backend, urgent").setValue(this.tags).onChange((value) => {
       this.tags = value;
     }));
     const buttonContainer = contentEl.createEl("div", { cls: "aio-modal-buttons" });
@@ -1928,10 +2398,10 @@ var TaskEditModal = class extends import_obsidian8.Modal {
       this.close();
     } catch (e) {
       if (e instanceof DaemonOfflineError) {
-        new import_obsidian8.Notice('Cannot save task: daemon is offline. Run "aio daemon start" to enable writes.');
+        new import_obsidian9.Notice('Cannot save task: daemon is offline. Run "aio daemon start" to enable writes.');
       } else {
         console.error("Error saving task:", e);
-        new import_obsidian8.Notice(`Error saving task: ${e instanceof Error ? e.message : "Unknown error"}`);
+        new import_obsidian9.Notice(`Error saving task: ${e instanceof Error ? e.message : "Unknown error"}`);
       }
     }
   }
@@ -1943,7 +2413,7 @@ var TaskEditModal = class extends import_obsidian8.Modal {
 
 // src/main.ts
 var HEALTH_CHECK_INTERVAL = 3e4;
-var AioPlugin = class extends import_obsidian9.Plugin {
+var AioPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.statusBarItem = null;
@@ -1974,11 +2444,18 @@ var AioPlugin = class extends import_obsidian9.Plugin {
       INBOX_VIEW_TYPE,
       (leaf) => new InboxView(leaf, this)
     );
+    this.registerView(
+      WEEKLY_REVIEW_VIEW_TYPE,
+      (leaf) => new WeeklyReviewView(leaf, this)
+    );
     this.addRibbonIcon("check-square", "Open AIO Tasks", () => {
       this.activateView(TASK_LIST_VIEW_TYPE);
     });
     this.addRibbonIcon("inbox", "Open AIO Inbox", () => {
       this.activateView(INBOX_VIEW_TYPE);
+    });
+    this.addRibbonIcon("rotate-ccw", "Start AIO Weekly Review", () => {
+      this.activateView(WEEKLY_REVIEW_VIEW_TYPE);
     });
     this.addCommand({
       id: "aio-add-task",
@@ -1996,6 +2473,11 @@ var AioPlugin = class extends import_obsidian9.Plugin {
       callback: () => this.activateView(INBOX_VIEW_TYPE)
     });
     this.addCommand({
+      id: "aio-start-weekly-review",
+      name: "Start weekly review",
+      callback: () => this.activateView(WEEKLY_REVIEW_VIEW_TYPE)
+    });
+    this.addCommand({
       id: "aio-complete-task",
       name: "Complete current task",
       checkCallback: (checking) => {
@@ -2006,9 +2488,9 @@ var AioPlugin = class extends import_obsidian9.Plugin {
               this.refreshViews();
             }).catch((e) => {
               if (e instanceof DaemonOfflineError) {
-                new import_obsidian9.Notice('Cannot complete task: daemon is offline. Run "aio daemon start" to enable writes.');
+                new import_obsidian10.Notice('Cannot complete task: daemon is offline. Run "aio daemon start" to enable writes.');
               } else {
-                new import_obsidian9.Notice(`Error: ${e.message}`);
+                new import_obsidian10.Notice(`Error: ${e.message}`);
               }
             });
           }
@@ -2028,9 +2510,9 @@ var AioPlugin = class extends import_obsidian9.Plugin {
               this.refreshViews();
             }).catch((e) => {
               if (e instanceof DaemonOfflineError) {
-                new import_obsidian9.Notice('Cannot start task: daemon is offline. Run "aio daemon start" to enable writes.');
+                new import_obsidian10.Notice('Cannot start task: daemon is offline. Run "aio daemon start" to enable writes.');
               } else {
-                new import_obsidian9.Notice(`Error: ${e.message}`);
+                new import_obsidian10.Notice(`Error: ${e.message}`);
               }
             });
           }
@@ -2050,9 +2532,9 @@ var AioPlugin = class extends import_obsidian9.Plugin {
               this.refreshViews();
             }).catch((e) => {
               if (e instanceof DaemonOfflineError) {
-                new import_obsidian9.Notice('Cannot defer task: daemon is offline. Run "aio daemon start" to enable writes.');
+                new import_obsidian10.Notice('Cannot defer task: daemon is offline. Run "aio daemon start" to enable writes.');
               } else {
-                new import_obsidian9.Notice(`Error: ${e.message}`);
+                new import_obsidian10.Notice(`Error: ${e.message}`);
               }
             });
           }
@@ -2072,9 +2554,9 @@ var AioPlugin = class extends import_obsidian9.Plugin {
               this.refreshViews();
             }).catch((e) => {
               if (e instanceof DaemonOfflineError) {
-                new import_obsidian9.Notice('Cannot set task to waiting: daemon is offline. Run "aio daemon start" to enable writes.');
+                new import_obsidian10.Notice('Cannot set task to waiting: daemon is offline. Run "aio daemon start" to enable writes.');
               } else {
-                new import_obsidian9.Notice(`Error: ${e.message}`);
+                new import_obsidian10.Notice(`Error: ${e.message}`);
               }
             });
           }
@@ -2094,9 +2576,9 @@ var AioPlugin = class extends import_obsidian9.Plugin {
               this.refreshViews();
             }).catch((e) => {
               if (e instanceof DaemonOfflineError) {
-                new import_obsidian9.Notice('Cannot schedule task: daemon is offline. Run "aio daemon start" to enable writes.');
+                new import_obsidian10.Notice('Cannot schedule task: daemon is offline. Run "aio daemon start" to enable writes.');
               } else {
-                new import_obsidian9.Notice(`Error: ${e.message}`);
+                new import_obsidian10.Notice(`Error: ${e.message}`);
               }
             });
           }
@@ -2111,6 +2593,7 @@ var AioPlugin = class extends import_obsidian9.Plugin {
     this.stopHealthChecks();
     this.app.workspace.detachLeavesOfType(TASK_LIST_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(INBOX_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(WEEKLY_REVIEW_VIEW_TYPE);
   }
   /**
    * Check daemon connection and update status bar.
@@ -2276,6 +2759,10 @@ var AioPlugin = class extends import_obsidian9.Plugin {
       view.refresh();
     }
     for (const leaf of this.app.workspace.getLeavesOfType(INBOX_VIEW_TYPE)) {
+      const view = leaf.view;
+      view.refresh();
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(WEEKLY_REVIEW_VIEW_TYPE)) {
       const view = leaf.view;
       view.refresh();
     }

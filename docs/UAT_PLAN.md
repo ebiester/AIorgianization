@@ -132,8 +132,10 @@ Before running any tests:
 | 4 | Open created task file | `project: "[[Projects/Q4 Migration]]"` in frontmatter |
 | 5 | Run `aio add "Another task" -p "Q4 Migration"` | Success (project now exists) |
 | 6 | Run `aio add "Typo test" -p "Q4 Migartion"` | Error with fuzzy match suggestion: "Did you mean? Q4-Migration" |
+| 7 | Run `aio project list` | Project summary shows task counts by status |
+| 8 | Run `aio project show "Q4 Migration"` | Project details and related tasks are shown |
 
-**Pass Criteria:** Project validation prevents typos, `--create-project` flag enables explicit creation, project files created in correct location with template.
+**Pass Criteria:** Project validation prevents typos, `--create-project` flag enables explicit creation, project files are created in the correct location, and project views show task counts and related tasks.
 
 **Error Case:** Specifying a non-existent project without `--create-project` should error with helpful suggestions.
 
@@ -693,11 +695,12 @@ Before running any tests:
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Cmd+P → "AIo: Open task list" | Task list pane opens |
-| 2 | View loads | Shows tasks with summary counts |
-| 3 | Click "Inbox (N)" filter | Shows only inbox tasks |
-| 4 | Task display | Shows checkbox, title, priority badge, due date |
+| 2 | View loads | Shows task tabs for All, Inbox, Next, Waiting, Blocked, Scheduled, Someday |
+| 3 | Click "Inbox" filter | Shows only inbox tasks |
+| 4 | Task display | Shows checkbox, title, status badge, due date, project, tags |
+| 5 | Right-click task title | Context menu shows complete/start/defer/wait/edit/open actions |
 
-**Pass Criteria:** Task list renders with filtering.
+**Pass Criteria:** Task list renders with filtering and context actions.
 
 ---
 
@@ -777,6 +780,55 @@ Before running any tests:
 
 ---
 
+### UAT-043c: Weekly Review View
+
+**Objective:** Verify the plugin weekly review flow and completion tracking.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Cmd+P → "AIo: Start weekly review" | Weekly review pane opens |
+| 2 | Step through Inbox, Projects, Waiting For, Someday | Each section shows relevant tasks or empty state |
+| 3 | In Inbox step, click Start/Defer/Done on a task | Task moves to the selected status and view refreshes |
+| 4 | Complete final step | `AIO/Dashboard/weekly-review-log.md` is created or appended |
+| 5 | Restart review | Last review timestamp appears on the final step |
+
+**Pass Criteria:** Weekly review can be completed from the plugin and records a timestamp in the vault.
+
+---
+
+### UAT-043a: Waiting and Blocked Plugin Views
+
+**Objective:** Verify grouped waiting items and dependency visibility in the plugin.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Create waiting tasks assigned to two people | Tasks exist in `AIO/Tasks/Waiting/` |
+| 2 | Open Task List → Waiting tab | Tasks grouped under each person |
+| 3 | Check waiting metadata | Each waiting task shows days since creation |
+| 4 | Add `blockedBy` to a task and `blocks` to its blocker | YAML remains valid |
+| 5 | Open Task List → Blocked tab | Blocked task appears |
+| 6 | Check blocked metadata | Row shows blocking task title or ID |
+
+**Pass Criteria:** Waiting tasks are grouped by person, and blocked tasks are discoverable from the Blocked tab.
+
+---
+
+### UAT-043b: Location Navigation and Subtask Progress
+
+**Objective:** Verify task rows expose location links and subtask progress.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Add markdown subtasks to a task body | Body contains `- [x]` and `- [ ]` items |
+| 2 | Open Task List | Task row shows progress like `1/2 subtasks` |
+| 3 | Add `location.url` to task frontmatter | Location action appears |
+| 4 | Click location action | URL opens in browser |
+| 5 | Replace with `location.file` pointing to a vault file | Location action opens that file in Obsidian |
+
+**Pass Criteria:** Subtask completion counts are visible, and URL/file locations open from task rows.
+
+---
+
 ## Task File Format Validation
 
 ### UAT-044: Task File Frontmatter
@@ -821,8 +873,9 @@ Before running any tests:
 | 1 | Open a task file | Contains markdown body after frontmatter |
 | 2 | Add subtasks manually | `## Subtasks` section with `- [ ]` items |
 | 3 | Check rendering | Subtasks render as checkboxes in Obsidian |
+| 4 | Open plugin task list | Row shows completed/total subtask count |
 
-**Pass Criteria:** Subtask format compatible with Obsidian.
+**Pass Criteria:** Subtask format is compatible with Obsidian and plugin progress display.
 
 ---
 
@@ -832,11 +885,13 @@ Before running any tests:
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Manually add location to task frontmatter | `location: {file: "src/api.ts", line: 42}` |
-| 2 | Or add URL | `location: {url: "https://github.com/..."}` |
-| 3 | Check file saves correctly | YAML remains valid |
+| 1 | Manually add location to task frontmatter | `location:` with nested `file`, `line`, or `url` fields |
+| 2 | Open plugin task list | Location action appears on the row |
+| 3 | Click URL location | Browser opens the URL |
+| 4 | Click file location | Obsidian opens the vault file |
+| 5 | Check file saves correctly | YAML remains valid |
 
-**Pass Criteria:** Location field format works (manual for now, per PROJECT_PLAN).
+**Pass Criteria:** Location field format works and plugin navigation opens file or URL targets.
 
 ---
 
@@ -849,9 +904,10 @@ Before running any tests:
 | 1 | Create two tasks | Tasks A and B exist |
 | 2 | Manually add to task A frontmatter | `blockedBy: ["<task-B-id>"]` |
 | 3 | Manually add to task B frontmatter | `blocks: ["<task-A-id>"]` |
-| 4 | Check files | YAML remains valid |
+| 4 | Open plugin task list → Blocked tab | Task A appears as blocked |
+| 5 | Check files | YAML remains valid |
 
-**Pass Criteria:** Dependency format works (model exists per PROJECT_PLAN).
+**Pass Criteria:** Dependency format works and blocked tasks are visible in the plugin.
 
 ---
 

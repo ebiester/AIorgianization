@@ -17,7 +17,8 @@ from aio.cli.index import index
 from aio.cli.init import init
 from aio.cli.list import list_tasks
 from aio.cli.plugin import plugin
-from aio.cli.status import defer, start, wait
+from aio.cli.project import project
+from aio.cli.status import defer, delegate, start, wait
 from aio.exceptions import AioError
 
 console = Console()
@@ -41,7 +42,8 @@ def cli(ctx: click.Context, vault: Path | None, debug: bool) -> None:
 @click.pass_context
 def help(ctx: click.Context) -> None:
     """Show this help message."""
-    click.echo(ctx.parent.get_help())
+    if ctx.parent is not None:
+        click.echo(ctx.parent.get_help())
 
 
 # Register commands
@@ -50,8 +52,11 @@ cli.add_command(add)
 cli.add_command(list_tasks, name="list")
 cli.add_command(done)
 cli.add_command(start)
+cli.add_command(start, name="next")
+cli.add_command(start, name="activate")
 cli.add_command(defer)
 cli.add_command(wait)
+cli.add_command(delegate)
 cli.add_command(dashboard)
 cli.add_command(archive)
 cli.add_command(config)
@@ -59,6 +64,7 @@ cli.add_command(file)
 cli.add_command(daemon)
 cli.add_command(plugin)
 cli.add_command(index)
+cli.add_command(project)
 
 
 def main() -> None:

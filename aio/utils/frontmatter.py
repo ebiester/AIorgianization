@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-import frontmatter
+import frontmatter  # type: ignore[import-untyped]
 
 
 def read_frontmatter(path: Path) -> tuple[dict[str, Any], str]:

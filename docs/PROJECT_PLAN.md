@@ -21,7 +21,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | 1 | Foundation | Done | Vault structure, CLI basics |
 | 2 | Obsidian Plugin Core | Done | Task views, commands |
 | 3 | AI Integration | Done | MCP server for MCP-capable clients |
-| 4 | Polish | Not Started | Weekly review, refinements |
+| 4 | Polish | Done | Weekly review, refinements |
 
 ---
 
@@ -93,15 +93,15 @@ aio archive tasks --before 2024-01-01
 | Quick add modal | Command palette task entry | Done |
 | Task edit modal | Edit frontmatter fields | Done |
 | Status commands | Complete, start, defer, wait | Done |
-| Right-click menu | Context actions on tasks | Not Started |
+| Right-click menu | Context actions on tasks | Done |
 | Inbox view | Process items one-by-one | Done |
-| Waiting-for view | Grouped by person | Not Started |
-| Dependency management | Link tasks as blockedBy/blocks | Done (model only) |
-| Dependency visualization | Show blocked tasks and blockers in views | Not Started |
-| Blocked view | Tasks waiting on dependencies | Not Started |
-| Location linking | Connect task to file path, line number, or URL | Done (model only) |
-| Location navigation | Click to open file/URL from task view | Not Started |
-| Subtask progress | Track and display subtask completion (e.g., "3/5") | Not Started |
+| Waiting-for view | Grouped by person | Done |
+| Dependency management | Link tasks as blockedBy/blocks | Done |
+| Dependency visualization | Show blocked tasks and blockers in views | Done |
+| Blocked view | Tasks waiting on dependencies | Done |
+| Location linking | Connect task to file path, line number, or URL | Done |
+| Location navigation | Click to open file/URL from task view | Done |
+| Subtask progress | Track and display subtask completion (e.g., "3/5") | Done |
 
 ### Verification
 
@@ -135,7 +135,7 @@ aio archive tasks --before 2024-01-01
 | Context pack tools | Create, list, append context packs | Done |
 | Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
 | Task resources | Expose task lists as resources | Done |
-| Client instruction file | Reusable AIO instructions for MCP-capable assistants, such as `.cursor/skills/aio.md` | Not Started |
+| Client instruction file | Reusable AIO instructions for MCP-capable assistants, such as `.cursor/skills/aio.md` | Done |
 | MCP integration tests | Test tool invocations | Done |
 | MCP startup message | Display initialization message when server starts | Done |
 | MCP graceful shutdown | Handle Ctrl+C gracefully with clean exit message | Done |
@@ -157,12 +157,12 @@ aio archive tasks --before 2024-01-01
 
 | Item | Description | Priority |
 |------|-------------|----------|
-| Weekly review wizard | Multi-step modal in plugin | P0 |
-| Review tracking | Record review completion | P1 |
-| Project views | Dataview integration or custom | P1 |
-| Delegated summary | Days-since-delegated display | P1 |
-| CLI improvements | Better output formatting | P2 |
-| Documentation | README, setup guide | P1 |
+| Weekly review wizard | Multi-step review view in plugin | Done |
+| Review tracking | Record review completion | Done |
+| Project views | Dataview integration and `aio project list/show` views | Done |
+| Delegated summary | Days-since-delegated display | Done |
+| CLI improvements | Better output formatting for project summaries | Done |
+| Documentation | User manual, PRD, project plan, UAT, client instructions | Done |
 
 ---
 
@@ -204,15 +204,16 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 
 ## Next Actions
 
-**Phase 4 (Polish) - Not Started:**
+**Phase 4 (Polish) - Done:**
 
-1. [ ] Implement weekly review wizard in Obsidian plugin
-2. [ ] Add review tracking (record completion timestamps)
-3. [ ] Implement Waiting-for view grouped by person
-5. [ ] Implement dependency visualization in task views
-6. [ ] Add Blocked view for tasks waiting on dependencies
-7. [ ] Implement location navigation (click to open file/URL)
-8. [ ] Add subtask progress display
+1. [x] Implement weekly review wizard in Obsidian plugin
+2. [x] Add review tracking (record completion timestamps)
+3. [x] Implement Waiting-for view grouped by person
+5. [x] Implement dependency visualization in task views
+6. [x] Add Blocked view for tasks waiting on dependencies
+7. [x] Implement location navigation (click to open file/URL)
+8. [x] Add subtask progress display
+9. [x] Add project list/show views
 10. [x] Write MCP integration tests
 11. [x] Add `delegate` as CLI alias for `wait` with required person argument
 13. [x] Add `aio_delegate_task` MCP tool (alias for wait with person)

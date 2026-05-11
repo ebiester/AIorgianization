@@ -143,8 +143,13 @@ aio add "Task title" [-d due] [-p project] [-a person]
 aio list [inbox|next|waiting|someday|today|overdue|all]
 aio done <task-id-or-query>       # Complete task
 aio start <task>                  # Move to Next status
+aio next <task>                   # Alias for start
+aio activate <task>               # Alias for start
 aio defer <task>                  # Move to Someday
 aio wait <task> [person]          # Move to Waiting
+aio delegate <task> <person>      # Alias for wait with required person
+aio project list                  # Show projects with task counts
+aio project show <project>         # Show project details and tasks
 
 # The -a/--assign flag creates task and delegates immediately:
 # aio add "Review API" --assign Sarah  # Creates in Waiting status

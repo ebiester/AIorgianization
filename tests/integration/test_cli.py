@@ -213,6 +213,18 @@ class TestStatusCommands:
         assert result.exit_code == 0
         assert "Started:" in result.output
 
+    @pytest.mark.uat("UAT-011")
+    def test_next_alias(
+        self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
+    ) -> None:
+        """next should be an alias for start."""
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "next", "AB2C"]
+        )
+
+        assert result.exit_code == 0
+        assert "Started:" in result.output
+
     @pytest.mark.uat("UAT-014")
     def test_defer_command(
         self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
@@ -232,6 +244,23 @@ class TestStatusCommands:
         """wait should move task to waiting (creating person if needed)."""
         result = runner.invoke(
             cli, ["--vault", str(initialized_vault), "wait", "AB2C", "Sarah", "--create-person"]
+        )
+
+        assert result.exit_code == 0
+        assert "Waiting:" in result.output
+
+    @pytest.mark.uat("UAT-015")
+    def test_delegate_alias(
+        self, runner: CliRunner, initialized_vault: Path, sample_task_file: Path
+    ) -> None:
+        """delegate should be an alias for wait with person required."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "delegate", "AB2C", "Sarah",
+                "--create-person",
+            ],
         )
 
         assert result.exit_code == 0
@@ -260,6 +289,56 @@ class TestDashboardCommand:
 
         assert result.exit_code == 0
         assert "Dashboard saved:" in result.output
+
+
+class TestProjectCommand:
+    """Tests for aio project commands."""
+
+    @pytest.mark.uat("UAT-006")
+    def test_project_list(self, runner: CliRunner, initialized_vault: Path) -> None:
+        """project list should show projects with task counts."""
+        create_result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "add", "Design API",
+                "-p", "Q4 Migration",
+                "--create-project",
+            ],
+        )
+        assert create_result.exit_code == 0
+
+        result = runner.invoke(
+            cli,
+            ["--vault", str(initialized_vault), "project", "list"],
+        )
+
+        assert result.exit_code == 0
+        assert "Q4 Migration" in result.output
+        assert "Projects" in result.output
+
+    @pytest.mark.uat("UAT-006")
+    def test_project_show(self, runner: CliRunner, initialized_vault: Path) -> None:
+        """project show should display project details and tasks."""
+        create_result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "add", "Review spec",
+                "-p", "Q4 Migration",
+                "--create-project",
+            ],
+        )
+        assert create_result.exit_code == 0
+
+        result = runner.invoke(
+            cli,
+            ["--vault", str(initialized_vault), "project", "show", "Q4 Migration"],
+        )
+
+        assert result.exit_code == 0
+        assert "Q4 Migration" in result.output
+        assert "Review spec" in result.output
 
 
 class TestFileCommands:

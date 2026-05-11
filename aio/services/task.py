@@ -465,29 +465,33 @@ class TaskService:
         updated = self._parse_datetime(metadata.get("updated"), datetime.now())
         completed = self._parse_datetime(metadata.get("completed"), None)
         archived_at = self._parse_datetime(metadata.get("archivedAt"), None)
+        if created is None:
+            created = datetime.now()
+        if updated is None:
+            updated = datetime.now()
 
-        return Task(
-            id=metadata.get("id", "????"),
-            type=metadata.get("type", "task"),
-            status=TaskStatus(metadata.get("status", "inbox")),
-            title=title,
-            body=content,
-            due=due,
-            project=metadata.get("project"),
-            assigned_to=metadata.get("assignedTo"),
-            waiting_on=metadata.get("waitingOn"),
-            blocked_by=metadata.get("blockedBy", []),
-            blocks=metadata.get("blocks", []),
-            location=location,
-            tags=metadata.get("tags", []),
-            time_estimate=metadata.get("timeEstimate"),
-            created=created,
-            updated=updated,
-            completed=completed,
-            archived=metadata.get("archived", False),
-            archived_at=archived_at,
-            archived_from=metadata.get("archivedFrom"),
-        )
+        return Task.model_validate({
+            "id": metadata.get("id", "????"),
+            "type": metadata.get("type", "task"),
+            "status": TaskStatus(metadata.get("status", "inbox")),
+            "title": title,
+            "body": content,
+            "due": due,
+            "project": metadata.get("project"),
+            "assignedTo": metadata.get("assignedTo"),
+            "waitingOn": metadata.get("waitingOn"),
+            "blockedBy": metadata.get("blockedBy", []),
+            "blocks": metadata.get("blocks", []),
+            "location": location,
+            "tags": metadata.get("tags", []),
+            "timeEstimate": metadata.get("timeEstimate"),
+            "created": created,
+            "updated": updated,
+            "completed": completed,
+            "archived": metadata.get("archived", False),
+            "archivedAt": archived_at,
+            "archivedFrom": metadata.get("archivedFrom"),
+        })
 
     def _extract_title(self, content: str, filepath: Path) -> str:
         """Extract title from content or filename.

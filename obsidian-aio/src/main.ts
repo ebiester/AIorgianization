@@ -5,6 +5,7 @@ import { VaultService } from './services/VaultService';
 import { TaskService } from './services/TaskService';
 import { TaskListView, TASK_LIST_VIEW_TYPE } from './views/TaskListView';
 import { InboxView, INBOX_VIEW_TYPE } from './views/InboxView';
+import { WeeklyReviewView, WEEKLY_REVIEW_VIEW_TYPE } from './views/WeeklyReviewView';
 import { QuickAddModal } from './modals/QuickAddModal';
 import { TaskEditModal } from './modals/TaskEditModal';
 import { DaemonOfflineError } from './services/DaemonClient';
@@ -58,6 +59,11 @@ export default class AioPlugin extends Plugin {
       (leaf) => new InboxView(leaf, this)
     );
 
+    this.registerView(
+      WEEKLY_REVIEW_VIEW_TYPE,
+      (leaf) => new WeeklyReviewView(leaf, this)
+    );
+
     // Add ribbon icons
     this.addRibbonIcon('check-square', 'Open AIO Tasks', () => {
       this.activateView(TASK_LIST_VIEW_TYPE);
@@ -65,6 +71,10 @@ export default class AioPlugin extends Plugin {
 
     this.addRibbonIcon('inbox', 'Open AIO Inbox', () => {
       this.activateView(INBOX_VIEW_TYPE);
+    });
+
+    this.addRibbonIcon('rotate-ccw', 'Start AIO Weekly Review', () => {
+      this.activateView(WEEKLY_REVIEW_VIEW_TYPE);
     });
 
     // Register commands
@@ -84,6 +94,12 @@ export default class AioPlugin extends Plugin {
       id: 'aio-open-inbox',
       name: 'Open inbox',
       callback: () => this.activateView(INBOX_VIEW_TYPE),
+    });
+
+    this.addCommand({
+      id: 'aio-start-weekly-review',
+      name: 'Start weekly review',
+      callback: () => this.activateView(WEEKLY_REVIEW_VIEW_TYPE),
     });
 
     this.addCommand({
@@ -212,6 +228,7 @@ export default class AioPlugin extends Plugin {
     // Detach all AIO views to prevent "plugin no longer active" errors on restart
     this.app.workspace.detachLeavesOfType(TASK_LIST_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(INBOX_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(WEEKLY_REVIEW_VIEW_TYPE);
   }
 
   /**
@@ -414,6 +431,11 @@ export default class AioPlugin extends Plugin {
     // Refresh inbox views
     for (const leaf of this.app.workspace.getLeavesOfType(INBOX_VIEW_TYPE)) {
       const view = leaf.view as InboxView;
+      view.refresh();
+    }
+
+    for (const leaf of this.app.workspace.getLeavesOfType(WEEKLY_REVIEW_VIEW_TYPE)) {
+      const view = leaf.view as WeeklyReviewView;
       view.refresh();
     }
   }

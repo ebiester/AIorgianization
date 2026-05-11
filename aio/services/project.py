@@ -276,17 +276,17 @@ class ProjectService:
                 if created.tzinfo:
                     created = created.replace(tzinfo=None)
 
-        return Project(
-            id=metadata.get("id", "????"),
-            type=metadata.get("type", "project"),
-            status=ProjectStatus(metadata.get("status", "active")),
-            category=metadata.get("category", "project"),
-            title=metadata.get("title", filepath.stem),
-            body=content,
-            team=metadata.get("team"),
-            target_date=target_date,
-            created=created,
-        )
+        return Project.model_validate({
+            "id": metadata.get("id", "????"),
+            "type": metadata.get("type", "project"),
+            "status": ProjectStatus(metadata.get("status", "active")),
+            "category": metadata.get("category", "project"),
+            "title": metadata.get("title", filepath.stem),
+            "body": content,
+            "team": metadata.get("team"),
+            "targetDate": target_date,
+            "created": created,
+        })
 
     def create(
         self,
