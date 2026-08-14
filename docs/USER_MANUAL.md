@@ -18,7 +18,7 @@ A personal task and deadline management system for engineering managers, built o
 10. [Troubleshooting](#troubleshooting)
 11. [Reference](#reference)
 
----
+--  -
 
 ## Installation
 
@@ -319,9 +319,20 @@ aio add "Update docs" -a Bob -d friday
 # Combined
 aio add "Review spec" -d friday -p "Q4 Migration"
 aio add "Design schema" -p "Q4 Migration" --assign Sarah -d "next monday"
+
+# With resume context (Markdown is stored in the task's Notes section)
+aio add "Send rollout options to Sam" --notes "- Why: approval blocks launch\n- Next action: send the two wording options"
 ```
 
 The `--assign` (or `-a`) flag creates the task and immediately delegates it to a person, moving it to Waiting status. This is equivalent to running `aio add` followed by `aio wait`.
+
+### Capture Follow-ups from AI Conversations
+
+The reusable [`action-capture`](../skills/action-capture/SKILL.md) skill makes Claude and Codex save substantive follow-up work automatically. It uses an action-led title and records why the task exists, its current state, constraints, the next action, and relevant references in `## Notes`.
+
+Use it with an AIO MCP connection so the agent can call `aio_add_task` with its `notes` field. For direct capture, use `aio add "<title>" --notes "<Markdown context>"`.
+
+To install the repository skill locally, copy `skills/action-capture/` into the skills directory used by Claude Code or Codex. For ChatGPT, package the same skill with the AIO MCP server as a personal plugin; OpenAI plugins can extend both ChatGPT and Codex with skills and MCP tools.
 
 ### Listing Tasks
 
@@ -421,7 +432,7 @@ aio-mcp
 
 | Tool | Description |
 |------|-------------|
-| `aio_add_task` | Create a new task with optional due date, project, and delegation |
+| `aio_add_task` | Create a new task with optional due date, project, delegation, and Markdown notes |
 | `aio_list_tasks` | List tasks filtered by status or project |
 | `aio_complete_task` | Mark a task as completed |
 | `aio_start_task` | Move a task to Next status |
@@ -451,6 +462,7 @@ Once configured, you can ask your AI assistant:
 - "What's on my plate today?" → Uses `aio_get_dashboard`
 - "Add a task to review the PR by Friday" → Uses `aio_add_task`
 - "Add a task for Sarah to update the docs" → Uses `aio_add_task` with `assign`
+- "Remember to send the rollout options to Sam" → Uses `aio_add_task` with `notes`
 - "Show my inbox" → Uses `aio_list_tasks`
 - "Mark the auth bug task as done" → Uses `aio_complete_task`
 
@@ -760,3 +772,6 @@ Your dashboard shows:
 | **Waiting For** | Delegated tasks, grouped by person |
 | **Team Load** | Active tasks per person |
 | **Quick Links** | Jump to common views |
+# Task-centered open brain
+
+Use `aio index rebuild` to create the local, disposable search index, `aio index reconcile` after bulk external edits, and `aio index status` to inspect its health. MCP harnesses can search (`aio_search`), assemble one task's context (`aio_resume_task`), link context (`aio_link_context`), record work (`aio_record_work`), and promote durable knowledge (`aio_promote_knowledge`). Existing task files remain valid; `context`, `lastWorked`, and `## Work Log` are added only when used.

@@ -556,6 +556,8 @@ Before running any tests:
 | 1 | Call `aio_add_task({title: "MCP Test", due: "tomorrow"})` | Returns task ID |
 | 2 | Check vault | Task file created in Inbox |
 
+**Context capture:** Call `aio_add_task({title: "Send rollout options", notes: "- Next action: send the draft"})`; the task's `## Notes` section contains the supplied Markdown.
+
 **Pass Criteria:** MCP tool creates task successfully.
 
 ---

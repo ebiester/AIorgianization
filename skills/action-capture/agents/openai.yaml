@@ -1,0 +1,4 @@
+interface:
+  display_name: "Action Capture"
+  short_description: "Capture actionable work with resume context"
+  default_prompt: "Use $action-capture to record every substantive follow-up with useful resume context."

@@ -24,6 +24,10 @@ TOOL_SCHEMAS = {
                     "enum": ["inbox", "next", "scheduled", "someday"],
                     "description": "Initial status (default: inbox)",
                 },
+                "notes": {
+                    "type": "string",
+                    "description": "Markdown context to store below the task Notes heading",
+                },
             },
             "required": ["title"],
         },

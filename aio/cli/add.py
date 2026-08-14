@@ -47,6 +47,7 @@ console = Console()
     "--assign",
     help="Delegate task to a person (moves to Waiting status)",
 )
+@click.option("--notes", help="Markdown context to store below the Notes heading")
 @click.pass_context
 def add(
     ctx: click.Context,
@@ -57,6 +58,7 @@ def add(
     status: str,
     tag: tuple[str, ...],
     assign: str | None,
+    notes: str | None,
 ) -> None:
     """Add a new task.
 
@@ -71,20 +73,20 @@ def add(
     """
     # Use direct for --create-project or tags (daemon doesn't support these yet)
     if create_project or tag:
-        _add_direct(ctx, title, due, project, create_project, status, tag, assign)
+        _add_direct(ctx, title, due, project, create_project, status, tag, assign, notes)
         return
 
     # Try daemon first
     client = DaemonClient()
     try:
         if client.is_running():
-            _add_via_daemon(client, title, due, project, status, assign)
+            _add_via_daemon(client, title, due, project, status, assign, notes)
             return
     except DaemonUnavailableError:
         pass
 
     # Fallback: direct execution
-    _add_direct(ctx, title, due, project, create_project, status, tag, assign)
+    _add_direct(ctx, title, due, project, create_project, status, tag, assign, notes)
 
 
 def _add_via_daemon(
@@ -94,6 +96,7 @@ def _add_via_daemon(
     project: str | None,
     status: str,
     assign: str | None,
+    notes: str | None,
 ) -> None:
     """Add task via daemon."""
     # Extract project name from wikilink if provided
@@ -111,6 +114,7 @@ def _add_via_daemon(
             project=project_query,
             status=status,
             assign=assign,
+            notes=notes,
         )
         task = result["task"]
         _display_created_task(task, due)
@@ -157,6 +161,7 @@ def _add_direct(
     status: str,
     tag: tuple[str, ...],
     assign: str | None,
+    notes: str | None,
 ) -> None:
     """Add task via direct service call."""
     vault_path: Path | None = ctx.obj.get("vault_path")
@@ -215,6 +220,7 @@ def _add_direct(
         project=project_link,
         status=TaskStatus(status),
         tags=list(tag),
+        notes=notes,
     )
 
     # Delegate task if --assign provided

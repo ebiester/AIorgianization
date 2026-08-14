@@ -837,3 +837,8 @@ The Phase 1 prototype used SQLite. Migration is complete:
 2. **Templater integration:** Task templates for common patterns
 3. **Mobile:** Obsidian mobile app provides cross-device access
 4. **Sharing:** Export context packs to Confluence when ready
+# Task-Centered Open Brain
+
+AIO keeps the Obsidian vault as its single source of truth. `.aio/index.sqlite` is a disposable SQLite FTS5 inventory derived from Markdown; it stores document hashes, metadata, and wikilink edges and can be deleted and rebuilt without loss. The `aio index rebuild`, `aio index reconcile`, and `aio index status` commands manage it.
+
+Harnesses explicitly select a task, use `aio_resume_task` to assemble its linked context and backlinks, then call `aio_record_work`. Task frontmatter supports optional `context` wikilinks and `lastWorked`; work logs are appended under `## Work Log`. Durable session evidence can be promoted to ADR, Project, Area, Context-Pack, or Person notes with task provenance.

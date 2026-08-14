@@ -49,7 +49,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Vault init | `aio init <vault-path>` creates AIO directory structure | Done |
-| Quick add | `aio add "Task" -d tomorrow` | Done |
+| Quick add | `aio add "Task" -d tomorrow [--notes context]` | Done |
 | Task listing | Filter by status, project, due date | Done |
 | Status transitions | inbox → next → waiting → completed | Done |
 | Waiting-for | Track tasks delegated to others | Done |
@@ -183,6 +183,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - `aio add "Review John's PR"` creates task in <1 second
 - Natural language dates parse correctly
 - Task appears in inbox by default
+- `aio add "Send rollout options" --notes "- Next action: send draft"` stores the supplied Markdown in the task's Notes section
 
 ### Delegation Tracking
 > As an EM, I want to see all tasks I've delegated so that I can follow up appropriately in 1:1s.

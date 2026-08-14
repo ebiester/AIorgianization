@@ -254,6 +254,7 @@ class DaemonClient:
         project: str | None = None,
         status: str | None = None,
         assign: str | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """Create a new task.
 
@@ -263,6 +264,7 @@ class DaemonClient:
             project: Optional project name or link.
             status: Optional initial status.
             assign: Optional person to assign/delegate to.
+            notes: Optional Markdown content to store with the task.
 
         Returns:
             Dict with 'task'.
@@ -276,6 +278,8 @@ class DaemonClient:
             params["status"] = status
         if assign:
             params["assign"] = assign
+        if notes:
+            params["notes"] = notes
         return cast(dict[str, Any], self.call("add_task", params))
 
     def complete_task(self, query: str) -> dict[str, Any]:

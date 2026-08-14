@@ -115,6 +115,13 @@ class TestTaskService:
 
         assert task.project == "[[Projects/Test]]"
 
+    def test_create_task_with_notes(self, vault_service: VaultService) -> None:
+        """create should store supplied context below the Notes heading."""
+        task_service = TaskService(vault_service)
+        task = task_service.create("Test Task", notes="- Next action: Send the draft.")
+
+        assert task.body == "# Test Task\n\n## Notes\n- Next action: Send the draft.\n"
+
     def test_get_task_by_id(
         self, vault_service: VaultService, sample_task_file: None
     ) -> None:

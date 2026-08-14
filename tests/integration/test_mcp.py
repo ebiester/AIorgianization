@@ -107,6 +107,16 @@ class TestAddTaskTool:
         assert "Created task:" in result[0].text
         assert "Due:" in result[0].text
 
+    def test_add_task_with_notes(self, mcp_registry: ServiceRegistry) -> None:
+        """aio_add_task should persist resume context in the task body."""
+        asyncio.run(handle_add_task({
+            "title": "Task with context",
+            "notes": "- Next action: Send the draft.",
+        }))
+
+        task = mcp_registry.task_service.find("Task with context")
+        assert "- Next action: Send the draft." in task.body
+
     def test_add_task_with_project(self, mcp_registry: ServiceRegistry) -> None:
         """aio_add_task should accept project."""
         result = asyncio.run(handle_add_task({

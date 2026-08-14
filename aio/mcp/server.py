@@ -5,6 +5,7 @@ Uses shared handlers from the daemon for consistent business logic.
 """
 
 import asyncio
+import json
 import signal
 import sys
 from typing import Any
@@ -71,6 +72,7 @@ from aio.models.task import TaskStatus
 from aio.services.context_pack import ContextPackService
 from aio.services.dashboard import DashboardService
 from aio.services.file import FileService
+from aio.services.open_brain import OpenBrainService
 from aio.services.person import PersonService
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
@@ -162,9 +164,7 @@ class ServiceRegistry:
     def dashboard_service(self) -> DashboardService:
         """Get the dashboard service, creating it lazily if needed."""
         if self._dashboard_service is None:
-            self._dashboard_service = DashboardService(
-                self.vault_service, self.task_service
-            )
+            self._dashboard_service = DashboardService(self.vault_service, self.task_service)
         return self._dashboard_service
 
     @property
@@ -224,6 +224,11 @@ def get_context_pack_service() -> ContextPackService:
 def get_file_service() -> FileService:
     """Get the file service."""
     return _registry.file_service
+
+
+def get_open_brain_service() -> OpenBrainService:
+    """Get task-centred retrieval and promotion services."""
+    return OpenBrainService(_registry.vault_service, _registry.task_service)
 
 
 # Global cache instance (lazy initialized)
@@ -303,6 +308,10 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Person to delegate task to (moves to Waiting status)",
                     },
+                    "notes": {
+                        "type": "string",
+                        "description": "Markdown context to store below the task Notes heading",
+                    },
                 },
                 "required": ["title"],
             },
@@ -316,8 +325,13 @@ async def list_tools() -> list[Tool]:
                     "status": {
                         "type": "string",
                         "enum": [
-                            "inbox", "next", "waiting", "scheduled",
-                            "someday", "today", "overdue",
+                            "inbox",
+                            "next",
+                            "waiting",
+                            "scheduled",
+                            "someday",
+                            "today",
+                            "overdue",
                         ],
                         "description": "Filter by status",
                     },
@@ -546,8 +560,7 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="aio_delegate_task",
             description=(
-                "Delegate a task to a person "
-                "(moves to Waiting status with person set as waitingOn)"
+                "Delegate a task to a person (moves to Waiting status with person set as waitingOn)"
             ),
             inputSchema={
                 "type": "object",
@@ -576,8 +589,7 @@ async def list_tools() -> list[Tool]:
                     "query": {
                         "type": "string",
                         "description": (
-                            "File ID (4-char), title substring, "
-                            "or path relative to vault root"
+                            "File ID (4-char), title substring, or path relative to vault root"
                         ),
                     },
                 },
@@ -597,8 +609,7 @@ async def list_tools() -> list[Tool]:
                     "query": {
                         "type": "string",
                         "description": (
-                            "File ID (4-char), title substring, "
-                            "or path relative to vault root"
+                            "File ID (4-char), title substring, or path relative to vault root"
                         ),
                     },
                     "content": {
@@ -608,6 +619,84 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["query", "content"],
             },
+        ),
+        Tool(
+            name="aio_search",
+            description="Search the derived local vault index.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "scope": {"type": "string"},
+                    "limit": {"type": "integer", "default": 10},
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="aio_resume_task",
+            description="Assemble bounded task, link, backlink, and related context.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "max_chars": {"type": "integer", "default": 20000},
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="aio_link_context",
+            description="Add validated vault wikilinks to a task.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "targets": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["query", "targets"],
+            },
+        ),
+        Tool(
+            name="aio_record_work",
+            description="Append a structured task work-log entry.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "outcome": {"type": "string"},
+                    "current_state": {"type": "string"},
+                    "decisions": {"type": "string"},
+                    "next_action": {"type": "string"},
+                    "references": {"type": "array", "items": {"type": "string"}},
+                    "harness": {"type": "string"},
+                },
+                "required": ["query", "outcome"],
+            },
+        ),
+        Tool(
+            name="aio_promote_knowledge",
+            description="Promote session evidence into a canonical vault artifact.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "target": {"type": "string"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["adr", "project", "area", "context-pack", "person"],
+                    },
+                    "content": {"type": "string"},
+                    "section": {"type": "string"},
+                    "provenance": {"type": "string"},
+                },
+                "required": ["query", "target", "category", "content"],
+            },
+        ),
+        Tool(
+            name="aio_index_status",
+            description="Show derived vault index health.",
+            inputSchema={"type": "object", "properties": {}},
         ),
     ]
 
@@ -648,6 +737,49 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await handle_file_get(arguments)
         elif name == "aio_file_set":
             return await handle_file_set(arguments)
+        elif name == "aio_search":
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        get_open_brain_service().index.search(
+                            arguments["query"], arguments.get("scope"), arguments.get("limit", 10)
+                        ),
+                        indent=2,
+                    ),
+                )
+            ]
+        elif name == "aio_resume_task":
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        get_open_brain_service().resume(
+                            arguments["query"], arguments.get("max_chars", 20000)
+                        ),
+                        indent=2,
+                    ),
+                )
+            ]
+        elif name == "aio_link_context":
+            task = get_task_service().link_context(arguments["query"], arguments["targets"])
+            return [
+                TextContent(
+                    type="text", text=f"Linked {len(task.context)} context item(s) to {task.id}."
+                )
+            ]
+        elif name == "aio_record_work":
+            task = get_task_service().record_work(**arguments)
+            return [TextContent(type="text", text=f"Recorded work for {task.title} ({task.id}).")]
+        elif name == "aio_promote_knowledge":
+            path = get_open_brain_service().promote(**arguments)
+            return [TextContent(type="text", text=f"Promoted knowledge to {path}.")]
+        elif name == "aio_index_status":
+            return [
+                TextContent(
+                    type="text", text=json.dumps(get_open_brain_service().index.status(), indent=2)
+                )
+            ]
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except FileOutsideVaultError as e:
@@ -741,10 +873,12 @@ async def handle_defer_task(args: dict[str, Any]) -> list[TextContent]:
     ctx = get_handler_context()
     result = await daemon_defer_task(ctx, args)
     task = result["task"]
-    return [TextContent(
-        type="text",
-        text=f"Deferred: {task['title']} ({task['id']})\nStatus: someday",
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=f"Deferred: {task['title']} ({task['id']})\nStatus: someday",
+        )
+    ]
 
 
 async def handle_get_dashboard(args: dict[str, Any]) -> list[TextContent]:
@@ -789,10 +923,12 @@ async def handle_add_to_context_pack(args: dict[str, Any]) -> list[TextContent]:
     result = await daemon_add_to_context_pack(ctx, args)
 
     section_msg = f" under section '{result['section']}'" if result.get("section") else ""
-    return [TextContent(
-        type="text",
-        text=f"Added content to context pack: {result['title']} ({result['id']}){section_msg}",
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=f"Added content to context pack: {result['title']} ({result['id']}){section_msg}",
+        )
+    ]
 
 
 async def handle_add_file_to_context_pack(args: dict[str, Any]) -> list[TextContent]:

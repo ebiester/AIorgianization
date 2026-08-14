@@ -6,6 +6,8 @@ import pytest
 from click.testing import CliRunner
 
 from aio.cli.main import cli
+from aio.services.task import TaskService
+from aio.services.vault import VaultService
 
 
 @pytest.fixture
@@ -124,6 +126,22 @@ class TestAddCommand:
 
         assert result.exit_code != 0
         assert "Person not found" in result.output
+
+    def test_add_task_with_notes(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """add --notes should persist context in the task body."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "add", "Review rollout", "--notes", "- Next action: Send the draft.",
+            ],
+        )
+
+        assert result.exit_code == 0
+        task = TaskService(VaultService(initialized_vault)).find("Review rollout")
+        assert "- Next action: Send the draft." in task.body
 
 
 class TestListCommand:

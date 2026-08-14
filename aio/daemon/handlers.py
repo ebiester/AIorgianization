@@ -144,7 +144,8 @@ async def handle_add_task(ctx: HandlerContext, params: dict[str, Any]) -> dict[s
 
     Args:
         ctx: Handler context.
-        params: Parameters including 'title' and optional 'due', 'project', 'status', 'assign'.
+        params: Parameters including 'title' and optional 'due', 'project', 'status',
+            'assign', and 'notes'.
 
     Returns:
         Created task dictionary.
@@ -153,6 +154,7 @@ async def handle_add_task(ctx: HandlerContext, params: dict[str, Any]) -> dict[s
     due_str = params.get("due")
     project = params.get("project")
     status_str = params.get("status", "inbox")
+    notes = params.get("notes")
 
     due_date = None
     if due_str:
@@ -172,6 +174,7 @@ async def handle_add_task(ctx: HandlerContext, params: dict[str, Any]) -> dict[s
         due=due_date,
         project=project_link,
         status=TaskStatus(status_str),
+        notes=notes,
     )
 
     # Delegate task if assign provided
