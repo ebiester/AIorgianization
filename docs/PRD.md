@@ -29,16 +29,16 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 ## Goals
 
 1. **Unified view**: See all deadlines (personal, delegated, team) in one place
-2. **Fast capture**: Add tasks in <5 seconds from terminal
+2. **Fast capture**: Add tasks in <5 seconds from terminal or chat
 3. **Smart organization**: GTD-style workflow with contexts, projects, and reviews
 4. **Integration**: Reference Obsidian notes
-5. **AI-powered**: Claude helps break down projects and suggests prioritization
+5. **AI-powered**: ChatGPT, Codex, and other assistants help manage and break down work
 6. **Visual dashboard**: Obsidian plugin for daily/weekly planning and reviews
 
 ## Non-Goals
 
 - Full calendar/scheduling functionality
-- Mobile app (CLI + web dashboard is sufficient)
+- Native AIO mobile app (ChatGPT Remote Connections provide remote chat access)
 - Multi-user collaboration (this is a personal tool)
 - Real-time sync across devices (local-first is acceptable)
 
@@ -155,12 +155,14 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Templates support Obsidian's template variables ({{date}}, {{time}}, etc.)
 - Default templates provided on init, user can customize or add new ones
 
-### P1: AI Features (Phase 4) ✓
+### P1: AI Features (Phases 4-5) ✓
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Claude skill | Add tasks via Claude Code | Done (MCP tools) |
-| MCP server | Structured API for Claude | Done |
+| Agent CLI | Stable JSON interface under `aio agent` | Done |
+| Chat skill | Manage AIO through `skills/manage-aio/` | Done |
+| Remote workflow | Use the host CLI and vault through ChatGPT Remote Connections | Done |
+| MCP server | Optional structured adapter for MCP-only clients | Done |
 | Task breakdown | Decompose projects into actions | Not Started |
 | Context injection | Use Obsidian notes in breakdown | Done (context packs) |
 | Priority suggestions | AI-assisted daily planning | Not Started |
@@ -202,13 +204,26 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Review marked complete with timestamp
 
 ### AI Task Breakdown
-> As an EM, I want Claude to help break down vague projects using my notes as context.
+> As an EM, I want an AI assistant to help break down vague projects using my notes as context.
 
 **Acceptance criteria:**
 - `aio breakdown "Q4 Platform Migration"` triggers AI analysis
 - AI reads linked Obsidian notes for context
 - Outputs concrete next actions with estimates
 - User confirms before tasks are created
+
+### Conversational and Remote Task Management
+
+> As an EM, I want to manage AIO through ChatGPT on my computer or a remotely connected device without operating a separate MCP server.
+
+**Acceptance criteria:**
+
+- The `manage-aio` skill maps natural-language requests to `aio agent` commands
+- Valid operations return one machine-readable JSON envelope and structured runtime errors
+- Mutations use an exact task ID after resolving ambiguous requests
+- Remote sessions operate against the connected host's vault and permissions
+- The host remains the source of truth; no task data is copied into a separate AIO service
+- MCP remains available for clients that cannot invoke the CLI
 
 ## Use Cases (Test Scenarios)
 
@@ -648,12 +663,12 @@ These use cases are designed to drive automated test development.
 | Inbox zero | Daily | Zero inbox items at end of day |
 | Weekly review | Weekly | Review completed each week |
 | Delegation visibility | 100% | All delegated items tracked |
-| Integration adoption | 80% | Notes linked, MCP tools used |
+| Integration adoption | 80% | Notes linked, chat skill or MCP integration used |
 
 ## Technical Constraints
 
 1. **Local-first**: All data in markdown files within Obsidian vault
-2. **CLI primary**: Must work entirely from terminal
+2. **CLI primary**: Human and JSON agent interfaces must work entirely from the terminal
 3. **Python + TypeScript**: Python for CLI/MCP, TypeScript for Obsidian plugin
 4. **No account required**: No cloud services, no login
 5. **Portable**: Markdown files in vault, git-friendly, easy backup
@@ -661,7 +676,7 @@ These use cases are designed to drive automated test development.
 ## Open Questions
 
 1. **Calendar integration**: Should scheduled tasks sync to calendar?
-2. **Mobile access**: Is web dashboard on localhost sufficient, or need remote access?
+2. **Mobile access**: Resolved—use ChatGPT Remote Connections to operate the desktop host
 3. **Team visibility**: Should there be a read-only view for sharing with teams?
 4. **Obsidian plugin**: Build plugin or just read vault directly?
 

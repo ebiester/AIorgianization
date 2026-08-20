@@ -92,18 +92,148 @@ Run `uv run ruff check .`, `uv run mypy aio`, and `uv run pytest` before release
 | Durable decision or operating knowledge emerges | It is promoted once to the correct canonical artifact with task provenance; transcript/reasoning/secrets are absent. |
 | Search has no confident result | The harness retains evidence in the task log and creates an inbox organisation task rather than inventing a canonical destination. |
 
-## End-to-End Acceptance Scenario
+## Implementable Acceptance Tests
 
-1. Create a project, person, context pack, and task linked to each.
-2. Run `aio index rebuild`; search for a unique phrase in the project and verify its path and excerpt.
-3. Call `aio_resume_task` for the task; verify linked material and a backlink appear in deterministic, character-limited context.
-4. Call `aio_record_work` with an outcome, decision, next action, and source reference.
-5. Use action capture to create the unresolved follow-up task with resume notes.
-6. Call `aio_promote_knowledge` for the durable decision and verify its target file contains task provenance and the task's `context` contains the canonical link.
-7. Restart the daemon (or delete `.aio/index.sqlite` and rebuild), then search again and verify the task, promotion, and backlinks remain discoverable.
-8. Open each affected file in Obsidian and verify it remains readable and editable.
+### Shared setup
 
-**Pass criteria:** all operations preserve Markdown-canonical state, the rebuilt index matches source content, and the harness can report every task and promoted file it created.
+Implement every acceptance test with a fresh `tmp_path` vault; do not use a developer's real vault.
+
+1. Create `TestVault/.obsidian/`, then initialise it through `VaultService(vault).initialize()`.
+2. Create a `TaskService`, `VaultIndex`, and `OpenBrainService` using that vault service.
+3. For MCP cases, reset the MCP service registry and register the temporary `VaultService` before invoking `call_tool`.
+4. Use deterministic fixture names and marker phrases below, such as `OB-unique-phrase-001`, so an assertion cannot match unrelated fixture content.
+5. Assert both the API response and the resulting Markdown/frontmatter. For index tests, also query SQLite or the index service directly where needed.
+6. Clean up only the temporary vault. Do not rely on global AIO configuration or an existing index.
+
+### AT-OB-001: Rebuild a disposable lexical index
+
+**Setup:** Create `AIO/Projects/Launch.md` with `# Launch` and body text containing `OB-unique-phrase-001`; create `AIO/Areas/Engineering.md` containing `[[AIO/Projects/Launch]]`.
+
+1. Call `VaultIndex.reconcile(rebuild=True)`.
+2. Assert that the result reports two indexed documents and zero errors.
+3. Call `search("OB-unique-phrase-001")`.
+4. Assert one result has path `AIO/Projects/Launch.md`, title `Launch`, a non-empty excerpt, entity metadata, and match reason `full-text match`.
+5. Call `backlinks("AIO/Projects/Launch.md")`.
+6. Assert it returns `AIO/Areas/Engineering.md`.
+7. Delete `.aio/index.sqlite`, construct a new `VaultIndex`, and call `reconcile(rebuild=True)`.
+8. Repeat steps 3–6 and assert the same path and backlink are returned.
+
+### AT-OB-002: Incremental index changes converge
+
+**Setup:** Use the indexed fixture from AT-OB-001.
+
+1. Replace the phrase in `Launch.md` with `OB-unique-phrase-002` and change the backlink target in `Engineering.md` to another existing note.
+2. Call `reconcile()` without `rebuild=True`.
+3. Assert search for phrase 001 returns no Launch result and search for phrase 002 returns Launch.
+4. Assert the old backlink is absent and the new backlink is present.
+5. Rename `Launch.md` to `Launch-v2.md`, call `reconcile()`, and assert the old path is absent from search results.
+6. Delete `Launch-v2.md`, call `reconcile()`, and assert it is absent from the document inventory and links table.
+
+### AT-OB-003: Task context and work-log persistence
+
+**Setup:** Create `AIO/Projects/Roadmap.md`, then create task `Ship widget` in Inbox.
+
+1. Call `TaskService.link_context(task.id, ["AIO/Projects/Roadmap"])`.
+2. Assert task frontmatter contains `context: ["[[AIO/Projects/Roadmap]]"]`.
+3. Call `record_work` with outcome `Validated rollout`, current state, one decision, next action, two references, and harness `codex`.
+4. Re-read the task from disk.
+5. Assert its body contains exactly one `## Work Log` heading and an entry with each supplied field.
+6. Assert frontmatter contains a parseable `lastWorked` timestamp and an updated timestamp.
+7. Call `record_work` again, then assert there are two dated entries and still one Work Log heading.
+
+### AT-OB-004: Invalid context links are safe
+
+**Setup:** Create a task with no context links and record its original Markdown text.
+
+1. Attempt `link_context` with a missing vault file.
+2. Assert it raises the documented file-not-found error.
+3. Attempt `link_context` with `../../outside.md` and with an absolute external path.
+4. Assert each attempt raises a validation error.
+5. Re-read the task and assert its Markdown and `context` list are unchanged from the original.
+
+### AT-OB-005: Resume assembles bounded, linked context
+
+**Setup:** Create a task linked to a Project and explicit Context-Pack; create a separate Area note with an inline link to the task file. Give each artifact a unique marker phrase.
+
+1. Rebuild the index.
+2. Call `OpenBrainService.resume(task.id, max_chars=800)`.
+3. Assert the response task has the selected ID, path, body, explicit context, and `last_worked` key.
+4. Assert linked context includes the Project and Context-Pack source paths.
+5. Assert first-hop backlink content from the Area note is included.
+6. Assert every included document has a source path and the combined returned text does not exceed the requested budget (allow only fixed response metadata outside the budget).
+7. Assert ranked related material contains an artifact matching a unique task title/tag term.
+
+### AT-OB-006: MCP contract for search and work recording
+
+**Setup:** Register the temporary vault in the MCP `ServiceRegistry`; create and index a task plus one linked project.
+
+1. Invoke `call_tool("aio_search", {"query": "<unique phrase>"})`.
+2. Parse the returned JSON text and assert path, excerpt, entity type, and match reason exist.
+3. Invoke `aio_link_context` for the task and linked project; assert success text and the task frontmatter link.
+4. Invoke `aio_record_work` with required outcome and optional details; assert success text.
+5. Invoke `aio_resume_task` and assert its JSON response contains the new Work Log entry.
+6. Invoke `aio_index_status`; assert it reports the index path, document count, exclusions, and last reconciliation.
+7. Invoke each tool with a missing task or invalid link and assert a user-facing `Error:` response, not a traceback.
+
+### AT-OB-007: Knowledge promotion is canonical and atomic
+
+**Setup:** Create a task named `Decide rollout`, record evidence for a staged rollout, and construct `OpenBrainService`.
+
+1. Call `promote(task.id, "Staged rollout", "adr", "Use staged rollout.", None, None)`.
+2. Assert `AIO/ADRs/Staged-rollout.md` exists and has an H1, supplied evidence, and a provenance link to the task's actual vault-relative path and ID.
+3. Re-read the task and assert its `context` includes the ADR wikilink.
+4. Promote a second statement to the same target with `section="Consequences"`.
+5. Assert the existing artifact is updated under that section rather than a duplicate file being created.
+6. Repeat steps 1–3 once each for `project`, `area`, `context-pack`, and `person`; assert each target is under the category's configured folder.
+7. Inject a `write_frontmatter` failure for a new target, then call promotion.
+8. Assert the call raises, no partial target file exists, and the task did not gain a link to that target.
+
+### AT-OB-008: Daemon catches vault-wide edits
+
+**Setup:** Create a task and start `VaultCache`/daemon services with the temporary vault; set a short reconciliation interval only in the test fixture.
+
+1. Assert startup creates or reconciles `.aio/index.sqlite`.
+2. Create a Project Markdown file outside `AIO/Tasks`; wait until the debounce condition is satisfied.
+3. Assert `VaultIndex.search` finds its unique phrase.
+4. Modify the file using an atomic-save pattern (write temporary file then rename); assert search returns the revised phrase.
+5. Rename and then delete the file; after each operation, assert stale search records and backlinks are removed.
+6. Stop the daemon, create a note, restart it, and assert startup reconciliation indexes the note.
+7. Stop the daemon and assert its observer and periodic timer are no longer active.
+
+### AT-OB-009: Action-capture skill creates a resumable follow-up
+
+**Setup:** Use an MCP test double that records `aio_add_task` arguments, or invoke the real handler against the temporary vault. Provide a conversation fixture with one unresolved approval request, current state, decision constraint, and source reference.
+
+1. Apply the action-capture skill's workflow to the fixture.
+2. Assert one task is created with a specific verb-led title, not a generic noun phrase.
+3. Assert `notes` contains Why, Current state, Next action, and References from the fixture without fabricated facts.
+4. Read the saved task and assert the same notes occur beneath `## Notes`.
+5. Repeat with two independent follow-ups and assert two separate task IDs are created.
+6. Repeat with a completed-only fixture and assert no task is created.
+
+### AT-OB-010: Context-Pack skill selects and updates the right artifact
+
+**Setup:** Create an existing System context pack named `Payments` with a `## Compliance` section and a separate source ADR.
+
+1. List context packs and assert `Payments` is discoverable as a System pack.
+2. Call `aio_add_to_context_pack` for `Payments`, content `OB-context-addition`, and section `Compliance`.
+3. Assert the marker is appended under `## Compliance`; assert unrelated sections are byte-for-byte unchanged.
+4. Call `aio_add_file_to_context_pack` with the source ADR and `References` section.
+5. Assert the copied source material is in the pack and any service-managed source attribution is present.
+6. Create one Domain and one Operating pack; assert the files are in their respective folders with requested tags and description.
+7. Attempt to update a nonexistent pack and add a file outside the vault; assert each fails without creating a partial artifact.
+
+### AT-OB-011: Task-loop isolates concurrent task selection
+
+**Setup:** Create two distinct tasks, each with a different unique Project marker. Construct two independent harness sessions or service instances.
+
+1. Session A resumes task A; session B resumes task B.
+2. Assert each response contains only its own selected task as `task.id` and its own linked Project marker.
+3. Record work for A from session A and work for B from session B.
+4. Assert each task contains only its own Work Log entry.
+5. Assert no vault file, config entry, or service state persists a global `active task` / `activeTask` value.
+
+**Pass criteria:** every acceptance test preserves Markdown-canonical state, emits user-facing failures instead of tracebacks, and leaves a rebuilt index equivalent to the source vault.
 
 ## Release Checklist
 

@@ -124,6 +124,35 @@ Add to `~/.cursor/mcp.json` or `.cursor/mcp.json` in your project:
 }
 ```
 
+#### For ChatGPT Desktop and Remote Connections
+
+The recommended ChatGPT workflow uses the installed AIO CLI through a reusable skill. It does not require the MCP server, a tunnel, or a second long-running process.
+
+1. Confirm that `aio` is installed and can find the vault:
+
+   ```bash
+   aio agent list inbox
+   ```
+
+   A successful command prints one JSON object with `"ok": true`. If vault discovery is not already configured, set `AIO_VAULT_PATH` as described above.
+
+2. Make the repository's skill available to ChatGPT/Codex on this computer. A symbolic link keeps the installed skill synchronized with the repository:
+
+   ```bash
+   mkdir -p ~/.agents/skills
+   ln -s /path/to/AIorgianization/skills/manage-aio ~/.agents/skills/manage-aio
+   ```
+
+   If that destination already exists, update or replace it intentionally instead of creating a second nested copy.
+
+3. Open the AIorgianization project in ChatGPT Desktop's Codex experience. Ask naturally, such as “Show my inbox” or “Add a task to review the PR by Friday.” You can explicitly invoke the skill with `$manage-aio` when you want to force AIO task management.
+
+4. For phone or browser access, enable **Remote Connections → Control this Mac or PC** in ChatGPT Desktop settings. Leave the desktop app running, the computer awake, and the vault accessible. Sign in to the same account and workspace on the remote device, select the connected computer, and continue the task there.
+
+A remote task uses the connected computer's project files, installed skill, CLI, environment, credentials, and approval settings. The vault remains the source of truth on that computer. A normal ChatGPT conversation that is not connected to the host cannot run the local CLI.
+
+See OpenAI's [Remote Connections guide](https://learn.chatgpt.com/docs/remote-connections) and [Skills guide](https://learn.chatgpt.com/docs/build-skills) for current product requirements and availability. The MCP server remains available for clients that cannot run skills or shell commands directly.
+
 #### For Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
@@ -298,6 +327,22 @@ Start the weekly review with the rotate icon in the ribbon or `Cmd+P` → "AIO: 
 
 ## CLI Reference
 
+### Agent and Skill Interface
+
+`aio agent` is the stable, non-interactive interface used by the `manage-aio` skill. Valid operations emit a single JSON object. Success responses contain `"ok": true`; runtime failures write a structured `error` object to stderr and return a nonzero exit code. Help and command-line usage errors retain Click's standard text format.
+
+```bash
+aio agent list inbox
+aio agent add "Review PR" --due friday --project "Q4 Migration"
+aio agent dashboard
+aio agent search "rollout decision"
+aio agent resume AB2C
+aio agent record-work AB2C "Reviewed the proposal" --next-action "Send feedback"
+aio agent complete AB2C
+```
+
+Use exact task IDs for changes. The interface also supports `start`, `defer`, `wait`, `link-context`, `promote-knowledge`, and `index-status`; run `aio agent --help` or a subcommand's `--help` for its options.
+
 ### Adding Tasks
 
 ```bash
@@ -328,11 +373,29 @@ The `--assign` (or `-a`) flag creates the task and immediately delegates it to a
 
 ### Capture Follow-ups from AI Conversations
 
-The reusable [`action-capture`](../skills/action-capture/SKILL.md) skill makes Claude and Codex save substantive follow-up work automatically. It uses an action-led title and records why the task exists, its current state, constraints, the next action, and relevant references in `## Notes`.
+The reusable [`action-capture`](../skills/action-capture/SKILL.md) skill makes AI assistants save substantive follow-up work automatically. It uses an action-led title and records why the task exists, its current state, constraints, the next action, and relevant references in `## Notes`.
 
-Use it with an AIO MCP connection so the agent can call `aio_add_task` with its `notes` field. For direct capture, use `aio add "<title>" --notes "<Markdown context>"`.
+Use it alongside [`manage-aio`](../skills/manage-aio/SKILL.md), which calls `aio agent add` and can include Markdown notes. For direct human capture, use `aio add "<title>" --notes "<Markdown context>"`.
 
-To install the repository skill locally, copy `skills/action-capture/` into the skills directory used by Claude Code or Codex. For ChatGPT, package the same skill with the AIO MCP server as a personal plugin; OpenAI plugins can extend both ChatGPT and Codex with skills and MCP tools.
+To install the repository skills locally, link or copy `skills/manage-aio/` and, optionally, `skills/action-capture/` into the skills directory used by the host.
+
+### Work a Task with Retrieved Context
+
+The task-loop workflow supports focused chat work. Select a task, then run `aio agent resume <id>`. AIO returns the task body, explicit context, available project/person links, first-hop backlinks, recent work log, and related indexed material.
+
+Before ending the session, run `aio agent record-work <id>` with an outcome and, when useful, the current state, decisions, next action, references, and harness name. This appends a readable entry to `## Work Log` and updates `lastWorked`; it does not store transcripts or hidden reasoning.
+
+Use `aio agent link-context` to add an existing vault artifact to the task's `context` frontmatter. AIO validates the target is inside the vault before writing it. For durable, session-supported knowledge, use `aio agent promote-knowledge`:
+
+| Category | Canonical destination |
+|---|---|
+| `adr` | `AIO/ADRs/` |
+| `project` | `AIO/Projects/` |
+| `area` | `AIO/Areas/` |
+| `context-pack` | `AIO/Context-Packs/Operating/` |
+| `person` | `AIO/People/` |
+
+Promotions include task provenance and link the task to the affected file. Promote only observed, durable information—never secrets, speculative conclusions, transcripts, or hidden reasoning.
 
 ### Listing Tasks
 
@@ -409,11 +472,27 @@ aio config show            # Show current configuration
 aio config set <key> <val> # Set configuration value
 ```
 
+### Search Index Commands
+
+The local index supports vault-wide search and backlinks. It is derived from Markdown and safe to remove and rebuild.
+
+```bash
+aio index status       # Document count, last reconciliation, and exclusions
+aio index rebuild      # Recreate ID and search indexes from vault Markdown
+aio index reconcile    # Incrementally scan vault changes immediately
+```
+
+The daemon watches the vault, debounces Markdown changes, and reconciles the index on startup and periodically. It excludes `.aio`, `.obsidian`, trash, backup, and hidden files.
+
 ---
 
 ## Integrations
 
-### MCP Server Integration
+### ChatGPT Desktop and Remote Integration
+
+ChatGPT Desktop runs AIO through the `manage-aio` skill and the `aio agent` commands. Remote Connections extend that same host session to another device; they do not move or duplicate the vault. This is the primary chat integration.
+
+### Optional MCP Server Integration
 
 The MCP server allows AI assistants to interact with your vault programmatically.
 
@@ -443,6 +522,12 @@ aio-mcp
 | `aio_create_context_pack` | Create a new context pack |
 | `aio_add_to_context_pack` | Append content to an existing context pack |
 | `aio_add_file_to_context_pack` | Copy a file's content into a context pack |
+| `aio_search` | Search indexed vault content by text and optional scope |
+| `aio_resume_task` | Assemble a selected task's links, backlinks, work log, and related material |
+| `aio_link_context` | Add validated vault wikilinks to a task's context |
+| `aio_record_work` | Append a structured work-log entry to a task |
+| `aio_promote_knowledge` | Create or update a canonical note with task provenance |
+| `aio_index_status` | Return derived index health to an MCP harness |
 
 #### Available MCP Resources
 
@@ -463,6 +548,8 @@ Once configured, you can ask your AI assistant:
 - "Add a task to review the PR by Friday" → Uses `aio_add_task`
 - "Add a task for Sarah to update the docs" → Uses `aio_add_task` with `assign`
 - "Remember to send the rollout options to Sam" → Uses `aio_add_task` with `notes`
+- "Find the rollout decision" → Uses `aio_search`
+- "Resume task AB2C" → Uses `aio_resume_task`, then records work before finishing
 - "Show my inbox" → Uses `aio_list_tasks`
 - "Mark the auth bug task as done" → Uses `aio_complete_task`
 
@@ -483,6 +570,9 @@ type: task
 status: next
 due: 2026-01-16
 project: "[[Projects/Q4-Migration]]"
+context:
+  - "[[AIO/Context-Packs/Systems/Payment-API]]"
+lastWorked: 2026-08-16T10:00:00
 location:
   url: "https://github.com/company/repo/pull/456"
 blockedBy: []
@@ -502,6 +592,12 @@ updated: 2026-01-15T09:00:00
 ## Notes
 - Focus on error handling
 - Check test coverage
+
+## Work Log
+### 2026-08-16T10:00:00
+- **Harness:** codex
+- **Outcome:** Reviewed the rollout plan.
+- **Next action:** Send the revised approval request.
 ```
 
 ### Waiting-For Task
@@ -704,6 +800,27 @@ aio config set vault.path /correct/path/to/vault
 ```bash
 uv pip install -e . --force-reinstall
 ```
+
+### Chat and Remote Issues
+
+**The `manage-aio` skill is not discovered**
+
+- Confirm `skills/manage-aio/SKILL.md` exists in the repository or the host's skills directory
+- Restart the project task after installing or linking the skill
+- Invoke `$manage-aio` explicitly to distinguish discovery from intent matching
+
+**An agent command returns `ok: false`**
+
+- Read the structured `error.type` and `error.message`
+- Confirm `aio agent list inbox` works in a host terminal
+- Resolve task titles to an exact ID before retrying a mutation
+
+**The remote computer is unavailable**
+
+- Confirm ChatGPT Desktop is running on the host
+- Keep the host awake, online, and signed in to the same account and workspace
+- Confirm **Remote Connections → Control this Mac or PC** remains enabled
+- Retry only after reconnecting; do not assume a different local vault contains the same state
 
 ### Obsidian Issues
 

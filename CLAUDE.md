@@ -4,11 +4,11 @@ This file provides guidance to AI assistants (Cursor, Claude Code, etc.) when wo
 
 ## Project Overview
 
-AIorgianization is an Obsidian-native task and context management system for Eric, an engineering manager. Tasks are stored as markdown files in the Obsidian vault, with a CLI for quick capture and an MCP server for MCP-capable AI assistants.
+AIorgianization is an Obsidian-native task and context management system for Eric, an engineering manager. Tasks are stored as markdown files in the Obsidian vault, with a human-friendly CLI, a JSON agent CLI for chat skills, and an optional MCP server.
 
 **Key principle:** The Obsidian vault is the single source of truth. No separate database.
 
-**Target integration:** Any AI assistant or client that can interact with MCP tools and resources.
+**Target integration:** ChatGPT Desktop and Remote Connections through `skills/manage-aio/`, plus MCP-only clients through the optional server.
 
 ## Architecture
 
@@ -35,6 +35,7 @@ AIorgianization/
 │   ├── cli/                # CLI commands (Click)
 │   │   ├── __init__.py
 │   │   ├── main.py         # Entry point
+│   │   ├── agent.py        # Stable JSON interface for chat skills
 │   │   ├── add.py
 │   │   ├── list.py
 │   │   ├── done.py
@@ -85,6 +86,8 @@ AIorgianization/
 │       ├── run-mcp-tests.sh
 │       ├── setup-test-vault.sh
 │       └── generate-report.py
+├── skills/
+│   └── manage-aio/         # ChatGPT/Codex task-management skill
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── PRD.md
@@ -122,6 +125,8 @@ aio add "Task" -d tomorrow        # Quick add
 aio list inbox                    # List inbox tasks
 aio done <id>                     # Complete task
 aio dashboard                     # Generate dashboard
+aio agent list inbox              # Machine-readable task listing
+aio agent add "Task"              # Machine-readable task capture
 
 # Comprehensive test runner (Python + TypeScript + MCP)
 ./scripts/test/run-tests.sh                    # Run all tests
@@ -150,6 +155,19 @@ aio wait <task> [person]          # Move to Waiting
 aio delegate <task> <person>      # Alias for wait with required person
 aio project list                  # Show projects with task counts
 aio project show <project>         # Show project details and tasks
+
+# Stable JSON interface for skills and agents
+aio agent list [filter] [--project project]
+aio agent add "Task title" [--due due] [--project project] [--assign person]
+aio agent complete|start|defer <task-id>
+aio agent wait <task-id> [person]
+aio agent dashboard
+aio agent search <query>
+aio agent resume <task-id>
+aio agent record-work <task-id> <outcome> [options]
+aio agent link-context <task-id> <vault-path>
+aio agent promote-knowledge <task-id> <target> --category <category> --content <text>
+aio agent index-status
 
 # The -a/--assign flag creates task and delegates immediately:
 # aio add "Review API" --assign Sarah  # Creates in Waiting status
@@ -457,7 +475,7 @@ def write_task(path: Path, task: Task) -> None:
 - Store dates as ISO 8601 in frontmatter
 - Display dates relative ("tomorrow", "in 3 days", "overdue")
 
-## MCP Server
+## MCP Server (Optional)
 
 The MCP server exposes vault operations to any MCP-capable assistant or client:
 
@@ -510,7 +528,7 @@ aio://dashboard        # Today's dashboard
 
 ### Assistant Instructions
 
-For clients that support reusable instructions or skills, create an AIO task-management instruction file such as `.cursor/skills/aio.md`:
+The primary reusable instructions live in `skills/manage-aio/SKILL.md` and invoke `aio agent`. MCP-only clients may use an instruction file such as `.cursor/skills/aio.md`:
 
 ```markdown
 # AIO Task Management Skill
@@ -536,7 +554,7 @@ Since this is built for one user:
 
 - No multi-user auth/permissions
 - Vault path can be hardcoded in config or env var
-- CLI can assume interactive terminal (colors, prompts)
+- Human CLI commands can use interactive formatting; `aio agent` must remain non-interactive JSON
 - No need for i18n
 - Can use Eric's typical folder locations as defaults
 
@@ -550,6 +568,8 @@ Since this is built for one user:
 | `aio/utils/ids.py` | 4-char ID generation |
 | `aio/utils/dates.py` | Natural language date parsing |
 | `aio/cli/main.py` | CLI entry point and command group |
+| `aio/cli/agent.py` | Stable JSON commands for skills and agents |
+| `skills/manage-aio/SKILL.md` | Primary ChatGPT/Codex workflow instructions |
 | `tests/conftest.py` | Shared pytest fixtures |
 
 ## Common Tasks

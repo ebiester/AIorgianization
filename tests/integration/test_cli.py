@@ -1,5 +1,6 @@
 """Integration tests for CLI commands."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,87 @@ class TestInitCommand:
         result = runner.invoke(cli, ["init", str(not_a_vault)])
 
         assert result.exit_code != 0
+
+
+class TestAgentCommands:
+    """Tests for the JSON-only CLI surface used by skills and Remote chats."""
+
+    @pytest.mark.uat("UAT-066")
+    def test_agent_add_and_list_are_machine_readable(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """Agent commands should return stable JSON without terminal decoration."""
+        added = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "agent", "add", "Remote follow-up",
+                "--due", "tomorrow",
+                "--notes", "Captured from chat.",
+            ],
+        )
+
+        assert added.exit_code == 0
+        added_payload = json.loads(added.output)
+        assert added_payload["ok"] is True
+        assert added_payload["task"]["title"] == "Remote follow-up"
+        assert added_payload["task"]["due"] is not None
+
+        listed = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "agent", "list", "inbox"]
+        )
+
+        assert listed.exit_code == 0
+        listed_payload = json.loads(listed.output)
+        assert listed_payload["count"] == 1
+        assert listed_payload["tasks"][0]["title"] == "Remote follow-up"
+
+    @pytest.mark.uat("UAT-067")
+    def test_agent_errors_are_machine_readable(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """Agent failures should return JSON and a non-zero exit code."""
+        result = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "agent", "complete", "ZZZZ"]
+        )
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["ok"] is False
+        assert payload["error"]["type"] == "TaskNotFoundError"
+
+    @pytest.mark.uat("UAT-068")
+    def test_agent_search_resume_and_record_work(
+        self, runner: CliRunner, initialized_vault: Path
+    ) -> None:
+        """Agent context commands should cover the chat task-work loop."""
+        note = initialized_vault / "AIO" / "Areas" / "Remote.md"
+        note.write_text("# Remote\n\nRemember the remote phrase.\n", encoding="utf-8")
+        task = TaskService(VaultService(initialized_vault)).create("Exercise remote workflow")
+
+        searched = runner.invoke(
+            cli,
+            ["--vault", str(initialized_vault), "agent", "search", "remote phrase"],
+        )
+        assert searched.exit_code == 0
+        assert json.loads(searched.output)["results"][0]["path"] == "AIO/Areas/Remote.md"
+
+        recorded = runner.invoke(
+            cli,
+            [
+                "--vault", str(initialized_vault),
+                "agent", "record-work", task.id, "Validated Remote usage",
+                "--next-action", "Document the workflow",
+            ],
+        )
+        assert recorded.exit_code == 0
+
+        resumed = runner.invoke(
+            cli, ["--vault", str(initialized_vault), "agent", "resume", task.id]
+        )
+        assert resumed.exit_code == 0
+        resumed_payload = json.loads(resumed.output)
+        assert "Validated Remote usage" in resumed_payload["context"]["task"]["body"]
 
 
 class TestAddCommand:

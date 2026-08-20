@@ -1081,6 +1081,64 @@ Before running any tests:
 
 ---
 
+### UAT-066: Agent JSON Add and List
+
+**Objective:** Verify the chat skill can create and inspect tasks without parsing terminal formatting.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Run `aio agent add "Review remote workflow" --due tomorrow` | Exit code 0 and one JSON object with `ok: true` and a task ID |
+| 2 | Run `aio agent list inbox` | Exit code 0 and a JSON task array containing the new ID |
+| 3 | Inspect stdout | No Rich table, progress text, or extra log lines |
+
+**Pass Criteria:** Valid agent operations return stable, machine-readable success envelopes.
+
+---
+
+### UAT-067: Agent Structured Error
+
+**Objective:** Verify a chat agent receives an actionable failure without a traceback.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Run `aio agent complete ZZZZ` | Nonzero exit code |
+| 2 | Inspect stderr | One JSON object with `ok: false`, error type, and message |
+| 3 | Inspect stdout | Empty |
+
+**Pass Criteria:** Failures are structured, nonzero, and do not expose a traceback in normal use.
+
+---
+
+### UAT-068: Agent Resume and Work-Log Loop
+
+**Objective:** Verify a chat can retrieve context, perform work, and leave a durable continuation point.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Create a task and capture its exact ID | JSON response returns the ID |
+| 2 | Run `aio agent search "<task title>"` | Search result includes the task |
+| 3 | Run `aio agent record-work <id> "Reviewed" --next-action "Send feedback"` | Work entry is appended and `lastWorked` updates |
+| 4 | Run `aio agent resume <id>` | Resume bundle contains the work outcome and next action |
+
+**Pass Criteria:** The next chat can recover task state without storing a transcript or hidden reasoning.
+
+---
+
+### UAT-069: ChatGPT Desktop and Remote Skill
+
+**Objective:** Verify the supported chat-first workflow uses the host CLI without MCP.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Install or link `skills/manage-aio/` on the desktop host | Skill is discoverable in the project session |
+| 2 | Ask “Show my inbox” | Assistant invokes `aio agent list inbox` and summarizes the JSON result |
+| 3 | Enable Remote Connections and connect from another device | Remote task uses the same host project, skill, CLI, and vault |
+| 4 | Put the host offline or let it sleep, then retry remotely | Connection is unavailable and no alternate vault is silently used |
+
+**Pass Criteria:** Local and remote chat operate the same host-backed AIO data, and host unavailability is explicit.
+
+---
+
 ## Test Summary Checklist
 
 ### Phase 1: Foundation
@@ -1167,6 +1225,12 @@ Before running any tests:
 - [ ] UAT-064: Exit Codes
 - [ ] UAT-065: No Stack Traces in Normal Use
 
+### Chat and Remote Agent Interface
+- [ ] UAT-066: Agent JSON Add and List
+- [ ] UAT-067: Agent Structured Error
+- [ ] UAT-068: Agent Resume and Work-Log Loop
+- [ ] UAT-069: ChatGPT Desktop and Remote Skill
+
 ---
 
 ## Notes
@@ -1179,4 +1243,6 @@ Before running any tests:
 
 4. **Known Limitations:** Some features marked as "Not Started" in PROJECT_PLAN (dependency visualization, location navigation, subtask progress) are not included in this UAT.
 
-5. **MCP Testing:** MCP tests (UAT-032 to UAT-040) require an MCP-capable client. For manual testing, use any MCP client or a test harness.
+5. **MCP Testing:** MCP tests (UAT-032 to UAT-040) require an MCP-capable client. For manual testing, use any MCP client or a test harness. MCP is optional for the primary chat workflow.
+
+6. **Remote Testing:** UAT-069 requires a ChatGPT account and workspace with Remote Connections available, plus an awake and online desktop host.

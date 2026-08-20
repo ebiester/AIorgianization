@@ -1,0 +1,4 @@
+interface:
+  display_name: "AIO Task Management"
+  short_description: "Manage your AIO vault through chat"
+  default_prompt: "Use $manage-aio to show what is on my plate today."

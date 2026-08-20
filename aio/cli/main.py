@@ -7,6 +7,7 @@ import click
 from rich.console import Console
 
 from aio.cli.add import add
+from aio.cli.agent import agent
 from aio.cli.archive import archive
 from aio.cli.config import config
 from aio.cli.daemon_cmd import daemon
@@ -48,6 +49,7 @@ def help(ctx: click.Context) -> None:
 
 # Register commands
 cli.add_command(init)
+cli.add_command(agent)
 cli.add_command(add)
 cli.add_command(list_tasks, name="list")
 cli.add_command(done)
