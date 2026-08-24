@@ -35,6 +35,7 @@ class TaskService:
         project: str | None = None,
         status: TaskStatus = TaskStatus.INBOX,
         tags: list[str] | None = None,
+        notes: str | None = None,
     ) -> Task:
         """Create a new task.
 
@@ -44,6 +45,7 @@ class TaskService:
             project: Optional project wikilink.
             status: Initial status (default: inbox).
             tags: Optional list of tags.
+            notes: Optional Markdown content to add below the Notes heading.
 
         Returns:
             The created task.
@@ -66,7 +68,8 @@ class TaskService:
         )
 
         # Generate content
-        body = f"# {title}\n\n## Notes\n"
+        notes_body = f"{notes.strip()}\n" if notes and notes.strip() else ""
+        body = f"# {title}\n\n## Notes\n{notes_body}"
         task.body = body
 
         # Write file
@@ -298,6 +301,75 @@ class TaskService:
 
         return task
 
+    def link_context(self, query: str, targets: list[str]) -> Task:
+        """Add validated, de-duplicated wikilinks to a task's explicit context."""
+        task = self.find(query)
+        clean = [self._validate_context_link(target) for target in targets]
+        task.context = list(dict.fromkeys([*task.context, *clean]))
+        task.updated = datetime.now()
+        self._write_task(task)
+        return task
+
+    def record_work(
+        self,
+        query: str,
+        outcome: str,
+        current_state: str | None = None,
+        decisions: str | None = None,
+        next_action: str | None = None,
+        references: list[str] | None = None,
+        harness: str | None = None,
+    ) -> Task:
+        """Append a structured, human-readable work-log entry to a task."""
+        task = self.find(query)
+        now = datetime.now()
+        fields = [
+            ("Harness", harness),
+            ("Outcome", outcome),
+            ("Current state", current_state),
+            ("Decisions", decisions),
+            ("Next action", next_action),
+        ]
+        entry = [f"### {now.isoformat(timespec='seconds')}"]
+        entry.extend(
+            f"- **{name}:** {value.strip()}" for name, value in fields if value and value.strip()
+        )
+        if references:
+            entry.append(f"- **References:** {', '.join(references)}")
+        log = "\n".join(entry)
+        heading = "## Work Log"
+        if heading not in task.body:
+            task.body = task.body.rstrip() + f"\n\n{heading}\n"
+        task.body = task.body.rstrip() + f"\n\n{log}\n"
+        task.last_worked = now
+        task.updated = now
+        self._write_task(task)
+        return task
+
+    def _validate_context_link(self, target: str) -> str:
+        """Return a normalized vault wikilink, rejecting non-vault targets."""
+        link = target.strip()
+        if link.startswith("[[") and link.endswith("]]"):
+            link = link[2:-2]
+        link = link.split("|")[0].strip().lstrip("/")
+        candidate = (
+            self.vault.vault_path / (link if link.endswith(".md") else f"{link}.md")
+        ).resolve()
+        try:
+            candidate.relative_to(self.vault.vault_path.resolve())
+        except ValueError as exc:
+            raise ValueError(f"Context target is outside the vault: {target}") from exc
+        if not candidate.exists():
+            raise FileNotFoundError(f"Context target does not exist: {target}")
+        return f"[[{candidate.relative_to(self.vault.vault_path).with_suffix('').as_posix()}]]"
+
+    def _write_task(self, task: Task) -> None:
+        """Persist an existing task without changing its path."""
+        filepath = self._find_task_file_by_id(task.id)
+        if not filepath:
+            raise TaskNotFoundError(f"Task file not found: {task.id}")
+        write_frontmatter(filepath, task.frontmatter(), task.body)
+
     def _update_status(self, task: Task, new_status: TaskStatus) -> Task:
         """Update a task's status and move its file.
 
@@ -470,28 +542,32 @@ class TaskService:
         if updated is None:
             updated = datetime.now()
 
-        return Task.model_validate({
-            "id": metadata.get("id", "????"),
-            "type": metadata.get("type", "task"),
-            "status": TaskStatus(metadata.get("status", "inbox")),
-            "title": title,
-            "body": content,
-            "due": due,
-            "project": metadata.get("project"),
-            "assignedTo": metadata.get("assignedTo"),
-            "waitingOn": metadata.get("waitingOn"),
-            "blockedBy": metadata.get("blockedBy", []),
-            "blocks": metadata.get("blocks", []),
-            "location": location,
-            "tags": metadata.get("tags", []),
-            "timeEstimate": metadata.get("timeEstimate"),
-            "created": created,
-            "updated": updated,
-            "completed": completed,
-            "archived": metadata.get("archived", False),
-            "archivedAt": archived_at,
-            "archivedFrom": metadata.get("archivedFrom"),
-        })
+        return Task.model_validate(
+            {
+                "id": metadata.get("id", "????"),
+                "type": metadata.get("type", "task"),
+                "status": TaskStatus(metadata.get("status", "inbox")),
+                "title": title,
+                "body": content,
+                "due": due,
+                "project": metadata.get("project"),
+                "assignedTo": metadata.get("assignedTo"),
+                "waitingOn": metadata.get("waitingOn"),
+                "context": metadata.get("context", []),
+                "lastWorked": self._parse_datetime(metadata.get("lastWorked"), None),
+                "blockedBy": metadata.get("blockedBy", []),
+                "blocks": metadata.get("blocks", []),
+                "location": location,
+                "tags": metadata.get("tags", []),
+                "timeEstimate": metadata.get("timeEstimate"),
+                "created": created,
+                "updated": updated,
+                "completed": completed,
+                "archived": metadata.get("archived", False),
+                "archivedAt": archived_at,
+                "archivedFrom": metadata.get("archivedFrom"),
+            }
+        )
 
     def _extract_title(self, content: str, filepath: Path) -> str:
         """Extract title from content or filename.
@@ -551,9 +627,7 @@ class TaskService:
         # Match wikilink or plain name
         return project_lower in task_project_lower
 
-    def _parse_datetime(
-        self, value: Any, default: datetime | None
-    ) -> datetime | None:
+    def _parse_datetime(self, value: Any, default: datetime | None) -> datetime | None:
         """Parse a datetime value, ensuring it's naive (no timezone).
 
         Args:

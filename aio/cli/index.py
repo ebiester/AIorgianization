@@ -7,6 +7,7 @@ from rich.console import Console
 
 from aio.services.id_index import IdIndex, IdIndexService
 from aio.services.vault import VaultService
+from aio.services.vault_index import VaultIndex
 
 console = Console()
 
@@ -24,7 +25,7 @@ def index() -> None:
 )
 @click.pass_context
 def rebuild(ctx: click.Context, check_collisions: bool) -> None:
-    """Rebuild the ID index from the vault.
+    """Rebuild derived vault indexes from Markdown.
 
     Scans all tasks, projects, and people (including completed and archived)
     to rebuild the ID index. This is useful for:
@@ -50,11 +51,13 @@ def rebuild(ctx: click.Context, check_collisions: bool) -> None:
 
     index_service = IdIndexService(vault_service)
     result = index_service.rebuild()
+    vault_result = VaultIndex(vault_service).reconcile(rebuild=True)
 
     console.print("[green]Index rebuilt successfully![/green]")
     console.print(f"  Tasks: {len(result.task_ids)}")
     console.print(f"  Projects: {len(result.project_ids)}")
     console.print(f"  People: {len(result.person_ids)}")
+    console.print(f"  Vault documents: {vault_result['indexed']}")
 
     if check_collisions:
         _check_for_collisions(vault_service, result)
@@ -63,7 +66,7 @@ def rebuild(ctx: click.Context, check_collisions: bool) -> None:
 @index.command()
 @click.pass_context
 def status(ctx: click.Context) -> None:
-    """Show the current ID index status.
+    """Show the current derived vault index status.
 
     Displays information about the ID index including:
     - Whether the index exists
@@ -84,6 +87,16 @@ def status(ctx: click.Context) -> None:
         raise SystemExit(1) from e
 
     index_service = IdIndexService(vault_service)
+    vault_index = VaultIndex(vault_service)
+    vault_status = vault_index.status()
+
+    console.print("[bold]Vault Search Index Status[/bold]")
+    console.print(f"  Path: {vault_index.path}")
+    console.print(f"  Documents: {vault_status['indexed']}")
+    console.print(f"  Pending/errors: {vault_status['pending']}/{vault_status['errors']}")
+    console.print(f"  Last reconciliation: {vault_status['last_reconciled'] or 'never'}")
+    console.print(f"  Exclusions: {', '.join(vault_status['exclusions'])}")
+    console.print()
 
     if not index_service.index_path.exists():
         console.print("[yellow]No ID index found.[/yellow]")
@@ -105,11 +118,24 @@ def status(ctx: click.Context) -> None:
 
     if is_stale:
         console.print(
-            "\n[yellow]Index is stale.[/yellow] "
-            "Run [bold]aio index rebuild[/bold] to update."
+            "\n[yellow]Index is stale.[/yellow] Run [bold]aio index rebuild[/bold] to update."
         )
     else:
         console.print("\n[green]Index is up to date.[/green]")
+
+
+@index.command()
+@click.pass_context
+def reconcile(ctx: click.Context) -> None:
+    """Immediately reconcile changed vault Markdown into the search index."""
+    vault_path: Path | None = ctx.obj.get("vault_path")
+    vault_service = VaultService(vault_path)
+    try:
+        result = VaultIndex(vault_service).reconcile()
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise SystemExit(1) from e
+    console.print(f"[green]Reconciled {result['indexed']} document(s).[/green]")
 
 
 def _check_for_collisions(

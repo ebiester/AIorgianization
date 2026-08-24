@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from aio.models.task import Task, TaskStatus
 from aio.services.task import TaskService
 from aio.services.vault import VaultService
+from aio.services.vault_index import VaultIndex
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class VaultCache:
 
     # Debounce time in seconds for file change events
     DEBOUNCE_SECONDS = 0.1
+    RECONCILE_SECONDS = 300
 
     def __init__(
         self,
@@ -44,6 +46,7 @@ class VaultCache:
         """
         self._vault_service = vault_service
         self._task_service = task_service
+        self._vault_index = VaultIndex(vault_service)
 
         # Cache storage
         self._tasks: dict[str, Task] = {}  # id -> Task
@@ -57,6 +60,7 @@ class VaultCache:
         self._pending_paths: set[Path] = set()
         self._debounce_timer: threading.Timer | None = None
         self._debounce_lock = threading.Lock()
+        self._reconcile_timer: threading.Timer | None = None
 
         # Track cache state
         self._is_populated = False
@@ -111,18 +115,20 @@ class VaultCache:
 
         # Create and start observer
         self._observer = Observer()
-        tasks_path = self._vault_service.aio_path / "Tasks"
+        vault_path = self._vault_service.vault_path
 
-        if tasks_path.exists():
+        if vault_path.exists():
             self._observer.schedule(
                 self._event_handler,
-                str(tasks_path),
+                str(vault_path),
                 recursive=True,
             )
             self._observer.start()
-            logger.info("File watcher started for %s", tasks_path)
+            self._vault_index.reconcile()
+            self._schedule_reconciliation()
+            logger.info("File watcher started for %s", vault_path)
         else:
-            logger.warning("Tasks folder does not exist: %s", tasks_path)
+            logger.warning("Vault folder does not exist: %s", vault_path)
 
     def stop(self) -> None:
         """Stop file watching."""
@@ -138,6 +144,9 @@ class VaultCache:
             if self._debounce_timer is not None:
                 self._debounce_timer.cancel()
                 self._debounce_timer = None
+            if self._reconcile_timer is not None:
+                self._reconcile_timer.cancel()
+                self._reconcile_timer = None
 
     def _on_file_change(self, path: Path) -> None:
         """Handle a file change event with debouncing.
@@ -175,6 +184,22 @@ class VaultCache:
             # For simplicity, just do a full refresh
             # A more sophisticated approach would invalidate only affected tasks
             self.refresh_sync()
+            self._vault_index.reconcile()
+
+    def _schedule_reconciliation(self) -> None:
+        """Reconcile derived search state periodically for missed sync events."""
+        self._reconcile_timer = threading.Timer(self.RECONCILE_SECONDS, self._reconcile_index)
+        self._reconcile_timer.daemon = True
+        self._reconcile_timer.start()
+
+    def _reconcile_index(self) -> None:
+        """Rebuild changed search records, then schedule the next sweep."""
+        try:
+            self._vault_index.reconcile()
+        except Exception as exc:
+            logger.warning("Vault index reconciliation failed: %s", exc)
+        if self._observer is not None:
+            self._schedule_reconciliation()
 
     def refresh_sync(self) -> None:
         """Synchronously refresh the cache from disk."""
@@ -317,10 +342,7 @@ class VaultCache:
         Returns:
             Dictionary with cache stats.
         """
-        status_counts = {
-            status.value: len(ids)
-            for status, ids in self._tasks_by_status.items()
-        }
+        status_counts = {status.value: len(ids) for status, ids in self._tasks_by_status.items()}
         return {
             "total_tasks": self._task_count,
             "is_populated": self._is_populated,

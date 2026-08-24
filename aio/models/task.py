@@ -58,6 +58,11 @@ class Task(BaseModel):
         alias="waitingOn",
         description="Wikilink to person we're waiting on",
     )
+    context: list[str] = Field(
+        default_factory=list,
+        description="Explicit wikilinks to vault material needed to work the task",
+    )
+    last_worked: datetime | None = Field(default=None, alias="lastWorked")
 
     # Dependencies
     blocked_by: list[str] = Field(
@@ -112,6 +117,10 @@ class Task(BaseModel):
             data["assignedTo"] = self.assigned_to
         if self.waiting_on:
             data["waitingOn"] = self.waiting_on
+        if self.context:
+            data["context"] = self.context
+        if self.last_worked:
+            data["lastWorked"] = self.last_worked
         if self.blocked_by:
             data["blockedBy"] = self.blocked_by
         if self.blocks:

@@ -4,37 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "44148657915b341f",
+        "id": "d4543a22542f6b83",
         "type": "tabs",
         "children": [
           {
-            "id": "215f85dde79cbca2",
+            "id": "ace57eea94895734",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Welcome.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Welcome"
-            }
-          }
-        ]
-      },
-      {
-        "id": "0b8f38c2ec23c340",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "a01decc768709600",
-            "type": "leaf",
-            "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -110,7 +90,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Welcome.md",
+                "file": "questions to andy.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -120,7 +100,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for Welcome"
+              "title": "Backlinks for questions to andy"
             }
           },
           {
@@ -129,12 +109,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Welcome.md",
+                "file": "questions to andy.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from Welcome"
+              "title": "Outgoing links from questions to andy"
             }
           },
           {
@@ -172,21 +152,20 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of Welcome"
+              "title": "Outline"
             }
           }
-        ]
+        ],
+        "currentTab": 4
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -199,8 +178,34 @@
       "bases:Create new base": false
     }
   },
-  "active": "215f85dde79cbca2",
+  "active": "7207113c122753b8",
   "lastOpenFiles": [
-    "Welcome.md"
+    "AIO/Projects/Q1-internationalization.md",
+    "questions to andy.md",
+    "AIO/Tasks/Inbox/2026-01-19-third-task.md",
+    "AIO/Tasks/Next/2026-01-19-fourth-task.md",
+    "AIO/Tasks/Inbox/2026-01-19-specify-q1-test.md",
+    "AIO/Projects/Q1-Test.md",
+    "AIO/People/Sarah.md",
+    "AIO/Tasks/Inbox/2026-01-19-new-project-task.md",
+    "AIO/Tasks/Inbox/2026-01-19-fifth-task.md",
+    "AIO/Tasks/Inbox/2026-01-19-another-task.md",
+    "AIO/Tasks/Someday/2026-01-19-third-task.md",
+    "AIO/Tasks/Completed/2026/01/2026-01-19-fourth-task.md",
+    "AIO/Tasks/Inbox/2026-01-19-mcp-test.md",
+    "AIO/Tasks/Completed/2026/01/2026-01-19-another-new-task.md",
+    "AIO/Tasks/Completed/2026/01/2026-01-19-new-task.md",
+    "AIO/Tasks/Completed/2026/01",
+    "AIO/Tasks/Completed/2026",
+    "2026-01-19.md",
+    "Welcome.md",
+    "AIO/Archive/Tasks/Waiting",
+    "AIO/Archive/Tasks/Someday",
+    "AIO/Archive/Tasks/Scheduled",
+    "AIO/Archive/Tasks/Next",
+    "AIO/Archive/Tasks/Inbox",
+    "AIO/Tasks/Waiting",
+    "AIO/Tasks/Someday",
+    "AIO/Tasks/Scheduled"
   ]
 }

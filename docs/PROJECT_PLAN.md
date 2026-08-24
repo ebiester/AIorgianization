@@ -43,6 +43,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | VaultService | Locate and read Obsidian vault (Python) | Done |
 | TaskService | Parse/write task markdown files (Python) | Done |
 | Add command | Create task file in Inbox | Done |
+| Contextual task capture | Store Markdown resume context through CLI and MCP | Done |
 | List command | Query tasks by status/folder | Done |
 | Done command | Move task to Completed folder | Done |
 | Dashboard command | Generate/append dashboard to daily note | Done |
@@ -124,7 +125,7 @@ aio archive tasks --before 2024-01-01
 | Item | Description | Status |
 |------|-------------|--------|
 | MCP package | Python mcp SDK setup | Done |
-| aio_add_task tool | Create task via MCP | Done |
+| aio_add_task tool | Create task via MCP, including Markdown resume context | Done |
 | aio_list_tasks tool | Query tasks via MCP | Done |
 | aio_complete_task tool | Complete task via MCP | Done |
 | aio_start_task tool | Start task via MCP | Done |

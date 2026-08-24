@@ -139,7 +139,7 @@ aio dashboard                     # Generate dashboard
 aio init <vault-path>             # Create AIO directory structure in vault
 
 # Task management
-aio add "Task title" [-d due] [-p project] [-a person]
+aio add "Task title" [-d due] [-p project] [-a person] [--notes context]
 aio list [inbox|next|waiting|someday|today|overdue|all]
 aio done <task-id-or-query>       # Complete task
 aio start <task>                  # Move to Next status
@@ -483,7 +483,7 @@ Add this server to your MCP client configuration. For example, Cursor uses `~/.c
 
 ```python
 # Task Management
-aio_add_task(title, due?, project?, assign?)  → task_id  # assign delegates immediately
+aio_add_task(title, due?, project?, assign?, notes?)  → task_id  # notes are stored under ## Notes
 aio_list_tasks(status?, project?)             → Task[]
 aio_complete_task(id)                         → success
 aio_start_task(id)                            → success
@@ -526,6 +526,7 @@ Example prompts:
 - "What's on my plate today?" → aio_get_dashboard()
 - "Add a task to review the PR by Friday" → aio_add_task("Review PR", due="friday")
 - "Add a task for Sarah to update docs" → aio_add_task("Update docs", assign="Sarah")
+- "Remember to send the rollout options" → aio_add_task("Send rollout options", notes="- Next action: send draft")
 - "Show my inbox" → aio_list_tasks(status="inbox")
 ```
 
