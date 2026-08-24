@@ -17,7 +17,7 @@ Persist work that would otherwise disappear into the chat. Prefer doing the capt
    - **Decision/constraint:** settled choices, boundaries, or risks.
    - **Next action:** the first concrete step.
    - **References:** paths, URLs, PRs, issue IDs, or people when known.
-4. Call `aio_add_task` with `title`, `notes`, and any known `due`, `project`, `status`, or `assign` values. If working without MCP, run `aio add "<title>" --notes "<notes>"`.
+4. Run `aio agent add "<title>" --notes "<notes>"` with any known `--due`, `--project`, `--status`, or `--assign` values.
 5. Confirm the saved title and ID in one short sentence. Do not duplicate the full note in chat.
 
 ## Rules

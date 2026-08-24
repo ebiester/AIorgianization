@@ -60,15 +60,15 @@ No global "active task" state will be persisted. Each harness conversation expli
 
 ## Agent and Public Interfaces
 
-- Add MCP tools:
-  - `aio_search(query, scope?, limit=10)` — search indexed vault content and return paths, excerpts, entity metadata, and match reasons.
-  - `aio_resume_task(query, max_chars=20000)` — return the task plus project, people, dependencies, explicit context, first-hop backlinks, recent work log, and ranked related material.
-  - `aio_link_context(query, targets[])` — add validated vault wikilinks to a task.
-  - `aio_record_work(query, outcome, current_state?, decisions?, next_action?, references?, harness?)` — append a structured work-log entry and update `lastWorked`.
-  - `aio_promote_knowledge(query, target, category, content, section?, provenance?)` — atomically update or create the canonical artifact and backlink it to the task.
-  - `aio_index_status()` — expose index health to harnesses.
+- Add JSON agent CLI commands:
+  - `aio agent search <query> [--scope <folder>] [--limit <n>]` — search indexed vault content.
+  - `aio agent resume <query> [--max-chars <n>]` — return the task plus project, people, dependencies, explicit context, first-hop backlinks, recent work log, and ranked related material.
+  - `aio agent link-context <query> <targets...>` — add validated vault wikilinks to a task.
+  - `aio agent record-work <query> <outcome> [...]` — append a structured work-log entry and update `lastWorked`.
+  - `aio agent promote-knowledge <query> <target> --category <category> --content <content>` — atomically update or create a canonical artifact and backlink it to the task.
+  - `aio agent index-status` — expose index health to harnesses.
 - Extend task serialization to include `context`, `last_worked`, and sufficient task body/work-log information for resumption.
-- Preserve existing task, CLI, plugin, and MCP behavior. The current `notes` support on `aio_add_task` becomes the foundation for automatic resume-context capture.
+- Preserve existing task, CLI, and plugin behavior. The `--notes` support on `aio agent add` becomes the foundation for automatic resume-context capture.
 - Add a shared task-loop skill usable by Codex and Claude:
   - Use dashboard/list tools to orient.
   - Resolve one task and call `aio_resume_task`.
@@ -76,14 +76,14 @@ No global "active task" state will be persisted. Each harness conversation expli
   - Call `aio_record_work` before the session ends.
   - Automatically create substantive follow-up tasks.
   - Automatically promote durable knowledge and then notify the user with the affected files.
-- Keep the Obsidian plugin as the human review/edit surface. Harness/MCP parity takes priority over new plugin UI in this release.
+- Keep the Obsidian plugin as the human review/edit surface. Harness/CLI parity takes priority over new plugin UI in this release.
 
 ## Delivery Sequence
 
 1. **Vault index foundation**
    - Implement inventory, FTS, link graph, exclusions, watcher expansion, startup/periodic reconciliation, and index CLI commands.
 2. **Task-centered context assembly**
-   - Add task relationship fields, work-log handling, search, resume, linking, and index-health MCP interfaces.
+   - Add task relationship fields, work-log handling, search, resume, linking, and index-health agent CLI interfaces.
 3. **Harness workflow**
    - Add the shared Codex/Claude task-loop skill, automatic follow-up capture, knowledge routing, provenance, and promotion notifications.
 4. **Retrieval evaluation**
@@ -96,7 +96,7 @@ No global "active task" state will be persisted. Each harness conversation expli
 - Unit-test frontmatter compatibility, work-log parsing, relationship extraction, routing, provenance, FTS ranking, exclusions, hashes, and atomic promotion.
 - Test index convergence for Obsidian edits while the daemon is running, edits while stopped, atomic-save patterns, rename, delete, sync arrival, malformed Markdown, and missed watcher events.
 - Verify rebuild and incremental reconciliation produce equivalent document and relationship sets.
-- Integration-test every new CLI and MCP interface, context ordering, character limits, ambiguous task matching, invalid links, and promotion failures.
+- Integration-test every agent CLI interface, context ordering, character limits, ambiguous task matching, invalid links, and promotion failures.
 - End-to-end test the complete loop: create/select task → resume context → record work → create follow-up → promote knowledge → restart daemon → retrieve the same state.
 - Confirm existing vaults require no migration, existing tasks and plugin views remain usable, and deleting `.aio/index.sqlite` loses no source information.
 - Run the full Python and TypeScript suites, Ruff with zero errors, mypy, actual CLI success/error cases, and update Architecture, PRD, Project Plan, User Manual, UAT Plan, README, and agent instructions.
@@ -107,4 +107,4 @@ No global "active task" state will be persisted. Each harness conversation expli
 - Automatic writes are allowed for inbox tasks, task work logs, and confident canonical promotions; every promotion is reported afterward.
 - Existing folders are retained and their BASB roles are documented rather than renamed.
 - Semantic embeddings are deferred until the lexical/link implementation has measurable retrieval examples.
-- Slack is not an AIO interface. Codex and Claude communicate through the same local MCP contract and reusable harness skill.
+- Slack is not an AIO interface. Codex and Claude communicate through the same local CLI contract and reusable harness skill.

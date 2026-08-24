@@ -10,7 +10,6 @@
 | 4 | Dataview queries use raw names vs slugged paths | **FIXED** | High |
 | 5 | waitingOn link format inconsistent | **FIXED** | High |
 | 6 | Title search ignores completed subfolders | **FIXED** | Medium |
-| 7 | MCP cache never refreshes | **CONFIRMED (by design)** | Low |
 | 8 | Archive metadata not written | **FIXED** | Medium |
 | 9 | Daemon endpoint mismatch in docs | **FIXED** | Low |
 | 10 | Plugin writes files in fallback mode | **FIXED** | Medium |
@@ -65,12 +64,6 @@
 - **Contrast:** `_find_task_file_by_id()` correctly searches subfolders.
 - **Solution:** Added subfolder iteration logic to `_find_tasks_by_title()` matching `_find_task_file_by_id()`.
 - **Files fixed:** `aio/services/task.py`
-
-#### #7 - MCP Cache Staleness (By Design)
-- **Problem:** MCP server doesn't call `cache.start()`, so file watching is disabled.
-- **Impact:** MCP returns stale data after external vault edits.
-- **Note:** This is documented behavior ("non-watching cache since each request is stateless").
-- **Potential fix:** Add optional `refresh()` call per request, or document limitation clearly.
 
 #### #8 - Archive Metadata Not Written (FIXED)
 - **Problem:** `ARCHITECTURE.md` promises `archived`, `archivedAt`, `archivedFrom` fields, but they're not written.
@@ -198,10 +191,6 @@ Added existence checks to TaskService.create(), ProjectService.create(), PersonS
 
 #### 4.1 Fix Endpoint Documentation (Finding #9) - DONE
 - Updated `DAEMON_ARCHITECTURE.md` line 198: `/wait` → `/delegate`
-
-#### 4.2 Document MCP Cache Behavior (Finding #7) - DONE
-- Added troubleshooting note to `docs/USER_MANUAL.md` under "MCP Issues" section
-- Documented workaround: restart MCP server to refresh cache
 
 ---
 

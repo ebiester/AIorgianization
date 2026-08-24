@@ -8,8 +8,8 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 
 - **Storage:** Markdown files in Obsidian vault (no database)
 - **UI:** Obsidian plugin for viewing/editing tasks
-- **CLI:** Python (Click) for quick capture when not in Obsidian
-- **MCP:** Python MCP server for any MCP-capable client
+- **CLI:** Python (Click) for human use plus a JSON interface for chat agents
+- **Chat integration:** Reusable skill for ChatGPT Desktop, Codex, and Remote Connections
 - **Testing:** pytest (unit, integration, e2e)
 
 ---
@@ -20,8 +20,9 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 |-------|------|--------|-------|
 | 1 | Foundation | Done | Vault structure, CLI basics |
 | 2 | Obsidian Plugin Core | Done | Task views, commands |
-| 3 | AI Integration | Done | MCP server for MCP-capable clients |
+| 3 | AI Integration | Done | Agent CLI and reusable chat skill |
 | 4 | Polish | Done | Weekly review, refinements |
+| 5 | Chat-first and Remote | Done | Agent CLI, reusable skill, remote-host workflow |
 
 ---
 
@@ -43,7 +44,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | VaultService | Locate and read Obsidian vault (Python) | Done |
 | TaskService | Parse/write task markdown files (Python) | Done |
 | Add command | Create task file in Inbox | Done |
-| Contextual task capture | Store Markdown resume context through CLI and MCP | Done |
+| Contextual task capture | Store Markdown resume context through CLI and agent CLI | Done |
 | List command | Query tasks by status/folder | Done |
 | Done command | Move task to Completed folder | Done |
 | Dashboard command | Generate/append dashboard to daily note | Done |
@@ -52,7 +53,7 @@ This document outlines the implementation phases for AIorgianization - an Obsidi
 | Unit tests | Test services, utils, models | Done |
 | Integration tests | Test CLI commands | Done |
 | E2E tests | Test full workflows with fixtures | Done |
-| Comprehensive test runner | Language-agnostic test orchestrator (Python + TypeScript + MCP) | Done |
+| Comprehensive test runner | Language-agnostic test orchestrator (Python + TypeScript) | Done |
 | UAT markers | pytest markers for UAT tracking with report generation | Done |
 | TypeScript tests | Vitest tests for Obsidian plugin with mocked API | Done |
 
@@ -118,34 +119,21 @@ aio archive tasks --before 2024-01-01
 
 ## Phase 3: AI Integration
 
-**Objective:** MCP server exposing vault to MCP-capable clients for AI assistance.
+**Objective:** JSON agent CLI and reusable skill expose vault operations to chat agents.
 
 ### Deliverables
 
 | Item | Description | Status |
 |------|-------------|--------|
-| MCP package | Python mcp SDK setup | Done |
-| aio_add_task tool | Create task via MCP, including Markdown resume context | Done |
-| aio_list_tasks tool | Query tasks via MCP | Done |
-| aio_complete_task tool | Complete task via MCP | Done |
-| aio_start_task tool | Start task via MCP | Done |
-| aio_defer_task tool | Defer task via MCP | Done |
-| aio_delegate_task tool | Delegate task (alias for wait with person) via MCP | Done |
-| aio_get_context tool | Read context packs | Done |
-| aio_get_dashboard tool | Get daily dashboard | Done |
-| Context pack tools | Create, list, append context packs | Done |
-| Entity read/write | Read or write any entity (task, project, person) by ID or title | Done |
-| Task resources | Expose task lists as resources | Done |
-| Client instruction file | Reusable AIO instructions for MCP-capable assistants, such as `.cursor/skills/aio.md` | Done |
-| MCP integration tests | Test tool invocations | Done |
-| MCP startup message | Display initialization message when server starts | Done |
-| MCP graceful shutdown | Handle Ctrl+C gracefully with clean exit message | Done |
+| Agent CLI | Stable JSON commands for task lifecycle and context work | Done |
+| Reusable skill | `skills/manage-aio/` maps natural-language requests to agent commands | Done |
+| Integration tests | Test command envelopes and error handling | Done |
 
 ### Verification
 
-- Configure MCP server in an MCP-capable client
+- Install `skills/manage-aio/` on the host
 - "Add a task to review the roadmap by Friday"
-- Client calls aio_add_task
+- Chat invokes `aio agent add`
 - Task file created in vault
 
 ---
@@ -161,9 +149,30 @@ aio archive tasks --before 2024-01-01
 | Weekly review wizard | Multi-step review view in plugin | Done |
 | Review tracking | Record review completion | Done |
 | Project views | Dataview integration and `aio project list/show` views | Done |
+| Project and area creation | Direct `aio project create` and `aio area create` commands | Done |
+| Linked task references | Project and area templates query tasks that backlink to the note | Done |
 | Delegated summary | Days-since-delegated display | Done |
 | CLI improvements | Better output formatting for project summaries | Done |
 | Documentation | User manual, PRD, project plan, UAT, client instructions | Done |
+
+---
+
+## Phase 5: Chat-first and Remote
+
+**Objective:** Make chat the primary AIO interface on desktop and remote devices through the host CLI.
+
+### Deliverables
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Agent CLI group | Add non-interactive `aio agent` commands with stable JSON envelopes | Done |
+| Task lifecycle parity | Support list, add, complete, start, defer, wait, and dashboard actions | Done |
+| Context workflow parity | Support search, resume, context links, work logs, knowledge promotion, and index health | Done |
+| Structured failures | Return JSON errors on stderr with nonzero exit codes | Done |
+| Reusable skill | Add `skills/manage-aio/` for natural-language task management | Done |
+| ChatGPT Desktop setup | Document local CLI and skill installation | Done |
+| Remote Connections setup | Document host requirements and remote-device behavior | Done |
+| Acceptance coverage | Add integration and UAT coverage for the agent workflow | Done |
 
 ---
 
@@ -174,8 +183,9 @@ aio archive tasks --before 2024-01-01
 | Phase | Work |
 |-------|------|
 | 1 | Project setup, VaultService, TaskService, CLI (add/list/done), tests |
-| 3 | MCP server, tools, resources |
+| 3 | Agent CLI and reusable chat skill |
 | 4 | Polish, better output |
+| 5 | JSON agent commands and chat-workflow integration tests |
 
 ### Obsidian Plugin (obsidian-aio/)
 
@@ -184,11 +194,12 @@ aio archive tasks --before 2024-01-01
 | 2 | All plugin features (TypeScript) |
 | 4 | Weekly review, polish |
 
-### MCP Client Integration
+### Agent Integrations
 
 | Phase | Work |
 |-------|------|
-| 3 | MCP config, reusable client instructions such as `.cursor/skills/aio.md` |
+| 3 | JSON agent commands and reusable client instructions |
+| 5 | `manage-aio` skill, ChatGPT Desktop setup, and Remote Connections workflow |
 
 ---
 
@@ -215,8 +226,14 @@ The Python CLI rewrite is complete. All core functionality has been migrated.
 7. [x] Implement location navigation (click to open file/URL)
 8. [x] Add subtask progress display
 9. [x] Add project list/show views
-10. [x] Write MCP integration tests
+10. [x] Add direct project and area creation commands
 11. [x] Add `delegate` as CLI alias for `wait` with required person argument
-13. [x] Add `aio_delegate_task` MCP tool (alias for wait with person)
-14. [x] Add MCP server startup message showing initialization status
-15. [x] Add graceful MCP server shutdown (handle Ctrl+C with clean exit message)
+
+**Phase 5 (Chat-first and Remote) - Done:**
+
+1. [x] Add stable JSON commands under `aio agent`
+2. [x] Cover task lifecycle and context-resume workflows
+3. [x] Create and validate the `manage-aio` skill
+4. [x] Document ChatGPT Desktop local setup
+5. [x] Document Remote Connections behavior and prerequisites
+7. [x] Add integration and UAT coverage

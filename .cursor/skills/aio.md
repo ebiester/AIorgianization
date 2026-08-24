@@ -1,23 +1,27 @@
 # AIO Task Management
 
-Use the AIO MCP server when the user asks about tasks, deadlines, projects, delegated work, or daily planning.
+Use the local JSON CLI, `aio agent`, for task and context work.
 
 ## Default Flow
 
-1. Use `aio_get_dashboard` for "today", "on my plate", or planning questions.
-2. Use `aio_list_tasks` for status-specific views such as inbox, next, waiting, today, or overdue.
-3. Use `aio_add_task` for quick capture. Include `due`, `project`, or `assign` when the user provides them.
-4. Use `aio_complete_task`, `aio_start_task`, `aio_defer_task`, or `aio_delegate_task` for status changes.
-5. Use `aio_get_context` when the user asks for project or domain context from context packs.
-6. For focused execution, select a task and call `aio_resume_task`; finish with `aio_record_work`. Use `aio_search` for additional vault material and `aio_link_context` for validated explicit links.
-7. Capture substantive follow-ups with `aio_add_task` and promote durable, evidenced knowledge using `aio_promote_knowledge`.
+1. Use `aio agent dashboard` for “today”, “on my plate”, or planning questions.
+2. Use `aio agent list` for status-specific views such as `inbox`, `next`, `waiting`, `today`, or `overdue`.
+3. Use `aio agent add "<title>" [--due <date>] [--notes <markdown>]` for quick capture.
+4. Use `aio agent complete`, `aio agent start`, `aio agent defer`, or `aio agent wait` for status changes.
+5. For focused work, select one task, run `aio agent resume <id>`, and finish with `aio agent record-work <id> "<outcome>"`.
+6. Use `aio agent search`, `aio agent link-context`, and `aio agent promote-knowledge` only with evidence from the vault or current work.
+
+## Safety
+
+- Parse the JSON response; successful commands return `"ok": true`.
+- Resolve ambiguous titles before a mutation and prefer task IDs.
+- Include Why, Current state, Next action, and References in `--notes` when future context matters.
+- Promote only observed, durable knowledge. Never save secrets, transcripts, hidden reasoning, or speculation.
 
 ## Examples
 
-- "What's on my plate today?" -> `aio_get_dashboard()`
-- "Show my inbox" -> `aio_list_tasks({status: "inbox"})`
-- "Add a task to review the roadmap by Friday" -> `aio_add_task({title: "Review the roadmap", due: "friday"})`
-- "Delegate API docs to Sarah" -> `aio_add_task({title: "API docs", assign: "Sarah"})`
-- "Mark AB2C done" -> `aio_complete_task({query: "AB2C"})`
-
-The Obsidian vault is the source of truth. Do not invent task state if the MCP server can answer it.
+- “What's on my plate today?” → `aio agent dashboard`
+- “Show my inbox” → `aio agent list inbox`
+- “Add a task to review the roadmap by Friday” → `aio agent add "Review the roadmap" --due friday`
+- “Delegate API docs to Sarah” → `aio agent add "API docs" --assign Sarah`
+- “Resume AB2C” → `aio agent resume AB2C`

@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from aio.exceptions import AmbiguousMatchError, ProjectNotFoundError
+from aio.models.project import ProjectStatus
 from aio.models.task import Task, TaskStatus
 from aio.services.project import ProjectService
 from aio.services.task import TaskService
@@ -18,7 +19,31 @@ console = Console()
 
 @click.group()
 def project() -> None:
-    """View projects and their tasks."""
+    """Manage projects and their tasks."""
+
+
+@project.command("create")
+@click.argument("name")
+@click.option(
+    "--status",
+    type=click.Choice(["active", "on-hold"]),
+    default="active",
+    help="Initial project status (default: active)",
+)
+@click.option("--team", help="Optional team wikilink")
+@click.pass_context
+def create_project(
+    ctx: click.Context,
+    name: str,
+    status: str,
+    team: str | None,
+) -> None:
+    """Create a project in AIO/Projects/."""
+    project_service, _ = _services(ctx)
+    item = project_service.create(name, status=ProjectStatus(status), team=team)
+
+    console.print(f"[green]Created project:[/green] {item.title}")
+    console.print(f"  ID: [cyan]{item.id}[/cyan]")
 
 
 @project.command("list")

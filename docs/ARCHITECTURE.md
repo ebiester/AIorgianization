@@ -2,7 +2,7 @@
 
 ## System Overview
 
-AIorgianization is an Obsidian-native task and context management system for engineering managers. Tasks are stored as markdown files in the vault, managed via an Obsidian plugin for rich UI, with a CLI for quick capture and Claude integration for AI assistance.
+AIorgianization is an Obsidian-native task and context management system for engineering managers. Tasks are stored as markdown files in the vault, managed through an Obsidian plugin, a human-friendly CLI, and a JSON CLI used by chat skills.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -11,11 +11,11 @@ AIorgianization is an Obsidian-native task and context management system for eng
 └─────────────────────────────────────────────────────────────────┘
          ▲                    ▲                    ▲
          │                    │                    │
-    ┌────┴────┐          ┌────┴────┐          ┌────┴────┐
-    │Obsidian │          │   CLI   │          │  Claude │
-    │ Plugin  │          │  (aio)  │          │   MCP   │
-    │  (UI)   │          │(capture)│          │  (AI)   │
-    └─────────┘          └─────────┘          └─────────┘
+    ┌────┴────┐          ┌────┴────┐          ┌────┴──────────────┐
+    │Obsidian │          │   CLI   │          │ ChatGPT / Codex  │
+    │ Plugin  │          │  (aio)  │◄─────────│ manage-aio skill │
+    │  (UI)   │          │         │          │ local or remote  │
+    └─────────┘          └─────────┘          └───────────────────┘
 ```
 
 **Key principle:** The Obsidian vault is the single source of truth. All tools read and write markdown files. No separate database.
@@ -28,8 +28,9 @@ The CLI initializes this structure via `aio init <vault-path>`:
 
 ```
 Vault/
-├── .aio/                          # AIorgianization config & cache
-│   └── config.yaml                # Settings
+├── .aio/                          # AIorgianization config & derived cache
+│   ├── config.yaml                # Settings
+│   └── index.sqlite               # Disposable FTS5 search index
 │
 ├── AIO/                           # All AIorgianization content
 │   ├── Dashboard/                 # Daily dashboards (generated)
@@ -261,24 +262,24 @@ Migrate payment processing to new platform with zero downtime.
 
 ### Open Tasks
 ```dataview
-TABLE status, priority, due, assignedTo.file.name AS "Owner"
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status != "completed"
+TABLE WITHOUT ID file.link AS "Task", status, priority, due, assignedTo.file.name AS "Owner"
+FROM [[]]
+WHERE type = "task" AND status != "completed"
 SORT priority ASC, due ASC
 ```
 
 ### Blocked / Waiting
 ```dataview
 LIST
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status = "waiting"
+FROM [[]]
+WHERE type = "task" AND status = "waiting"
 ```
 
 ### Completed This Week
 ```dataview
 LIST
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status = "completed" AND completed >= date(today) - dur(7d)
+FROM [[]]
+WHERE type = "task" AND status = "completed" AND completed >= date(today) - dur(7d)
 ```
 
 ---
@@ -548,6 +549,7 @@ aio/
 ├── cli/                           # CLI commands (Click)
 │   ├── __init__.py
 │   ├── main.py                    # Entry point, command group
+│   ├── agent.py                   # Stable JSON interface for skills and agents
 │   ├── add.py                     # Create task file
 │   ├── list.py                    # Query task files
 │   ├── done.py                    # Move to completed
@@ -573,10 +575,6 @@ aio/
 │   ├── frontmatter.py             # YAML frontmatter parsing
 │   ├── dates.py                   # Natural language dates
 │   └── ids.py                     # 4-char ID generation
-├── mcp/                           # MCP server
-│   ├── __init__.py
-│   ├── server.py                  # MCP server implementation
-│   └── tools.py                   # Tool handlers
 └── exceptions.py                  # Custom exceptions
 ```
 
@@ -593,6 +591,14 @@ aio done <task-file-or-query>
 aio start <task>
 aio defer <task>
 aio wait <task> [person]
+
+# Machine-readable chat/agent interface
+aio agent list [filter]
+aio agent add "Task title" [options]
+aio agent complete|start|defer|wait <task-id>
+aio agent dashboard
+aio agent search|resume|record-work ...
+aio agent link-context|promote-knowledge|index-status ...
 
 # Project/people
 aio project list
@@ -691,64 +697,11 @@ This is useful for periodic cleanup (e.g., archive all completed tasks older tha
 
 ---
 
-## Claude MCP Integration
+## Chat and Agent Integration
 
-MCP server exposes vault content to Claude for AI assistance. The MCP server runs locally and is invoked by Claude Code or other MCP-compatible clients - no Anthropic API key required in the tool itself.
+The primary chat path is the reusable `skills/manage-aio/` skill. It translates natural-language task requests into `aio agent` commands. Those commands call the same service layer as the human CLI and return one JSON envelope, so the skill does not need to scrape Rich terminal output or keep a daemon running.
 
-### MCP Tools
-
-```typescript
-const tools = [
-  {
-    name: 'aio_add_task',
-    description: 'Create a task file in the vault',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string' },
-        due: { type: 'string' },
-        priority: { enum: ['P1', 'P2', 'P3', 'P4'] },
-        project: { type: 'string' },
-        contexts: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['title']
-    }
-  },
-  {
-    name: 'aio_list_tasks',
-    description: 'Query tasks from the vault',
-    inputSchema: { /* status, project, due filters */ }
-  },
-  {
-    name: 'aio_complete_task',
-    description: 'Mark a task as completed',
-    inputSchema: { /* task identifier */ }
-  },
-  {
-    name: 'aio_get_context',
-    description: 'Retrieve context pack content for AI use',
-    inputSchema: {
-      properties: {
-        packs: { type: 'array', items: { type: 'string' } }
-      }
-    }
-  }
-];
-```
-
-### MCP Resources
-
-```typescript
-const resources = [
-  { uri: 'aio://tasks/inbox', name: 'Inbox Tasks' },
-  { uri: 'aio://tasks/next', name: 'Next Actions' },
-  { uri: 'aio://tasks/waiting', name: 'Waiting For' },
-  { uri: 'aio://projects', name: 'Active Projects' },
-  { uri: 'aio://context-packs', name: 'Context Packs Index' }
-];
-```
-
----
+ChatGPT Remote Connections execute through the connected desktop host. The remote device therefore uses the host's checked-out project, installed skill, CLI, vault path, credentials, filesystem permissions, and approval policy. No separate AIO cloud service or replicated task database is introduced.
 
 ## Data Flow Examples
 
@@ -778,19 +731,16 @@ User: Right-click task → "Start working"
 5. View refreshes
 ```
 
-### AI Task Breakdown
+### Chat Task Workflow
 
 ```
-User: (via Claude) "Break down the Q4 Migration project"
+User: (via ChatGPT Desktop or Remote) "Resume the Q4 Migration task"
 
-1. Claude calls aio_get_context with project + relevant packs
-2. MCP reads:
-   - Projects/Q4-Migration.md
-   - Context-Packs/Domains/Payments.md
-   - Context-Packs/Systems/Payment-API.md
-3. Returns content to Claude
-4. Claude analyzes and suggests subtasks
-5. Claude calls aio_add_task for each confirmed subtask
+1. manage-aio resolves the task with a read-only aio agent command
+2. aio agent resume <id> assembles the task, links, backlinks, and recent work
+3. The assistant performs the requested work using the host's project and permissions
+4. aio agent record-work <id> stores the outcome and next action
+5. The markdown vault remains the only durable task record
 ```
 
 ---
@@ -802,7 +752,7 @@ User: (via Claude) "Break down the Q4 Migration project"
 | Task storage | Markdown + YAML frontmatter | Human-readable, git-friendly, Obsidian-native |
 | Plugin | TypeScript + Obsidian API | Required for Obsidian plugins |
 | CLI | Python + Click | Type-safe, excellent CLI framework |
-| MCP server | mcp (Python SDK) | Official Python SDK |
+| Chat skill | Markdown skill + JSON CLI | Natural language without a dedicated server |
 | YAML parsing | python-frontmatter | Standard for frontmatter |
 | Date parsing | dateparser | Natural language dates |
 | Data validation | Pydantic | Type-safe models with serialization |
@@ -813,8 +763,9 @@ User: (via Claude) "Break down the Q4 Migration project"
 ## Security Considerations
 
 1. **Vault permissions:** CLI respects filesystem permissions
-2. **MCP scope:** Read-only by default, write operations require explicit tool calls
-3. **No cloud sync:** All data stays local (Obsidian Sync is user's choice)
+2. **Agent scope:** Skills use exact task IDs for mutations and inherit host approvals
+3. **Remote scope:** Remote Connections inherit the connected host's credentials and permissions; keep the host secured and revoke access when unused
+4. **No AIO cloud database:** Markdown remains local unless the user separately enables a sync service
 
 ---
 

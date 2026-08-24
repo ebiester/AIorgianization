@@ -145,7 +145,7 @@ class IdIndexService:
 
         Scans all relevant directories for entity IDs:
         - Tasks: All status folders, Completed/YYYY/MM, Archive/Tasks/*
-        - Projects: Projects/, Archive/Projects/
+        - Projects/areas: Projects/, Areas/, and their archive folders
         - People: People/, Archive/People/
 
         Returns:
@@ -202,7 +202,7 @@ class IdIndexService:
                 self._scan_folder_for_ids(archive_folder, index.task_ids)
 
     def _scan_project_ids(self, index: IdIndex) -> None:
-        """Scan project locations for IDs.
+        """Scan project and area locations for IDs.
 
         Args:
             index: Index to populate with project IDs.
@@ -216,6 +216,15 @@ class IdIndexService:
         archive_projects = self.vault.archive_folder("Projects")
         if archive_projects.exists():
             self._scan_folder_for_ids(archive_projects, index.project_ids)
+
+        # Areas use the same project-like model and ID namespace.
+        areas_folder = self.vault.areas_folder()
+        if areas_folder.exists():
+            self._scan_folder_for_ids(areas_folder, index.project_ids)
+
+        archive_areas = self.vault.archive_folder("Areas")
+        if archive_areas.exists():
+            self._scan_folder_for_ids(archive_areas, index.project_ids)
 
     def _scan_person_ids(self, index: IdIndex) -> None:
         """Scan people locations for IDs.
@@ -307,6 +316,12 @@ class IdIndexService:
         )
         self._add_folder_to_fingerprint(
             self.vault.archive_folder("Projects"), fingerprint_data
+        )
+
+        # Areas share the project-like ID namespace.
+        self._add_folder_to_fingerprint(self.vault.areas_folder(), fingerprint_data)
+        self._add_folder_to_fingerprint(
+            self.vault.archive_folder("Areas"), fingerprint_data
         )
 
         # People
