@@ -63,7 +63,8 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Projects | Group tasks under projects with links, timeline, health, and CLI views | Done |
+| Projects | Group tasks under projects with links, timeline, CLI views, and live backlink-based task lists | Done |
+| Areas | Create ongoing areas with live lists of tasks that reference the area | Done |
 | Teams | Define teams and members | Done (via Person model) |
 | People | Track who you delegate to | Done |
 | Delegated view | See all tasks you've given to others | Done (`aio list waiting`) |
@@ -162,7 +163,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 | Agent CLI | Stable JSON interface under `aio agent` | Done |
 | Chat skill | Manage AIO through `skills/manage-aio/` | Done |
 | Remote workflow | Use the host CLI and vault through ChatGPT Remote Connections | Done |
-| MCP server | Optional structured adapter for MCP-only clients | Done |
 | Task breakdown | Decompose projects into actions | Not Started |
 | Context injection | Use Obsidian notes in breakdown | Done (context packs) |
 | Priority suggestions | AI-assisted daily planning | Not Started |
@@ -214,7 +214,7 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 
 ### Conversational and Remote Task Management
 
-> As an EM, I want to manage AIO through ChatGPT on my computer or a remotely connected device without operating a separate MCP server.
+> As an EM, I want to manage AIO through ChatGPT on my computer or a remotely connected device using the host CLI.
 
 **Acceptance criteria:**
 
@@ -223,7 +223,6 @@ Existing tools (Todoist, Things, OmniFocus) are designed for individual contribu
 - Mutations use an exact task ID after resolving ambiguous requests
 - Remote sessions operate against the connected host's vault and permissions
 - The host remains the source of truth; no task data is copied into a separate AIO service
-- MCP remains available for clients that cannot invoke the CLI
 
 ## Use Cases (Test Scenarios)
 
@@ -415,21 +414,21 @@ These use cases are designed to drive automated test development.
 - Subtasks inherit project from parent
 - Each subtask is actionable (has verb)
 
-### UC-013: MCP Tool Invocation
+### UC-013: Agent CLI Invocation
 
-**Preconditions:** MCP server running
+**Preconditions:** `aio` is installed and can discover the vault.
 
-| Tool Call | Expected Result |
+| Command | Expected Result |
 |-----------|-----------------|
-| `aio_add_task({title: "Test", due: "tomorrow"})` | Task created, ID returned |
-| `aio_list_tasks({status: "inbox"})` | Array of inbox tasks returned |
-| `aio_complete_task({id: "..."})` | Task completed, confirmation returned |
-| `aio_breakdown({id: "...", noteContext: "..."})` | Subtask suggestions returned |
+| `aio agent add "Test" --due tomorrow` | Task created, ID returned in JSON |
+| `aio agent list inbox` | JSON array of inbox tasks returned |
+| `aio agent complete <id>` | Task completed, confirmation returned in JSON |
+| `aio agent resume <id>` | Task context returned in JSON |
 
 **Test assertions:**
-- MCP responses match schema
-- Errors return structured error objects
-- Tool descriptions accurate
+- Successful commands return `ok: true`
+- Failures return structured JSON errors with a nonzero exit code
+- Command help and examples are accurate
 
 ### UC-014: Vault Initialization
 
@@ -663,13 +662,13 @@ These use cases are designed to drive automated test development.
 | Inbox zero | Daily | Zero inbox items at end of day |
 | Weekly review | Weekly | Review completed each week |
 | Delegation visibility | 100% | All delegated items tracked |
-| Integration adoption | 80% | Notes linked, chat skill or MCP integration used |
+| Integration adoption | 80% | Notes linked and chat skill used |
 
 ## Technical Constraints
 
 1. **Local-first**: All data in markdown files within Obsidian vault
 2. **CLI primary**: Human and JSON agent interfaces must work entirely from the terminal
-3. **Python + TypeScript**: Python for CLI/MCP, TypeScript for Obsidian plugin
+3. **Python + TypeScript**: Python for CLI, TypeScript for Obsidian plugin
 4. **No account required**: No cloud services, no login
 5. **Portable**: Markdown files in vault, git-friendly, easy backup
 

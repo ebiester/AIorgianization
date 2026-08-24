@@ -8,6 +8,7 @@ from aio.exceptions import AmbiguousMatchError, ProjectNotFoundError
 from aio.models.project import Project, ProjectStatus
 from aio.services.project import ProjectService
 from aio.services.vault import VaultService
+from aio.utils.frontmatter import read_frontmatter
 
 
 class TestProjectModel:
@@ -69,12 +70,39 @@ class TestProjectService:
         assert project.status == ProjectStatus.ACTIVE
         assert len(project.id) == 4
 
+        _, body = read_frontmatter(
+            vault_service.projects_folder() / "Q4-Migration.md"
+        )
+        assert "## Backlog" in body
+        assert "FROM [[]]" in body
+        assert 'file.link AS "Task"' in body
+        assert 'WHERE type = "task" AND status != "completed"' in body
+
     def test_create_project_with_status(self, vault_service: VaultService) -> None:
         """create should set status."""
         project_service = ProjectService(vault_service)
         project = project_service.create("Test", status=ProjectStatus.ON_HOLD)
 
         assert project.status == ProjectStatus.ON_HOLD
+
+    def test_create_area(self, vault_service: VaultService) -> None:
+        """create_area should create an area file with area metadata."""
+        project_service = ProjectService(vault_service)
+
+        area = project_service.create_area("Engineering Leadership")
+
+        assert area.title == "Engineering Leadership"
+        assert area.type == "area"
+        assert area.category == "area"
+        assert (vault_service.areas_folder() / "Engineering-Leadership.md").exists()
+        assert not (vault_service.projects_folder() / "Engineering-Leadership.md").exists()
+
+        _, body = read_frontmatter(
+            vault_service.areas_folder() / "Engineering-Leadership.md"
+        )
+        assert "## Active Tasks" in body
+        assert "## Completed Tasks" in body
+        assert body.count("FROM [[]]") == 2
 
     def test_get_project_by_id(self, vault_service: VaultService) -> None:
         """get should retrieve project by ID."""

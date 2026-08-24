@@ -15,9 +15,9 @@ The Obsidian vault is the canonical source in every test. `.aio/index.sqlite` is
 | Level | Scope | Location / command |
 |---|---|---|
 | Unit | Models, Markdown transformations, index, link handling, promotion | `tests/unit/` / `uv run pytest tests/unit` |
-| Integration | CLI commands, MCP schemas/handlers, daemon events | `tests/integration/` / `uv run pytest tests/integration` |
+| Integration | CLI commands, JSON agent command envelopes, daemon events | `tests/integration/` / `uv run pytest tests/integration` |
 | End-to-end | Complete harness task loop against a real temporary vault | `tests/e2e/` / `uv run pytest tests/e2e` |
-| UAT | Human-visible behavior in Obsidian and an MCP-capable harness | See acceptance scenarios below |
+| UAT | Human-visible behavior in Obsidian and a CLI-capable chat harness | See acceptance scenarios below |
 
 Run `uv run ruff check .`, `uv run mypy aio`, and `uv run pytest` before release.
 
@@ -50,7 +50,7 @@ Run `uv run ruff check .`, `uv run mypy aio`, and `uv run pytest` before release
 - Simulate a missed file event and assert the five-minute periodic reconciliation corrects the index.
 - Verify watcher changes outside task folders refresh derived search state without corrupting task cache data.
 
-### MCP and CLI contracts
+### CLI contracts
 
 - `aio index status`, `aio index rebuild`, and `aio index reconcile` report document count, errors/pending state, last reconciliation, and exclusions.
 - `aio_search` returns path, excerpt, entity metadata, and match reason; empty and invalid queries have clear responses.
@@ -70,7 +70,7 @@ Run `uv run ruff check .`, `uv run mypy aio`, and `uv run pytest` before release
 | Several independent follow-ups arise | Each becomes a separate task; no combined, ambiguous task is created. |
 | Work is fully complete | No unnecessary follow-up task is created. |
 | A blocker or uncertainty remains | The note captures the fact and labels uncertainty rather than inventing a conclusion. |
-| MCP unavailable | `aio add --notes` produces the same task content as `aio_add_task(notes=...)`. |
+| Chat skill capture | `aio agent add --notes` produces the expected resumable task content. |
 
 ### Context-Pack skill
 
@@ -100,7 +100,7 @@ Implement every acceptance test with a fresh `tmp_path` vault; do not use a deve
 
 1. Create `TestVault/.obsidian/`, then initialise it through `VaultService(vault).initialize()`.
 2. Create a `TaskService`, `VaultIndex`, and `OpenBrainService` using that vault service.
-3. For MCP cases, reset the MCP service registry and register the temporary `VaultService` before invoking `call_tool`.
+3. For agent-command cases, invoke `aio agent` through Click's test runner with `--vault` set to the temporary vault.
 4. Use deterministic fixture names and marker phrases below, such as `OB-unique-phrase-001`, so an assertion cannot match unrelated fixture content.
 5. Assert both the API response and the resulting Markdown/frontmatter. For index tests, also query SQLite or the index service directly where needed.
 6. Clean up only the temporary vault. Do not rely on global AIO configuration or an existing index.
@@ -163,17 +163,17 @@ Implement every acceptance test with a fresh `tmp_path` vault; do not use a deve
 6. Assert every included document has a source path and the combined returned text does not exceed the requested budget (allow only fixed response metadata outside the budget).
 7. Assert ranked related material contains an artifact matching a unique task title/tag term.
 
-### AT-OB-006: MCP contract for search and work recording
+### AT-OB-006: Agent CLI contract for search and work recording
 
-**Setup:** Register the temporary vault in the MCP `ServiceRegistry`; create and index a task plus one linked project.
+**Setup:** Create and index a task plus one linked project in the temporary vault.
 
-1. Invoke `call_tool("aio_search", {"query": "<unique phrase>"})`.
-2. Parse the returned JSON text and assert path, excerpt, entity type, and match reason exist.
-3. Invoke `aio_link_context` for the task and linked project; assert success text and the task frontmatter link.
-4. Invoke `aio_record_work` with required outcome and optional details; assert success text.
-5. Invoke `aio_resume_task` and assert its JSON response contains the new Work Log entry.
-6. Invoke `aio_index_status`; assert it reports the index path, document count, exclusions, and last reconciliation.
-7. Invoke each tool with a missing task or invalid link and assert a user-facing `Error:` response, not a traceback.
+1. Invoke `aio agent search "<unique phrase>"`.
+2. Parse the JSON response and assert path, excerpt, entity type, and match reason exist.
+3. Invoke `aio agent link-context <task-id> AIO/Projects/<project>`; assert `ok: true` and the task frontmatter link.
+4. Invoke `aio agent record-work <task-id> "Validated rollout"`; assert `ok: true`.
+5. Invoke `aio agent resume <task-id>` and assert its JSON response contains the new Work Log entry.
+6. Invoke `aio agent index-status`; assert it reports the index path, document count, exclusions, and last reconciliation.
+7. Invoke each command with a missing task or invalid link and assert an `ok: false` JSON response, not a traceback.
 
 ### AT-OB-007: Knowledge promotion is canonical and atomic
 
@@ -202,7 +202,7 @@ Implement every acceptance test with a fresh `tmp_path` vault; do not use a deve
 
 ### AT-OB-009: Action-capture skill creates a resumable follow-up
 
-**Setup:** Use an MCP test double that records `aio_add_task` arguments, or invoke the real handler against the temporary vault. Provide a conversation fixture with one unresolved approval request, current state, decision constraint, and source reference.
+**Setup:** Invoke `aio agent add` against the temporary vault. Provide a conversation fixture with one unresolved approval request, current state, decision constraint, and source reference.
 
 1. Apply the action-capture skill's workflow to the fixture.
 2. Assert one task is created with a specific verb-led title, not a generic noun phrase.
@@ -238,8 +238,8 @@ Implement every acceptance test with a fresh `tmp_path` vault; do not use a deve
 ## Release Checklist
 
 - [ ] Unit, integration, and E2E coverage added for new behavior.
-- [ ] New MCP tool schemas and error paths covered.
+- [ ] New agent-command JSON envelopes and error paths covered.
 - [ ] Daemon create/modify/atomic-save/move/delete/restart cases covered.
-- [ ] Skill scenarios exercised in an MCP-capable harness.
+- [ ] Skill scenarios exercised in a CLI-capable chat harness.
 - [ ] `uv run ruff check .`, `uv run mypy aio`, and `uv run pytest` pass.
 - [ ] Manual Obsidian review confirms no migration is required and existing files remain usable.

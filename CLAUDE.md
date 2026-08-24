@@ -153,8 +153,10 @@ aio activate <task>               # Alias for start
 aio defer <task>                  # Move to Someday
 aio wait <task> [person]          # Move to Waiting
 aio delegate <task> <person>      # Alias for wait with required person
+aio project create <project>      # Create a standalone project
 aio project list                  # Show projects with task counts
-aio project show <project>         # Show project details and tasks
+aio project show <project>        # Show project details and tasks
+aio area create <area>            # Create an ongoing area of responsibility
 
 # Stable JSON interface for skills and agents
 aio agent list [filter] [--project project]
@@ -186,6 +188,10 @@ aio archive project <project>
 aio archive tasks --before "6 months ago"
 aio archive tasks --before 2024-01-01 --dry-run
 ```
+
+New project and area notes contain Dataview sections sourced with `FROM [[]]`.
+These sections list active and completed tasks whose frontmatter wikilinks back
+to the current project or area note.
 
 ## Data Formats
 

@@ -141,6 +141,24 @@ Before running any tests:
 
 ---
 
+### UAT-006A: Direct Project and Area Creation
+
+**Objective:** Verify projects and ongoing areas can be created independently of tasks.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Run `aio project create "Q4 Migration"` | Success message includes the project name and generated ID |
+| 2 | Check `AIO/Projects/` | `Q4-Migration.md` exists with project frontmatter and active/completed backlink task queries (`FROM [[]]`) |
+| 3 | Run `aio area create "Engineering Leadership"` | Success message includes the area name and generated ID |
+| 4 | Check `AIO/Areas/` | `Engineering-Leadership.md` exists with `type: area`, `category: area`, and active/completed backlink task queries (`FROM [[]]`) |
+| 5 | Repeat either create command with the same name | Friendly error reports that the file already exists |
+| 6 | Create or link a task to each note and open the notes in Obsidian with Dataview enabled | Each task appears in the active task section of the note it references |
+| 7 | Complete those tasks and refresh the notes | Each task moves from the active query to the completed query |
+
+**Pass Criteria:** Each command creates a correctly categorized note in its canonical folder without requiring a task, and referenced tasks appear in the appropriate live query.
+
+---
+
 ### UAT-007: Quick Task Add (Combined Options)
 
 **Objective:** Verify task creation with multiple options.
@@ -172,7 +190,7 @@ Before running any tests:
 
 **Pass Criteria:** `--assign` creates task directly in Waiting status with person link. Combines correctly with other options. Fails cleanly if person doesn't exist.
 
-**MCP Equivalent:** `aio_add_task({title: "Review API", assign: "Sarah"})` should produce the same result.
+**Agent CLI equivalent:** `aio agent add "Review API" --assign Sarah` should produce the same result.
 
 ---
 
@@ -527,137 +545,6 @@ Before running any tests:
 | 2 | Run `aio plugin upgrade` | Error: "No vault found. Run 'aio init' first." |
 
 **Pass Criteria:** Clear error message with remediation.
-
----
-
-## Phase 3: MCP Server Integration
-
-### UAT-028: MCP Server Startup
-
-**Objective:** Verify MCP server can start.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Run `uv run aio-mcp` | Server starts without errors |
-| 2 | Server output | Shows available tools/resources |
-
-**Pass Criteria:** Server starts and exposes tools.
-
----
-
-### UAT-029: MCP Tool - Add Task
-
-**Objective:** Verify MCP add task tool.
-
-**Note:** This requires an MCP-capable client or test harness.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_add_task({title: "MCP Test", due: "tomorrow"})` | Returns task ID |
-| 2 | Check vault | Task file created in Inbox |
-
-**Context capture:** Call `aio_add_task({title: "Send rollout options", notes: "- Next action: send the draft"})`; the task's `## Notes` section contains the supplied Markdown.
-
-**Pass Criteria:** MCP tool creates task successfully.
-
----
-
-### UAT-029a: MCP Tool - Add Task with Assign
-
-**Objective:** Verify MCP add task tool with delegation.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Create person first: `aio_create_person({name: "Alice"})` | Person created |
-| 2 | Call `aio_add_task({title: "Delegated via MCP", assign: "Alice"})` | Returns task ID with status: waiting |
-| 3 | Response includes | "Status: waiting" and "Waiting on:" fields |
-| 4 | Check vault | Task file in `Tasks/Waiting/` (not Inbox) |
-| 5 | Call `aio_add_task({title: "Unknown person", assign: "Nobody"})` | Returns error: "Person not found" |
-
-**Pass Criteria:** MCP assign parameter creates delegated task. Fails cleanly for unknown person.
-
----
-
-### UAT-030: MCP Tool - List Tasks
-
-**Objective:** Verify MCP list tasks tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_list_tasks({status: "inbox"})` | Returns array of inbox tasks |
-| 2 | Response format | Structured task objects with id, title, due, etc. |
-
-**Pass Criteria:** MCP returns properly formatted task list.
-
----
-
-### UAT-031: MCP Tool - Complete Task
-
-**Objective:** Verify MCP complete task tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Create task via MCP or CLI | Task exists |
-| 2 | Call `aio_complete_task({id: "<task-id>"})` | Returns success |
-| 3 | Check vault | Task moved to Completed |
-
-**Pass Criteria:** MCP can complete tasks.
-
----
-
-### UAT-032: MCP Tool - Start Task
-
-**Objective:** Verify MCP start task tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_start_task({id: "<task-id>"})` | Returns success |
-| 2 | Check task status | Marked as in-progress |
-
-**Pass Criteria:** MCP can start tasks.
-
----
-
-### UAT-033: MCP Tool - Defer Task
-
-**Objective:** Verify MCP defer task tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_defer_task({id: "<task-id>"})` | Returns success |
-| 2 | Check vault | Task moved to Someday |
-
-**Pass Criteria:** MCP can defer tasks.
-
----
-
-### UAT-034: MCP Tool - Get Dashboard
-
-**Objective:** Verify MCP dashboard tool.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Call `aio_get_dashboard()` | Returns dashboard content |
-| 2 | Response includes | Overdue, Due Today, Waiting For sections |
-
-**Pass Criteria:** Dashboard content returned via MCP.
-
----
-
-### UAT-035: MCP Resources
-
-**Objective:** Verify MCP resource endpoints.
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Access `aio://tasks/inbox` | Returns inbox tasks |
-| 2 | Access `aio://tasks/next` | Returns next action tasks |
-| 3 | Access `aio://tasks/waiting` | Returns waiting tasks |
-| 4 | Access `aio://tasks/today` | Returns today + overdue tasks |
-| 5 | Access `aio://projects` | Returns project list |
-| 6 | Access `aio://dashboard` | Returns dashboard content |
-
-**Pass Criteria:** All resources return expected data.
 
 ---
 
@@ -1126,7 +1013,7 @@ Before running any tests:
 
 ### UAT-069: ChatGPT Desktop and Remote Skill
 
-**Objective:** Verify the supported chat-first workflow uses the host CLI without MCP.
+**Objective:** Verify the supported chat-first workflow uses the host CLI.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -1180,18 +1067,6 @@ Before running any tests:
 - [ ] UAT-030: Jira Sync - Status Mapping
 - [ ] UAT-031: Jira Sync - Auth Failure
 
-### Phase 4: MCP Server
-- [ ] UAT-032: MCP Server Startup
-- [ ] UAT-033: MCP Tool - Add Task
-- [ ] UAT-033a: MCP Tool - Add Task with Assign
-- [ ] UAT-034: MCP Tool - List Tasks
-- [ ] UAT-035: MCP Tool - Complete Task
-- [ ] UAT-036: MCP Tool - Start Task
-- [ ] UAT-037: MCP Tool - Defer Task
-- [ ] UAT-038: MCP Tool - Get Dashboard
-- [ ] UAT-039: MCP Tool - Jira Sync
-- [ ] UAT-040: MCP Resources
-
 ### Phase 2: Obsidian Plugin
 - [ ] UAT-041: Plugin Installation
 - [ ] UAT-042: Plugin Settings
@@ -1235,7 +1110,7 @@ Before running any tests:
 
 ## Notes
 
-1. **Test Order:** Run Phase 1 tests first as they establish the foundation. Phase 3 and 4 can be run in parallel. Phase 2 (Obsidian plugin) requires manual testing in Obsidian.
+1. **Test Order:** Run Phase 1 tests first as they establish the foundation. Phase 2 (Obsidian plugin) requires manual testing in Obsidian.
 
 2. **Test Environment:** Use a dedicated test vault separate from your production vault.
 
@@ -1243,6 +1118,4 @@ Before running any tests:
 
 4. **Known Limitations:** Some features marked as "Not Started" in PROJECT_PLAN (dependency visualization, location navigation, subtask progress) are not included in this UAT.
 
-5. **MCP Testing:** MCP tests (UAT-032 to UAT-040) require an MCP-capable client. For manual testing, use any MCP client or a test harness. MCP is optional for the primary chat workflow.
-
-6. **Remote Testing:** UAT-069 requires a ChatGPT account and workspace with Remote Connections available, plus an awake and online desktop host.
+5. **Remote Testing:** UAT-069 requires a ChatGPT account and workspace with Remote Connections available, plus an awake and online desktop host.

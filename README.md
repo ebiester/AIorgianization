@@ -12,7 +12,6 @@ There will be a blog post coming on this if anyone is interested. That said, for
 - **Obsidian-native storage**: All data is markdown files in your vault
 - **GTD workflow**: Inbox, Next, Waiting, Someday status tracking
 - **Chat-first integration**: Use the `manage-aio` skill in ChatGPT Desktop, Codex, or a Remote Connection
-- **Optional MCP integration**: Support clients that require MCP tools and resources
 - **Daily dashboards**: Generated overviews of overdue, due today, and waiting items
 - **Task-centred open brain**: Resume a task with linked context, record work, and promote durable knowledge while keeping Markdown canonical
 - **Local retrieval**: A rebuildable SQLite full-text index for vault search and backlinks
@@ -39,8 +38,6 @@ Install or link `skills/manage-aio/` on the desktop host, then use this loop loc
 3. Perform the work using the returned source paths as context.
 4. Run `aio agent record-work <id>` before ending the session.
 5. Create substantive follow-ups with `aio agent add --notes ...` and promote durable evidence with `aio agent promote-knowledge`.
-
-The MCP server exposes equivalent operations for clients that cannot invoke the CLI.
 
 There is deliberately no global active-task state: every session explicitly supplies the task it is working on.
 

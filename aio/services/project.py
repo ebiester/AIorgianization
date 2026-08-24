@@ -10,11 +10,32 @@ from aio.exceptions import AmbiguousMatchError, ProjectNotFoundError
 from aio.models.project import Project, ProjectStatus
 from aio.services.id_service import EntityType, IdService
 from aio.services.vault import VaultService
-from aio.utils import get_slug
 from aio.utils.frontmatter import read_frontmatter, write_frontmatter
 from aio.utils.ids import is_valid_id, normalize_id
 
 logger = logging.getLogger(__name__)
+
+
+def _linked_task_sections(active_heading: str, completed_heading: str) -> str:
+    """Build Dataview sections for tasks that link to the current note."""
+    return f"""## {active_heading}
+
+```dataview
+TABLE WITHOUT ID file.link AS "Task", due AS "Due", status AS "Status"
+FROM [[]]
+WHERE type = "task" AND status != "completed"
+SORT due ASC
+```
+
+## {completed_heading}
+
+```dataview
+TABLE WITHOUT ID file.link AS "Task", due AS "Due", completed AS "Completed"
+FROM [[]]
+WHERE type = "task" AND status = "completed"
+SORT completed DESC
+```
+"""
 
 
 class ProjectService:
@@ -304,57 +325,84 @@ class ProjectService:
         Returns:
             The created project.
         """
+        return self._create(name, status, team, category="project")
+
+    def create_area(
+        self,
+        name: str,
+        team: str | None = None,
+    ) -> Project:
+        """Create a new area for an ongoing responsibility.
+
+        Args:
+            name: Area name/title.
+            team: Optional team wikilink.
+
+        Returns:
+            The created area.
+        """
+        return self._create(name, ProjectStatus.ACTIVE, team, category="area")
+
+    def _create(
+        self,
+        name: str,
+        status: ProjectStatus,
+        team: str | None,
+        category: str,
+    ) -> Project:
+        """Create a project or area in its canonical vault folder."""
         self.vault.ensure_initialized()
 
         project = Project(
             id=self._id_service.generate_unique_id(EntityType.PROJECT),
+            type=category,
             title=name,
             status=status,
+            category=category,
             team=team,
             created=datetime.now(),
         )
 
-        # Generate content with Dataview queries for tasks
-        slug = get_slug(name)
-        body = f"""# {name}
+        if category == "area":
+            body = f"""# {name}
+
+## Purpose
+
+## Responsibilities
+
+## Standards
+
+## Review Cadence
+
+## Related Projects
+
+{_linked_task_sections("Active Tasks", "Completed Tasks")}
+## Notes
+"""
+            folder = self.vault.areas_folder()
+        else:
+            body = f"""# {name}
 
 ## Overview
 
 ## Goals
 
-## Backlog
-
-```dataview
-TABLE due AS "Due", status AS "Status"
-FROM "AIO/Tasks"
-WHERE contains(project, link("AIO/Projects/{slug}")) AND status != "completed"
-SORT due ASC
-```
-
-## Previous Actions
-
-```dataview
-TABLE due AS "Due", completed AS "Completed"
-FROM "AIO/Tasks"
-WHERE contains(project, link("AIO/Projects/{slug}")) AND status = "completed"
-SORT completed DESC
-```
-
+{_linked_task_sections("Backlog", "Previous Actions")}
 ## Supporting Material
 
 ## Notes
 """
+            folder = self.vault.projects_folder()
         project.body = body
 
         # Write file
-        folder = self.vault.projects_folder()
         filename = project.generate_filename()
         filepath = folder / filename
 
         if filepath.exists():
             raise FileExistsError(
-                f"Cannot create project: file already exists at {filepath}. "
-                f"Another project may have a conflicting name."
+                f"Cannot create {category}: file already exists at {filepath}. "
+                f"Another {category} may have a conflicting name."
             )
 
         write_frontmatter(filepath, project.frontmatter(), body)

@@ -2,7 +2,7 @@
 
 ## System Overview
 
-AIorgianization is an Obsidian-native task and context management system for engineering managers. Tasks are stored as markdown files in the vault, managed through an Obsidian plugin, a human-friendly CLI, and a JSON CLI used by chat skills. MCP is an optional adapter for clients that require it.
+AIorgianization is an Obsidian-native task and context management system for engineering managers. Tasks are stored as markdown files in the vault, managed through an Obsidian plugin, a human-friendly CLI, and a JSON CLI used by chat skills.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,13 +15,7 @@ AIorgianization is an Obsidian-native task and context management system for eng
     │Obsidian │          │   CLI   │          │ ChatGPT / Codex  │
     │ Plugin  │          │  (aio)  │◄─────────│ manage-aio skill │
     │  (UI)   │          │         │          │ local or remote  │
-    └─────────┘          └────┬────┘          └───────────────────┘
-                              ▲
-                              │ optional adapter
-                         ┌────┴────┐
-                         │   MCP   │
-                         │ clients │
-                         └─────────┘
+    └─────────┘          └─────────┘          └───────────────────┘
 ```
 
 **Key principle:** The Obsidian vault is the single source of truth. All tools read and write markdown files. No separate database.
@@ -268,24 +262,24 @@ Migrate payment processing to new platform with zero downtime.
 
 ### Open Tasks
 ```dataview
-TABLE status, priority, due, assignedTo.file.name AS "Owner"
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status != "completed"
+TABLE WITHOUT ID file.link AS "Task", status, priority, due, assignedTo.file.name AS "Owner"
+FROM [[]]
+WHERE type = "task" AND status != "completed"
 SORT priority ASC, due ASC
 ```
 
 ### Blocked / Waiting
 ```dataview
 LIST
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status = "waiting"
+FROM [[]]
+WHERE type = "task" AND status = "waiting"
 ```
 
 ### Completed This Week
 ```dataview
 LIST
-FROM "Tasks"
-WHERE contains(project, this.file.link) AND status = "completed" AND completed >= date(today) - dur(7d)
+FROM [[]]
+WHERE type = "task" AND status = "completed" AND completed >= date(today) - dur(7d)
 ```
 
 ---
@@ -581,10 +575,6 @@ aio/
 │   ├── frontmatter.py             # YAML frontmatter parsing
 │   ├── dates.py                   # Natural language dates
 │   └── ids.py                     # 4-char ID generation
-├── mcp/                           # MCP server
-│   ├── __init__.py
-│   ├── server.py                  # MCP server implementation
-│   └── tools.py                   # Tool handlers
 └── exceptions.py                  # Custom exceptions
 ```
 
@@ -713,65 +703,6 @@ The primary chat path is the reusable `skills/manage-aio/` skill. It translates 
 
 ChatGPT Remote Connections execute through the connected desktop host. The remote device therefore uses the host's checked-out project, installed skill, CLI, vault path, credentials, filesystem permissions, and approval policy. No separate AIO cloud service or replicated task database is introduced.
 
-### Optional MCP Adapter
-
-The MCP server exposes the same vault operations to clients that cannot invoke a local CLI or skill. It runs locally and delegates to the shared service layer; it is no longer required for the primary ChatGPT Desktop or Remote Connections workflow.
-
-### MCP Tools
-
-```typescript
-const tools = [
-  {
-    name: 'aio_add_task',
-    description: 'Create a task file in the vault',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string' },
-        due: { type: 'string' },
-        priority: { enum: ['P1', 'P2', 'P3', 'P4'] },
-        project: { type: 'string' },
-        contexts: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['title']
-    }
-  },
-  {
-    name: 'aio_list_tasks',
-    description: 'Query tasks from the vault',
-    inputSchema: { /* status, project, due filters */ }
-  },
-  {
-    name: 'aio_complete_task',
-    description: 'Mark a task as completed',
-    inputSchema: { /* task identifier */ }
-  },
-  {
-    name: 'aio_get_context',
-    description: 'Retrieve context pack content for AI use',
-    inputSchema: {
-      properties: {
-        packs: { type: 'array', items: { type: 'string' } }
-      }
-    }
-  }
-];
-```
-
-### MCP Resources
-
-```typescript
-const resources = [
-  { uri: 'aio://tasks/inbox', name: 'Inbox Tasks' },
-  { uri: 'aio://tasks/next', name: 'Next Actions' },
-  { uri: 'aio://tasks/waiting', name: 'Waiting For' },
-  { uri: 'aio://projects', name: 'Active Projects' },
-  { uri: 'aio://context-packs', name: 'Context Packs Index' }
-];
-```
-
----
-
 ## Data Flow Examples
 
 ### Quick Add (CLI)
@@ -822,7 +753,6 @@ User: (via ChatGPT Desktop or Remote) "Resume the Q4 Migration task"
 | Plugin | TypeScript + Obsidian API | Required for Obsidian plugins |
 | CLI | Python + Click | Type-safe, excellent CLI framework |
 | Chat skill | Markdown skill + JSON CLI | Natural language without a dedicated server |
-| MCP server | mcp (Python SDK) | Official Python SDK |
 | YAML parsing | python-frontmatter | Standard for frontmatter |
 | Date parsing | dateparser | Natural language dates |
 | Data validation | Pydantic | Type-safe models with serialization |
@@ -835,8 +765,7 @@ User: (via ChatGPT Desktop or Remote) "Resume the Q4 Migration task"
 1. **Vault permissions:** CLI respects filesystem permissions
 2. **Agent scope:** Skills use exact task IDs for mutations and inherit host approvals
 3. **Remote scope:** Remote Connections inherit the connected host's credentials and permissions; keep the host secured and revoke access when unused
-4. **MCP scope:** Write operations require explicit tool calls from the client
-5. **No AIO cloud database:** Markdown remains local unless the user separately enables a sync service
+4. **No AIO cloud database:** Markdown remains local unless the user separately enables a sync service
 
 ---
 

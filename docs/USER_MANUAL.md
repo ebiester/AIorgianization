@@ -84,49 +84,9 @@ The plugin is installed automatically when you run `aio init`. To install manual
 2. Restart Obsidian
 3. Enable the "AIorgianization" plugin in Settings → Community plugins
 
-### Install the MCP Server (Optional)
+### Use with ChatGPT Desktop and Remote Connections
 
-The MCP server allows any MCP-capable AI assistant or client to interact with your vault.
-
-#### For Claude Code
-
-Add to `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "aio": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
-      "env": {
-        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
-    }
-  }
-}
-```
-
-#### For Cursor
-
-Add to `~/.cursor/mcp.json` or `.cursor/mcp.json` in your project:
-
-```json
-{
-  "mcpServers": {
-    "aio": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
-      "env": {
-        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
-    }
-  }
-}
-```
-
-#### For ChatGPT Desktop and Remote Connections
-
-The recommended ChatGPT workflow uses the installed AIO CLI through a reusable skill. It does not require the MCP server, a tunnel, or a second long-running process.
+The ChatGPT workflow uses the installed AIO CLI through a reusable skill. It does not require a tunnel or a second long-running process.
 
 1. Confirm that `aio` is installed and can find the vault:
 
@@ -151,30 +111,7 @@ The recommended ChatGPT workflow uses the installed AIO CLI through a reusable s
 
 A remote task uses the connected computer's project files, installed skill, CLI, environment, credentials, and approval settings. The vault remains the source of truth on that computer. A normal ChatGPT conversation that is not connected to the host cannot run the local CLI.
 
-See OpenAI's [Remote Connections guide](https://learn.chatgpt.com/docs/remote-connections) and [Skills guide](https://learn.chatgpt.com/docs/build-skills) for current product requirements and availability. The MCP server remains available for clients that cannot run skills or shell commands directly.
-
-#### For Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "aio": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/AIorgianization", "aio-mcp"],
-      "env": {
-        "AIO_VAULT_PATH": "/path/to/your/obsidian/vault"
-      }
-    }
-  }
-}
-```
-
-**Configuration notes:**
-- Replace `/path/to/AIorgianization` with the actual path to this repository
-- Replace `/path/to/your/obsidian/vault` with the path to your Obsidian vault
-- Restart your MCP client after updating the configuration
+See OpenAI's [Remote Connections guide](https://learn.chatgpt.com/docs/remote-connections) and [Skills guide](https://learn.chatgpt.com/docs/build-skills) for current product requirements and availability.
 
 ---
 
@@ -412,9 +349,19 @@ aio list overdue      # Past due date
 ### Project Views
 
 ```bash
+aio project create "Q4 Migration"  # Create a standalone project
 aio project list                  # Project summary with task counts
 aio project show "Q4 Migration"   # Project details and related tasks
+aio area create "Engineering"     # Create an ongoing area of responsibility
 ```
+
+Use a project for work with a defined outcome or end point. Use an area for an
+ongoing responsibility such as Engineering Leadership, Hiring, or Operations.
+Projects are saved under `AIO/Projects/`; areas are saved under `AIO/Areas/`.
+Both note templates include active and completed task sections powered by
+Dataview's current-note backlink source (`FROM [[]]`). A task appears
+automatically when its `project` or `context` frontmatter contains a wikilink to
+that project or area; no task list in the note needs to be maintained manually.
 
 ### Changing Status
 
@@ -492,66 +439,33 @@ The daemon watches the vault, debounces Markdown changes, and reconciles the ind
 
 ChatGPT Desktop runs AIO through the `manage-aio` skill and the `aio agent` commands. Remote Connections extend that same host session to another device; they do not move or duplicate the vault. This is the primary chat integration.
 
-### Optional MCP Server Integration
+### Agent CLI Reference
 
-The MCP server allows AI assistants to interact with your vault programmatically.
+Chat skills use `aio agent` and consume its JSON response. Successful commands return `"ok": true`; failures return `"ok": false` with structured error details.
 
-#### Starting the Server
+| Command | Purpose |
+|---|---|
+| `aio agent dashboard` | Generate a dashboard as JSON |
+| `aio agent list [filter]` | List tasks, including `inbox`, `next`, `waiting`, `today`, and `overdue` |
+| `aio agent add "Title" --notes "…"` | Create a resumable task |
+| `aio agent start\|complete\|defer <id>` | Change task status |
+| `aio agent wait <id> [person]` | Move a task to Waiting |
+| `aio agent search "query"` | Search indexed vault content |
+| `aio agent resume <id>` | Assemble linked task context |
+| `aio agent link-context <id> <path>…` | Add validated context links |
+| `aio agent record-work <id> "outcome"` | Append a structured task work log |
+| `aio agent promote-knowledge <id> <target> …` | Promote durable knowledge with provenance |
+| `aio agent index-status` | Inspect search index health |
+
+Examples:
 
 ```bash
-uv run aio-mcp
+aio agent dashboard
+aio agent add "Review the rollout plan" --due friday --notes "- Next action: send approval request"
+aio agent resume AB2C
+aio agent record-work AB2C "Validated staged rollout" --next-action "Publish release notes"
+aio agent promote-knowledge AB2C "Staged rollout" --category adr --content "Use staged rollout."
 ```
-
-Or if installed globally:
-```bash
-aio-mcp
-```
-
-#### Available MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `aio_add_task` | Create a new task with optional due date, project, delegation, and Markdown notes |
-| `aio_list_tasks` | List tasks filtered by status or project |
-| `aio_complete_task` | Mark a task as completed |
-| `aio_start_task` | Move a task to Next status |
-| `aio_defer_task` | Move a task to Someday status |
-| `aio_get_dashboard` | Get today's dashboard content |
-| `aio_get_context` | Retrieve context pack content |
-| `aio_list_context_packs` | List available context packs by category |
-| `aio_create_context_pack` | Create a new context pack |
-| `aio_add_to_context_pack` | Append content to an existing context pack |
-| `aio_add_file_to_context_pack` | Copy a file's content into a context pack |
-| `aio_search` | Search indexed vault content by text and optional scope |
-| `aio_resume_task` | Assemble a selected task's links, backlinks, work log, and related material |
-| `aio_link_context` | Add validated vault wikilinks to a task's context |
-| `aio_record_work` | Append a structured work-log entry to a task |
-| `aio_promote_knowledge` | Create or update a canonical note with task provenance |
-| `aio_index_status` | Return derived index health to an MCP harness |
-
-#### Available MCP Resources
-
-| Resource URI | Content |
-|--------------|---------|
-| `aio://tasks/inbox` | Current inbox tasks |
-| `aio://tasks/next` | Next actions |
-| `aio://tasks/waiting` | Waiting-for items |
-| `aio://tasks/today` | Tasks due today + overdue |
-| `aio://projects` | Active projects list |
-| `aio://dashboard` | Today's dashboard |
-
-#### Example Usage
-
-Once configured, you can ask your AI assistant:
-
-- "What's on my plate today?" → Uses `aio_get_dashboard`
-- "Add a task to review the PR by Friday" → Uses `aio_add_task`
-- "Add a task for Sarah to update the docs" → Uses `aio_add_task` with `assign`
-- "Remember to send the rollout options to Sam" → Uses `aio_add_task` with `notes`
-- "Find the rollout decision" → Uses `aio_search`
-- "Resume task AB2C" → Uses `aio_resume_task`, then records work before finishing
-- "Show my inbox" → Uses `aio_list_tasks`
-- "Mark the auth bug task as done" → Uses `aio_complete_task`
 
 ---
 
@@ -746,7 +660,7 @@ Set these up in Obsidian's hotkey settings:
 
 ### Running Tests
 
-The project includes a comprehensive test runner that orchestrates Python, TypeScript, and MCP server tests:
+The project includes a comprehensive test runner that orchestrates Python and TypeScript tests:
 
 ```bash
 # Run all tests
@@ -755,7 +669,6 @@ The project includes a comprehensive test runner that orchestrates Python, TypeS
 # Run specific test suites
 ./scripts/test/run-tests.sh --python-only      # Python tests only
 ./scripts/test/run-tests.sh --typescript-only  # TypeScript plugin tests only
-./scripts/test/run-tests.sh --mcp-only         # MCP server protocol tests only
 
 # Additional options
 ./scripts/test/run-tests.sh --skip-coverage    # Skip coverage generation
@@ -835,28 +748,6 @@ Ensure the task's `project` field uses wikilink syntax:
 project: "[[Projects/Q4-Migration]]"
 ```
 
-### MCP Issues
-
-**Server not starting**
-- Verify `uv` is installed and in your PATH
-- Check the directory path in the configuration is correct
-- Try running `uv run aio-mcp` manually to see error messages
-
-**Vault not found**
-- Ensure `AIO_VAULT_PATH` points to a valid Obsidian vault
-- The vault must have been initialized with `aio init`
-
-**Tools not appearing**
-- Restart your MCP client after configuration changes
-- Check your client's logs for connection errors
-
-**Stale data from MCP server**
-- The MCP server loads vault data once at startup and does not watch for file changes
-- If you edit tasks in Obsidian and the MCP server shows stale data, restart the MCP server
-- This is by design since MCP requests are stateless
-
----
-
 ## Reference
 
 ### File Locations
@@ -889,6 +780,6 @@ Your dashboard shows:
 | **Waiting For** | Delegated tasks, grouped by person |
 | **Team Load** | Active tasks per person |
 | **Quick Links** | Jump to common views |
-# Task-centered open brain
+## Task-Centered Open Brain
 
-Use `aio index rebuild` to create the local, disposable search index, `aio index reconcile` after bulk external edits, and `aio index status` to inspect its health. MCP harnesses can search (`aio_search`), assemble one task's context (`aio_resume_task`), link context (`aio_link_context`), record work (`aio_record_work`), and promote durable knowledge (`aio_promote_knowledge`). Existing task files remain valid; `context`, `lastWorked`, and `## Work Log` are added only when used.
+Use `aio index rebuild` to create the local, disposable search index, `aio index reconcile` after bulk external edits, and `aio index status` to inspect its health. Chat skills use `aio agent search`, `aio agent resume`, `aio agent link-context`, `aio agent record-work`, and `aio agent promote-knowledge`. Existing task files remain valid; `context`, `lastWorked`, and `## Work Log` are added only when used.

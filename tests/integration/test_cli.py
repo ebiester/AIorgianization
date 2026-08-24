@@ -395,6 +395,18 @@ class TestProjectCommand:
     """Tests for aio project commands."""
 
     @pytest.mark.uat("UAT-006")
+    def test_project_create(self, runner: CliRunner, initialized_vault: Path) -> None:
+        """project create should create a standalone project."""
+        result = runner.invoke(
+            cli,
+            ["--vault", str(initialized_vault), "project", "create", "Roadmap"],
+        )
+
+        assert result.exit_code == 0
+        assert "Created project: Roadmap" in result.output
+        assert (initialized_vault / "AIO" / "Projects" / "Roadmap.md").exists()
+
+    @pytest.mark.uat("UAT-006")
     def test_project_list(self, runner: CliRunner, initialized_vault: Path) -> None:
         """project list should show projects with task counts."""
         create_result = runner.invoke(
@@ -439,6 +451,34 @@ class TestProjectCommand:
         assert result.exit_code == 0
         assert "Q4 Migration" in result.output
         assert "Review spec" in result.output
+
+
+class TestAreaCommand:
+    """Tests for aio area commands."""
+
+    def test_area_create(self, runner: CliRunner, initialized_vault: Path) -> None:
+        """area create should create an area in the Areas folder."""
+        result = runner.invoke(
+            cli,
+            [
+                "--vault",
+                str(initialized_vault),
+                "area",
+                "create",
+                "Engineering Leadership",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Created area: Engineering Leadership" in result.output
+        area_file = (
+            initialized_vault
+            / "AIO"
+            / "Areas"
+            / "Engineering-Leadership.md"
+        )
+        assert area_file.exists()
+        assert "category: area" in area_file.read_text(encoding="utf-8")
 
 
 class TestFileCommands:
